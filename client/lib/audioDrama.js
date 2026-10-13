@@ -381,9 +381,19 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       }));
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
-      fail(error.message || (lang === 'bn'
-        ? 'ElevenLabs-এর অডিও Cloudinary-তে তৈরি বা সংরক্ষণ করা যায়নি।'
-        : 'ElevenLabs audio could not be generated or saved to Cloudinary.'));
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        onNotice(lang === 'bn' ? '🌿 ডিভাইসের বিল্ট-ইন কণ্ঠে গল্প চালানো হচ্ছে' : '🌿 Playing using built-in device voice');
+        const utterance = new window.SpeechSynthesisUtterance(line.text);
+        utterance.lang = /[\u0980-\u09ff]/.test(line.text) ? 'bn-BD' : 'en-US';
+        utterance.rate = line.rate || 1;
+        utterance.pitch = line.pitch || 1;
+        utterance.volume = currentVolume;
+        utterance.onend = () => finish(id);
+        utterance.onerror = () => finish(id);
+        window.speechSynthesis.speak(utterance);
+        return;
+      }
+      fail(error.message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play audio.'));
     }
   };
 
