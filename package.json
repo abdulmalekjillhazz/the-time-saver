@@ -1,0 +1,40 @@
+{
+  "name": "smart-routine",
+  "version": "1.0.0-rc.1",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "server",
+    "client",
+    "shared"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "test": "npm test --workspaces --if-present",
+    "test:unit": "npm run test:unit --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "test:integration": "npm run test:integration -w server",
+    "lint": "eslint .",
+    "build": "npm run build --workspaces --if-present",
+    "audit": "npm audit --audit-level=high"
+  },
+  "dependencies": {
+    "@sentry/node": "^11.7.0",
+    "next": "^16.4.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "vite": "^8.3.4"
+  },
+  "overrides": {
+    "braces": "3.0.3",
+    "micromatch": "4.0.8",
+    "postcss": "^8.4.49",
+    "postcss-selector-parser": "^7.1.6"
+  }
+}
