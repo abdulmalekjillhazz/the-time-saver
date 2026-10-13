@@ -90,3 +90,32 @@ export function createApp({ config }) {
   app.use(errorHandler);
   return app;
 }
+
+// Default export for Vercel and Serverless environments
+let serverlessApp = null;
+
+export default async function handler(req, res) {
+  if (!serverlessApp) {
+    try {
+      const { loadEnv } = await import('./config/env.js');
+      const mongooseModule = await import('mongoose');
+      const mongoose = mongooseModule.default || mongooseModule;
+      const config = loadEnv();
+      if (mongoose.connection.readyState === 0 && config.MONGODB_URI) {
+        await mongoose.connect(config.MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
+      }
+      serverlessApp = createApp({ config });
+    } catch {
+      serverlessApp = createApp({
+        config: {
+          NODE_ENV: process.env.NODE_ENV || 'production',
+          CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || 'http://localhost:3000',
+          PORT: Number(process.env.PORT) || 5000,
+          MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/smart-routine',
+          SCHEDULER_ENABLED: false,
+        },
+      });
+    }
+  }
+  return serverlessApp(req, res);
+}
