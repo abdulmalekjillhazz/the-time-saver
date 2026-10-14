@@ -1,24 +1,12 @@
 'use client';
-import { TelegramSettingsCard } from './TelegramSettingsCard.jsx';
-
-import { HabitCirclesCard } from './HabitCirclesCard.jsx';
-import { PrayerTimesCard } from './PrayerTimesCard.jsx';
-import { GamificationBar } from './GamificationBar.jsx';
-import { VoiceBriefingModal } from './VoiceBriefingModal.jsx';
-import { EveningReflectionModal } from './EveningReflectionModal.jsx';
-import { HeatmapGrid } from './HeatmapGrid.jsx';
-import { BadgesShowcase } from './BadgesShowcase.jsx';
-import { AdaptiveReplanModal } from './AdaptiveReplanModal.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Script from 'next/script';
 import { predictMissProbability, routineFeatures, TRAINING_CONSENT_VERSION, todayInZone } from '@smart-routine/shared';
 import { enqueueAndFlush } from '../lib/outboxClient.js';
 import { useAppStore } from '../lib/appStore.js';
 import { answerWithLocalModel } from '../lib/localAssistant.js';
 import { apiRequest } from '../lib/apiClient.js';
-import { RoutineDashboard } from './RoutineDashboard.jsx';
-import { GoalToRoutine } from './GoalToRoutine.jsx';
-import { TemplatePicker } from './TemplatePicker.jsx';
 import { base64UrlToBytes, bengaliCalendarMonthRange, buildCalendarDays } from '../lib/calendar.js';
 import { getRoutineMood } from '../lib/routineMood.js';
 import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
@@ -30,8 +18,21 @@ import { Button } from './ui/Button.jsx';
 import { Card } from './ui/Card.jsx';
 import { StatusChip } from './ui/StatusChip.jsx';
 import { SyncStatus } from './SyncStatus.jsx';
-import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
-import { DailyLessonCard } from './DailyLessonCard.jsx';
+
+const TelegramSettingsCard = dynamic(() => import('./TelegramSettingsCard.jsx').then((m) => m.TelegramSettingsCard), { ssr: false });
+const HabitCirclesCard = dynamic(() => import('./HabitCirclesCard.jsx').then((m) => m.HabitCirclesCard), { ssr: false });
+const PrayerTimesCard = dynamic(() => import('./PrayerTimesCard.jsx').then((m) => m.PrayerTimesCard), { ssr: false });
+const GamificationBar = dynamic(() => import('./GamificationBar.jsx').then((m) => m.GamificationBar), { ssr: false });
+const VoiceBriefingModal = dynamic(() => import('./VoiceBriefingModal.jsx').then((m) => m.VoiceBriefingModal), { ssr: false });
+const EveningReflectionModal = dynamic(() => import('./EveningReflectionModal.jsx').then((m) => m.EveningReflectionModal), { ssr: false });
+const HeatmapGrid = dynamic(() => import('./HeatmapGrid.jsx').then((m) => m.HeatmapGrid), { ssr: false });
+const BadgesShowcase = dynamic(() => import('./BadgesShowcase.jsx').then((m) => m.BadgesShowcase), { ssr: false });
+const AdaptiveReplanModal = dynamic(() => import('./AdaptiveReplanModal.jsx').then((m) => m.AdaptiveReplanModal), { ssr: false });
+const RoutineDashboard = dynamic(() => import('./RoutineDashboard.jsx').then((m) => m.RoutineDashboard), { ssr: false });
+const GoalToRoutine = dynamic(() => import('./GoalToRoutine.jsx').then((m) => m.GoalToRoutine), { ssr: false });
+const TemplatePicker = dynamic(() => import('./TemplatePicker.jsx').then((m) => m.TemplatePicker), { ssr: false });
+const AudioDramaPlayer = dynamic(() => import('./AudioDramaPlayer.jsx').then((m) => m.AudioDramaPlayer), { ssr: false });
+const DailyLessonCard = dynamic(() => import('./DailyLessonCard.jsx').then((m) => m.DailyLessonCard), { ssr: false });
 import { ProfileAvatar, ProfileAvatarPicker } from './ProfileAvatar.jsx';
 import { TodayProgressCard } from './TodayProgressCard.jsx';
 import { PrayerAnchorSelector } from './PrayerAnchorSelector.jsx';
@@ -532,7 +533,6 @@ export function PrivateApp() {
   }, []);
 
   useEffect(() => {
-    if (!uiReady) return undefined;
     let active = true;
     request('/api/me')
       .then(({ user: currentUser }) => {
@@ -551,7 +551,7 @@ export function PrivateApp() {
         if (active) setAuthReady(true);
       });
     return () => { active = false; };
-  }, [uiReady, setStoredLanguage]);
+  }, [setStoredLanguage]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -1200,7 +1200,6 @@ export function PrivateApp() {
     }
   }
 
-  if (!authReady) return <main className="mx-auto max-w-4xl"><p role="status">{copy.loading}</p></main>;
   if (!user) {
     return (
       <main className="app-shell mx-auto my-6 max-w-md space-y-5 rounded-[2rem] p-4 sm:my-10 sm:p-7">
@@ -1253,7 +1252,7 @@ export function PrivateApp() {
           </div>
         </header>
 
-        <Card as="form" className="surface-card space-y-5 rounded-3xl p-6 sm:p-7" onSubmit={authenticate}>
+        <Card as="form" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" className="surface-card space-y-5 rounded-3xl p-6 sm:p-7" onSubmit={authenticate}>
           <div className="grid grid-cols-2 gap-2 rounded-2xl border border-gold/25 bg-paper/60 p-1.5">
             <button
               type="button"
