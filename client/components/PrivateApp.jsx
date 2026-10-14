@@ -317,13 +317,19 @@ function GoogleSignInButton({ clientId, lang, disabled, onCredential }) {
   const buttonRef = useRef(null);
   const wrapperRef = useRef(null);
   const credentialHandler = useRef(onCredential);
+  const lastRenderKeyRef = useRef('');
   credentialHandler.current = onCredential;
 
   const renderGoogleButton = useCallback(() => {
     const googleAccounts = globalThis.google?.accounts?.id;
     if (!googleAccounts || !buttonRef.current) return;
     const availableWidth = wrapperRef.current?.clientWidth || 320;
-    const buttonWidth = Math.max(200, Math.min(400, Math.floor(availableWidth)));
+    const buttonWidth = Math.max(200, Math.min(380, Math.floor(availableWidth)));
+    const renderKey = `${clientId}:${lang}:${buttonWidth}`;
+    if (lastRenderKeyRef.current === renderKey && buttonRef.current.childElementCount > 0) {
+      return;
+    }
+    lastRenderKeyRef.current = renderKey;
     buttonRef.current.replaceChildren();
     googleAccounts.initialize({
       client_id: clientId,
@@ -343,19 +349,8 @@ function GoogleSignInButton({ clientId, lang, disabled, onCredential }) {
   }, [clientId, lang]);
 
   useEffect(() => {
+    lastRenderKeyRef.current = '';
     renderGoogleButton();
-    const wrapper = wrapperRef.current;
-    if (!wrapper || typeof ResizeObserver === 'undefined') return undefined;
-    let debounce = null;
-    const observer = new ResizeObserver(() => {
-      if (debounce) window.clearTimeout(debounce);
-      debounce = window.setTimeout(renderGoogleButton, 150);
-    });
-    observer.observe(wrapper);
-    return () => {
-      observer.disconnect();
-      if (debounce) window.clearTimeout(debounce);
-    };
   }, [renderGoogleButton]);
 
   return (
@@ -365,12 +360,12 @@ function GoogleSignInButton({ clientId, lang, disabled, onCredential }) {
         strategy="afterInteractive"
         onReady={renderGoogleButton}
       />
-      <div ref={wrapperRef} className="w-full min-w-[200px] max-w-[400px]">
+      <div ref={wrapperRef} className="mx-auto flex min-h-[44px] w-full min-w-[200px] max-w-[380px] items-center justify-center">
         <div
           ref={buttonRef}
           aria-label={lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}
           aria-disabled={disabled}
-          className={`flex w-full justify-center overflow-hidden ${disabled ? 'pointer-events-none opacity-60' : ''}`}
+          className={`flex min-h-[44px] w-full items-center justify-center overflow-hidden ${disabled ? 'pointer-events-none opacity-60' : ''}`}
         />
       </div>
     </>
