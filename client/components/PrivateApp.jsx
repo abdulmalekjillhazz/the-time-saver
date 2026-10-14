@@ -35,6 +35,7 @@ const AudioDramaPlayer = dynamic(() => import('./AudioDramaPlayer.jsx').then((m)
 const DailyLessonCard = dynamic(() => import('./DailyLessonCard.jsx').then((m) => m.DailyLessonCard), { ssr: false });
 import { ProfileAvatar, ProfileAvatarPicker } from './ProfileAvatar.jsx';
 import { TodayProgressCard } from './TodayProgressCard.jsx';
+import { StoryReader } from './StoryReader.jsx';
 import { PrayerAnchorSelector } from './PrayerAnchorSelector.jsx';
 import { formatNaturalTime } from '../lib/prayerAnchors.js';
 
@@ -1420,6 +1421,10 @@ export function PrivateApp() {
         ))}
       </nav>
 
+      <div className={tab === 'today' ? 'block' : 'hidden'}>
+        <PrayerTimesCard lang={lang} />
+      </div>
+
       {tab === 'dashboard' ? (
         <section className="space-y-4">
           <GamificationBar lang={lang} />
@@ -1442,7 +1447,7 @@ export function PrivateApp() {
             }}
           />
 
-          <PrayerTimesCard lang={lang} />
+          {/* PrayerTimesCard is mounted above tabs so Azan stays active */}
 
           {reminders.length ? (
             <Card className="border-gold bg-gold-soft" role="status">
@@ -1683,15 +1688,7 @@ export function PrivateApp() {
             </div>
           </details>
 
-          <details className="surface-card group rounded-2xl p-4 transition">
-            <summary className="cursor-pointer font-bold text-ink flex items-center justify-between list-none">
-              <span className="flex items-center gap-2">
-                <span aria-hidden="true">⏱️</span>
-                <span>{lang === 'bn' ? 'ফোকাস টাইমার ও অ্যালার্ম' : 'Focus Stopwatch & Alarms'}</span>
-              </span>
-              <span className="text-xs font-semibold text-sapphire group-open:rotate-180 transition-transform">▼</span>
-            </summary>
-            <div className="mt-4 pt-3 border-t border-sapphire/15">
+          <div id="alarm-section-card" className="scroll-mt-6">
               <section className="grid gap-4 lg:grid-cols-2">
             <Card className="surface-card space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1764,8 +1761,7 @@ export function PrivateApp() {
               </ul>
             </Card>
           </section>
-            </div>
-          </details>
+          </div>
         </section>
       ) : null}
 
@@ -1773,23 +1769,58 @@ export function PrivateApp() {
         <section className="space-y-4">
           {dailyLesson ? <DailyLessonCard dailyLesson={dailyLesson} quiz={dailyQuiz} lang={lang} /> : null}
           {lessons.length ? (
-            <div className="grid gap-4 md:grid-cols-[minmax(220px,1fr)_2fr]">
-              <Card className="space-y-3">
-                <h2 className="text-2xl font-semibold">{copy.lessons}</h2>
-                {lessons.map((item) => (
-                  <div key={item.slug} className="flex items-center justify-between gap-2">
-                    <span>{localized(item.title, lang)}</span>
-                    <Button variant="secondary" disabled={busy} onClick={() => loadLesson(item.slug)}>{copy.read}</Button>
-                  </div>
-                ))}
+            <div className="space-y-4">
+              <Card className="surface-card space-y-3 p-4 sm:p-6">
+                <h2 className="text-xl font-extrabold text-gold-soft">{copy.lessons}</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {lessons.map((item) => (
+                    <div key={item.slug} className="rounded-xl border border-gold/35 bg-paper p-3.5 flex flex-col justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-sapphire">
+                          📖 {lang === 'bn' ? 'গল্প ও কুইজ' : 'Story & Quiz'}
+                        </p>
+                        <h3 className="mt-1 text-base font-bold text-ink">{localized(item.title, lang)}</h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="primary"
+                          className="flex min-h-[42px] w-full items-center justify-center text-xs font-bold"
+                          disabled={busy}
+                          onClick={() => loadLesson(item.slug)}
+                        >
+                          📖 {copy.read}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="flex min-h-[42px] w-full items-center justify-center text-xs font-bold"
+                          disabled={busy}
+                          onClick={() => loadLesson(item.slug)}
+                        >
+                          🧩 {copy.quiz}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </Card>
-              <Card className="space-y-4">
+              <Card className="surface-card space-y-4 p-4 sm:p-6">
                 {!lesson ? <p>{copy.chooseLesson}</p> : (
                   <>
-                    <h2 className="text-2xl font-semibold">{localized(lesson.title, lang)}</h2>
-                    <p className="whitespace-pre-wrap">{localized(lesson.body, lang)}</p>
+                    <div className="rounded-xl border-2 border-gold/40 bg-paper p-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-gold-soft">
+                        📖 {lang === 'bn' ? 'নির্বাচিত গল্প ও কুইজ' : 'Selected Story & Quiz'}
+                      </p>
+                      <h2 className="mt-1 text-xl font-extrabold text-ink sm:text-2xl">{localized(lesson.title, lang)}</h2>
+                    </div>
+                    <StoryReader
+                      lines={String(localized(lesson.body, lang) || '').split(/\r?\n/).filter(Boolean).map((line) => {
+                        const match = line.match(/^\[([^\]]+)\]\s*:\s*(.*)$/);
+                        return match ? { speaker: match[1], text: match[2] } : { speaker: null, text: line };
+                      })}
+                      vocabulary={lesson.vocabulary || []}
+                      lang={lang}
+                    />
                     <AudioDramaPlayer title={localized(lesson.title, lang)} content={localized(lesson.body, lang)} lang={lang} />
-                    {lesson.vocabulary?.length ? <ul className="list-inside list-disc">{lesson.vocabulary.map((item) => <li key={item.word}>{item.word}: {localized(item.meaning, lang)}</li>)}</ul> : null}
                     {lesson.quiz?.length ? (
                       <div className="space-y-4">
                         <h3 className="text-xl font-semibold">{copy.quiz}</h3>

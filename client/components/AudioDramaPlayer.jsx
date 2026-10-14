@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { parseStoryScript, playDrama } from '../lib/audioDrama.js';
+import { fetchOnlineWordMeaning, normalizeWord } from './StoryReader.jsx';
 
 function characterIcon(role) {
   if (role === 'male') return '👨';
@@ -10,8 +11,8 @@ function characterIcon(role) {
   return '🎙️';
 }
 
-export function spokenTextParts(text, fraction, completed) {
-  const parts = text.split(/(\s+)/);
+export function spokenTextParts(text, fraction, completed, onWordClick, selectedTerm = '') {
+  const parts = String(text || '').split(/(\s+)/);
   const wordCount = parts.filter((part) => /\S/.test(part)).length;
   const revealedWords = completed
     ? wordCount
@@ -24,10 +25,38 @@ export function spokenTextParts(text, fraction, completed) {
     if (!/\S/.test(part)) return part;
     wordIndex += 1;
     const highlighted = wordIndex <= revealedWords;
-    return React.createElement('span', {
-      key: index,
-      className: highlighted ? 'rounded bg-gold/40 px-0.5 text-ink' : undefined,
-    }, part);
+    const clean = normalizeWord(part);
+    const isSelected = Boolean(selectedTerm && clean && selectedTerm === clean);
+
+    const baseClass = highlighted ? 'rounded bg-gold/40 px-0.5 text-ink' : undefined;
+    if (!onWordClick) {
+      return React.createElement('span', {
+        key: index,
+        className: baseClass,
+      }, part);
+    }
+
+    return React.createElement(
+      'span',
+      {
+        key: index,
+        role: 'button',
+        tabIndex: 0,
+        onClick: () => onWordClick(part),
+        onKeyDown: (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onWordClick(part);
+          }
+        },
+        className: [
+          baseClass || 'rounded px-0.5',
+          'cursor-pointer underline decoration-dotted decoration-gold/50 underline-offset-4 transition hover:bg-gold/30',
+          isSelected ? 'bg-gold text-on-gold font-extrabold ring-2 ring-gold' : '',
+        ].filter(Boolean).join(' '),
+      },
+      part
+    );
   });
 }
 
@@ -41,6 +70,8 @@ export function AudioDramaPlayer({ title = '', content = '', lang = 'bn', onClos
   const [source, setSource] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [selectedWord, setSelectedWord] = useState(null);
   const controllerRef = useRef(null);
   const lineRefs = useRef([]);
   const isPlayingRef = useRef(false);
@@ -63,9 +94,28 @@ export function AudioDramaPlayer({ title = '', content = '', lang = 'bn', onClos
     relaxing: isBn ? '🌿 আরাম করে শুনুন — গল্প চলছে' : '🌿 Sit back and relax — story playing',
     ready: isBn ? '🌿 গল্প প্রস্তুত — শুনতে চাপ দিন' : '🌿 Story ready — press play to listen',
     friendlyError: isBn ? 'অডিও এখন চালানো যাচ্ছে না। ইন্টারনেট দেখে আবার চেষ্টা করুন।' : 'Audio cannot play right now. Check your connection and try again.',
+    fullscreen: isBn ? '⛶ ফুলস্ক্রিন' : '⛶ Full screen',
+    exitFullscreen: isBn ? '✕ সাধারণ ভিউ' : '✕ Exit full screen',
+    tapWordHint: isBn ? '💡 যেকোনো শব্দে ক্লিক করলে সাথে সাথে অর্থ হাইলাইট হয়ে দেখাবে' : '💡 Click any word to highlight and see its meaning',
+    searching: isBn ? 'অনলাইন থেকে অর্থ খোঁজা হচ্ছে...' : 'Fetching meaning online...',
   };
 
-  // Keep users relaxed: never show technical backend details, only a calm green sign.
+  const handleWordLookup = async (rawWord) => {
+    const clean = normalizeWord(rawWord);
+    if (!clean || clean.length < 2) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setSelectedWord({
+        term: clean,
+        meaning: isBn ? '⚠️ অফলাইন: শব্দার্থ দেখতে ইন্টারনেট সংযোগ প্রয়োজন।' : '⚠️ Offline: Internet connection required.',
+        isOffline: true,
+      });
+      return;
+    }
+    setSelectedWord({ term: clean, meaning: copy.searching, loading: true });
+    const res = await fetchOnlineWordMeaning(clean, lang);
+    if (res) setSelectedWord(res);
+  };
+
   const showCalmNotice = () => {
     setNotice(copy.relaxing);
   };
@@ -185,41 +235,125 @@ export function AudioDramaPlayer({ title = '', content = '', lang = 'bn', onClos
   return (
     <section
       aria-label={copy.title}
-      className="surface-card my-5 p-4"
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-50 overflow-y-auto bg-paper p-4 sm:p-8'
+          : 'surface-card my-4 w-full p-4 sm:p-6'
+      }
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-extrabold tracking-wide text-gold-soft">{copy.title}</h3>
-          {title ? <p className="mt-1 truncate text-sm opacity-70">{title}</p> : null}
-        </div>
-        <div className="flex items-center gap-2">
-          {onClose ? (
-            <button type="button" onClick={onClose} aria-label={copy.close} className="rounded-full px-2 py-1 opacity-70 hover:bg-sapphire/10 hover:text-ink">
-              ✕
+      <div className={isFullscreen ? 'mx-auto max-w-5xl space-y-4' : 'space-y-4'}>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/35 bg-paper/90 p-3.5">
+          <div className="min-w-0">
+            <h3 className="text-sm font-extrabold tracking-wide text-gold-soft">{copy.title}</h3>
+            {title ? <p className="mt-0.5 text-base font-bold text-ink">{title}</p> : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className="secondary-button min-h-[42px] px-3.5 py-1.5 text-xs font-bold"
+            >
+              {isFullscreen ? copy.exitFullscreen : copy.fullscreen}
             </button>
-          ) : null}
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={copy.close}
+                className="secondary-button min-h-[42px] px-3 py-1.5 text-xs font-bold"
+              >
+                ✕
+              </button>
+            ) : null}
+          </div>
         </div>
-      </div>
 
-      <div className="routine-tile mt-4 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex max-w-[70%] items-center gap-2 truncate rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-bold text-gold-soft">
-            <span aria-hidden="true">{currentLine ? characterIcon(currentLine.role) : '🎙️'}</span>
-            {currentCharacter}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-sapphire/50 bg-sapphire/15 px-3 py-1 text-xs font-bold text-sapphire" role="status">
-            <span aria-hidden="true">🌿</span>
-            {isPlaying ? (isBn ? 'শুনুন ও রিলাক্স করুন' : 'Listen & relax') : (isBn ? 'শান্ত গল্প' : 'Calm story')}
-          </span>
-          <span className="text-xs tabular-nums opacity-75">
-            {lines.length ? `${Math.min(Math.floor(position) + 1, lines.length)} / ${lines.length}` : '0 / 0'}
-          </span>
+        <div className="sticky top-2 z-30 space-y-2 rounded-2xl border border-gold/40 bg-paper/95 p-3.5 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePlayPause}
+                disabled={!lines.length}
+                className="primary-button min-h-[44px] min-w-[130px] bg-sapphire px-4 py-2 text-sm font-extrabold text-on-sapphire disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isPaused ? `▶ ${copy.resume}` : isPlaying ? `⏸ ${copy.pause}` : `▶ ${copy.play}`}
+              </button>
+              <button
+                type="button"
+                onClick={handleStop}
+                disabled={!isPlaying && !isPaused}
+                className="secondary-button min-h-[44px] min-w-[110px] px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ■ {copy.stop}
+              </button>
+              <span className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-bold text-gold-soft">
+                <span aria-hidden="true">{currentLine ? characterIcon(currentLine.role) : '🎙️'}</span>
+                {currentCharacter}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sapphire/50 bg-sapphire/15 px-3 py-1 text-xs font-bold text-sapphire" role="status">
+                <span aria-hidden="true">🌿</span>
+                {isPlaying ? (isBn ? 'শুনুন ও রিলাক্স করুন' : 'Listen & relax') : (isBn ? 'শান্ত গল্প' : 'Calm story')}
+              </span>
+              <span className="text-xs font-bold tabular-nums opacity-85">
+                {lines.length ? `${Math.min(Math.floor(position) + 1, lines.length)} / ${lines.length}` : '0 / 0'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <input
+              aria-label={isBn ? 'পাঠে এগোন' : 'Seek lesson audio'}
+              type="range"
+              min="0"
+              max={progressMax}
+              step="0.01"
+              value={Math.min(position, progressMax)}
+              onChange={handleSeek}
+              className="h-2 flex-1 cursor-pointer accent-sapphire"
+            />
+            <label className="flex min-w-36 items-center gap-2 text-xs opacity-85">
+              <span>{copy.volume}</span>
+              <input
+                aria-label={copy.volume}
+                type="range"
+                min="0"
+                max="100"
+                value={volume}
+                onChange={(event) => setVolume(Number(event.target.value))}
+                className="h-2 w-24 cursor-pointer accent-gold"
+              />
+            </label>
+          </div>
+
+          {selectedWord ? (
+            <div className="flex items-center justify-between rounded-xl border-2 border-gold bg-gold/15 p-3 text-sm">
+              <div className="min-w-0 flex-1 pr-2">
+                <span className="mr-2 inline-block rounded bg-gold px-2 py-0.5 text-xs font-extrabold text-on-gold">
+                  {selectedWord.term}
+                </span>
+                <span className="font-semibold text-ink">{selectedWord.meaning}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedWord(null)}
+                className="shrink-0 rounded-lg border border-gold/50 px-2.5 py-1 text-xs font-bold text-gold-soft"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs font-semibold text-sapphire">{copy.tapWordHint}</p>
+          )}
         </div>
+
         <div
           role="list"
           aria-label={copy.story}
           tabIndex={0}
-          className="mt-3 max-h-72 space-y-2 overflow-y-auto scroll-smooth pr-1"
+          className="w-full space-y-3"
         >
           {lines.map((line, lineIndex) => {
             const isCurrentLine = lineIndex === currentLineIndex;
@@ -232,17 +366,17 @@ export function AudioDramaPlayer({ title = '', content = '', lang = 'bn', onClos
                 role="listitem"
                 aria-current={isCurrentLine ? 'step' : undefined}
                 aria-label={`${line.character}: ${line.text}`}
-                className={`flex items-start gap-2 rounded-xl p-2 transition-colors duration-300 ${
+                className={`flex items-start gap-3 rounded-2xl border p-3.5 transition-colors duration-200 ${
                   isCurrentLine
-                    ? 'bg-sapphire/15 ring-2 ring-sapphire'
+                    ? 'border-sapphire bg-sapphire/15 ring-2 ring-sapphire'
                     : isCompletedLine
-                      ? 'bg-sapphire-deep/20'
-                      : 'opacity-60'
+                      ? 'border-gold/25 bg-sapphire-deep/20'
+                      : 'border-gold/15 bg-paper/60 opacity-85'
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-lg ${
+                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-lg ${
                     isCurrentLine
                       ? 'bg-sapphire text-on-sapphire'
                       : 'bg-paper border border-gold/30'
@@ -252,8 +386,8 @@ export function AudioDramaPlayer({ title = '', content = '', lang = 'bn', onClos
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-gold-soft">{line.character}</p>
-                  <p className="mt-1 text-sm leading-relaxed">
-                    {spokenTextParts(line.text, fraction, isCompletedLine)}
+                  <p className="mt-1 text-base leading-relaxed">
+                    {spokenTextParts(line.text, fraction, isCompletedLine, handleWordLookup, selectedWord?.term)}
                   </p>
                 </div>
               </div>
@@ -261,51 +395,10 @@ export function AudioDramaPlayer({ title = '', content = '', lang = 'bn', onClos
           })}
           {!lines.length ? <p className="min-h-10 text-sm leading-relaxed opacity-80">{copy.loading}</p> : null}
         </div>
-        <input
-          aria-label={isBn ? 'পাঠে এগোন' : 'Seek lesson audio'}
-          type="range"
-          min="0"
-          max={progressMax}
-          step="0.01"
-          value={Math.min(position, progressMax)}
-          onChange={handleSeek}
-          className="mt-3 h-2 w-full cursor-pointer accent-sapphire"
-        />
-      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={handlePlayPause}
-          disabled={!lines.length}
-          className="primary-button bg-sapphire px-4 py-2 text-sm font-extrabold text-on-sapphire disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isPaused ? `▶ ${copy.resume}` : isPlaying ? `⏸ ${copy.pause}` : `▶ ${copy.play}`}
-        </button>
-        <button
-          type="button"
-          onClick={handleStop}
-          disabled={!isPlaying && !isPaused}
-          className="secondary-button px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          ■ {copy.stop}
-        </button>
-        <label className="ml-auto flex min-w-40 flex-1 items-center gap-2 text-xs opacity-80">
-          <span>{copy.volume}</span>
-          <input
-            aria-label={copy.volume}
-            type="range"
-            min="0"
-            max="100"
-            value={volume}
-            onChange={(event) => setVolume(Number(event.target.value))}
-            className="h-2 min-w-20 flex-1 cursor-pointer accent-gold"
-          />
-        </label>
+        {notice ? <p role="status" className="inline-flex items-center gap-2 rounded-full border border-sapphire/50 bg-sapphire/15 px-3 py-1 text-sm font-semibold text-sapphire">{notice}</p> : null}
+        {error ? <p role="alert" className="text-sm font-medium text-red-400">{error}</p> : null}
       </div>
-
-      {notice ? <p role="status" className="mt-3 inline-flex items-center gap-2 rounded-full border border-sapphire/50 bg-sapphire/15 px-3 py-1 text-sm font-semibold text-sapphire">{notice}</p> : null}
-      {error ? <p role="alert" className="mt-3 text-sm font-medium text-red-400">{error}</p> : null}
     </section>
   );
 }

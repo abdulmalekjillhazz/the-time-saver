@@ -33,9 +33,7 @@ async function showSystemNotification(title, options) {
         return true;
       }
     }
-  } catch {
-    // Fallback to standard Notification API below
-  }
+  } catch {}
   try {
     new Notification(title, options);
     return true;
@@ -56,6 +54,7 @@ export function PrayerTimesCard({ lang = 'bn' }) {
   const [source, setSource] = useState('');
   const [error, setError] = useState('');
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [isPlayingAzan, setIsPlayingAzan] = useState(false);
   const [locating, setLocating] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [azanUrl, setAzanUrl] = useState(AZAN_REMOTE_URL);
@@ -63,6 +62,40 @@ export function PrayerTimesCard({ lang = 'bn' }) {
   const isBn = lang === 'bn';
   const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Dhaka';
   const prayerDateKey = getPrayerDateKey(now, timezone || browserTimezone);
+
+  const playAzanAudioNow = useCallback(async () => {
+    const audio = adhanAudioRef.current;
+    if (!audio) return;
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.muted = false;
+      audio.volume = 1;
+      await audio.play();
+      setIsPlayingAzan(true);
+      setAudioBlocked(false);
+    } catch {
+      if (audio.src && !audio.src.endsWith(AZAN_FALLBACK_URL)) {
+        audio.src = AZAN_FALLBACK_URL;
+        try {
+          await audio.play();
+          setIsPlayingAzan(true);
+          setAudioBlocked(false);
+          return;
+        } catch {}
+      }
+      setAudioBlocked(true);
+    }
+  }, []);
+
+  const stopAzanAudio = useCallback(() => {
+    const audio = adhanAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    setIsPlayingAzan(false);
+  }, []);
 
   const requestLocation = useCallback(async () => {
     setLocating(true);
@@ -130,9 +163,7 @@ export function PrayerTimesCard({ lang = 'bn' }) {
           }
           return;
         }
-      } catch {
-        // Fallback to direct Aladhan API below
-      }
+      } catch {}
 
       try {
         const directUrl = `https://api.aladhan.com/v1/timings/${apiDate}?latitude=${encodeURIComponent(location.latitude)}&longitude=${encodeURIComponent(location.longitude)}&method=1&school=1`;
@@ -151,9 +182,7 @@ export function PrayerTimesCard({ lang = 'bn' }) {
             setSource('Aladhan API');
           }
         }
-      } catch {
-        // Keep DEFAULT_TIMINGS active
-      }
+      } catch {}
     }
 
     loadTimings();
@@ -162,7 +191,7 @@ export function PrayerTimesCard({ lang = 'bn' }) {
 
   useEffect(() => {
     if (!showPrayerTimes) return undefined;
-    const timer = window.setInterval(() => setNow(new Date()), 20_000);
+    const timer = window.setInterval(() => setNow(new Date()), 10_000);
     return () => window.clearInterval(timer);
   }, [showPrayerTimes]);
 
@@ -175,10 +204,10 @@ export function PrayerTimesCard({ lang = 'bn' }) {
 
   useEffect(() => {
     if (!showPrayerTimes || !notificationsEnabled || !timings || !timezone
-      || typeof window === 'undefined' || !('Notification' in window)) return undefined;
+      || typeof window === 'undefined') return undefined;
 
     const triggerPrayerAlert = (due) => {
-      if (!due || Notification.permission !== 'granted') return;
+      if (!due) return;
       const notificationId = `${due.date}-${due.prayer.key}`;
       if (notificationId === lastNotificationId) return;
 
@@ -194,37 +223,24 @@ export function PrayerTimesCard({ lang = 'bn' }) {
         renotify: true,
       });
 
-      try {
-        const audio = adhanAudioRef.current;
-        if (audio) {
-          audio.currentTime = 0;
-          audio.muted = false;
-          const playback = audio.play();
-          playback?.catch(() => {
-            setAudioBlocked(true);
-          });
-        }
-      } catch {
-        setAudioBlocked(true);
-      }
+      void playAzanAudioNow();
     };
 
     const checkDuePrayer = () => {
-      if (Notification.permission !== 'granted') return;
       const currentTime = new Date();
       const due = getPrayerOccurrences(timings, currentTime, timezone).find(({ at }) => (
-        at <= currentTime && currentTime.getTime() - at.getTime() <= 10 * 60_000
+        at <= currentTime && currentTime.getTime() - at.getTime() <= 15 * 60_000
       ));
       if (due) triggerPrayerAlert(due);
     };
 
     checkDuePrayer();
-    const intervalId = window.setInterval(checkDuePrayer, 15_000);
+    const intervalId = window.setInterval(checkDuePrayer, 5_000);
 
     let exactTimeoutId = null;
     const next = nextPrayerInfo(timings, new Date(), timezone);
     if (next && next.at) {
-      const delayMs = Math.max(500, next.at.getTime() - Date.now() + 250);
+      const delayMs = Math.max(250, next.at.getTime() - Date.now() + 100);
       if (delayMs <= 24 * 3_600_000) {
         exactTimeoutId = window.setTimeout(() => {
           triggerPrayerAlert(next);
@@ -244,16 +260,12 @@ export function PrayerTimesCard({ lang = 'bn' }) {
       window.removeEventListener('focus', onVisibilityOrFocus);
       document.removeEventListener('visibilitychange', onVisibilityOrFocus);
     };
-  }, [showPrayerTimes, notificationsEnabled, timings, timezone, lastNotificationId, setLastNotificationId, isBn]);
+  }, [showPrayerTimes, notificationsEnabled, timings, timezone, lastNotificationId, setLastNotificationId, isBn, playAzanAudioNow]);
 
   useEffect(() => {
     if (showPrayerTimes && notificationsEnabled) return;
-    const audio = adhanAudioRef.current;
-    if (audio && !audio.paused) {
-      audio.pause();
-      audio.currentTime = 0;
-    }
-  }, [showPrayerTimes, notificationsEnabled]);
+    stopAzanAudio();
+  }, [showPrayerTimes, notificationsEnabled, stopAzanAudio]);
 
   useEffect(() => () => {
     const audio = adhanAudioRef.current;
@@ -269,21 +281,30 @@ export function PrayerTimesCard({ lang = 'bn' }) {
 
   async function togglePrayerNotifications() {
     if (notificationsEnabled) {
+      stopAzanAudio();
       setNotificationsEnabled(false);
       return;
     }
-    if (!('Notification' in window)) {
-      setError(isBn ? 'এই browser-এ notification সমর্থিত নয়।' : 'Notifications are not supported in this browser.');
-      return;
-    }
     try {
-      const permission = Notification.permission === 'default'
-        ? await Notification.requestPermission()
-        : Notification.permission;
-      if (permission !== 'granted') {
-        setError(isBn ? 'Browser settings থেকে notification অনুমতি দিন।' : 'Allow notifications in your browser settings.');
-        return;
+      const audio = adhanAudioRef.current;
+      if (audio) {
+        audio.muted = true;
+        await audio.play().catch(() => {});
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = false;
       }
+
+      if ('Notification' in window) {
+        const permission = Notification.permission === 'default'
+          ? await Notification.requestPermission()
+          : Notification.permission;
+        if (permission !== 'granted') {
+          setError(isBn ? 'Browser settings থেকে notification অনুমতি দিন।' : 'Allow notifications in your browser settings.');
+          return;
+        }
+      }
+
       setError('');
       setNotificationsEnabled(true);
 
@@ -291,19 +312,6 @@ export function PrayerTimesCard({ lang = 'bn' }) {
         setAzanUrl(url);
         useAppStore.getState().setAzanStatus(url === AZAN_FALLBACK_URL ? 'fallback' : 'ready');
       });
-
-      try {
-        const audio = adhanAudioRef.current;
-        if (audio) {
-          audio.muted = true;
-          await audio.play().catch(() => {});
-          audio.pause();
-          audio.currentTime = 0;
-          audio.muted = false;
-        }
-      } catch {
-        // Best-effort audio unlock
-      }
 
       const nextText = upcoming
         ? (isBn ? `পরবর্তী আজান: ${upcoming.prayer.name.bn} (${timings[upcoming.prayer.key]?.slice(0, 5)})` : `Next Azan: ${upcoming.prayer.name.en} (${timings[upcoming.prayer.key]?.slice(0, 5)})`)
@@ -322,6 +330,17 @@ export function PrayerTimesCard({ lang = 'bn' }) {
 
   return (
     <Card className="surface-card p-4">
+      <audio
+        ref={adhanAudioRef}
+        hidden
+        preload="auto"
+        src={azanUrl}
+        onPlay={() => { setAudioBlocked(false); setIsPlayingAzan(true); }}
+        onEnded={() => setIsPlayingAzan(false)}
+        onPause={() => setIsPlayingAzan(false)}
+        onError={() => { if (azanUrl !== AZAN_FALLBACK_URL) setAzanUrl(AZAN_FALLBACK_URL); }}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gold/20 pb-2.5">
         <div className="flex items-center gap-2">
           <span className="brand-orb text-xl">🕌</span>
@@ -341,7 +360,7 @@ export function PrayerTimesCard({ lang = 'bn' }) {
             type="button"
             onClick={requestLocation}
             disabled={locating}
-            className="secondary-button min-h-9 px-3 py-1 text-xs disabled:opacity-60"
+            className="secondary-button min-h-[40px] px-3 py-1.5 text-xs font-bold disabled:opacity-60"
           >
             {locating
               ? (isBn ? 'লোকেশন খোঁজা হচ্ছে…' : 'Finding location…')
@@ -351,12 +370,23 @@ export function PrayerTimesCard({ lang = 'bn' }) {
             type="button"
             aria-pressed={notificationsEnabled}
             onClick={togglePrayerNotifications}
-            className={`primary-button min-h-9 px-3 py-1 text-xs ${notificationsEnabled ? 'bg-sapphire text-on-sapphire' : ''}`}
+            className={`primary-button min-h-[40px] px-3.5 py-1.5 text-xs font-bold ${notificationsEnabled ? 'bg-sapphire text-on-sapphire' : ''}`}
           >
             {notificationsEnabled
               ? (isBn ? '🔔 আজান চালু আছে' : '🔔 Azan alerts on')
               : (isBn ? '🔔 আজান চালু করুন' : '🔔 Enable Azan alerts')}
           </button>
+          {notificationsEnabled ? (
+            <button
+              type="button"
+              onClick={isPlayingAzan ? stopAzanAudio : playAzanAudioNow}
+              className="secondary-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
+            >
+              {isPlayingAzan
+                ? (isBn ? '⏹️ আজান থামান' : '⏹️ Stop Azan')
+                : (isBn ? '🔊 আজান চেক' : '🔊 Test Azan')}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -413,22 +443,11 @@ export function PrayerTimesCard({ lang = 'bn' }) {
       {notificationsEnabled ? (
         <div className="mt-2 space-y-1.5 text-xs opacity-90">
           <p>{isBn ? '✅ স্বয়ংক্রিয় আজান সক্রিয়: প্রতি ওয়াক্তে নোটিফিকেশন ও আজানের ধ্বনি বাজবে।' : '✅ Automatic Azan active: notifications and Azan audio will play at each prayer time.'}</p>
-          <audio
-            ref={adhanAudioRef}
-            hidden
-            preload="auto"
-            src={azanUrl}
-            onPlay={() => setAudioBlocked(false)}
-            onError={() => { if (azanUrl !== AZAN_FALLBACK_URL) setAzanUrl(AZAN_FALLBACK_URL); }}
-          />
           <p className="text-[11px] opacity-70">{AZAN_CREDIT}</p>
           {audioBlocked ? (
             <button
               type="button"
-              onClick={() => {
-                adhanAudioRef.current?.play().catch(() => {});
-                setAudioBlocked(false);
-              }}
+              onClick={playAzanAudioNow}
               className="mt-1 rounded-lg border border-gold bg-gold/20 px-3 py-1.5 text-xs font-bold text-gold-soft"
             >
               {isBn ? '🔊 আজানের সাউন্ড আনলক করতে এখানে ট্যাপ করুন' : '🔊 Tap here to unmute Azan audio'}

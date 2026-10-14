@@ -231,22 +231,50 @@ export default async function HomePage(props) {
           </div>
         </section>
 
-        <section id="daily-story" className="surface-card scroll-mt-8 overflow-hidden">
-          <div className="border-b border-gold/20 px-6 py-5 sm:px-8">
-            <p className="eyebrow">
-              {isBn ? '🌙 প্রতিদিন রাত ১২টায় নতুন গল্প ও কুইজ' : '🌙 A new story and quiz every night at midnight'}
-            </p>
-            <h2 className="section-heading mt-2 text-2xl sm:text-3xl">
-              {dailyLesson?.title || (isBn ? 'আজকের গল্প শিগগিরই আসছে' : "Today's story is coming soon")}
-            </h2>
-            {dailyLesson?.description ? <p className="mt-2 max-w-3xl text-sm leading-relaxed opacity-80">{dailyLesson.description}</p> : null}
+        <section id="daily-story" className="surface-card scroll-mt-8 overflow-hidden p-5 sm:p-8">
+          <div className="rounded-2xl border-2 border-gold/45 bg-paper p-4 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-gold/30 bg-gold/10 p-3.5">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-gold-soft">
+                  📖 {isBn ? 'আজকের গল্প (Story)' : "Today's Story"}
+                </p>
+                <h2 className="mt-1 text-lg font-extrabold text-ink sm:text-xl">
+                  {dailyLesson?.title || (isBn ? 'আজকের গল্প শিগগিরই আসছে' : "Today's story is coming soon")}
+                </h2>
+              </div>
+
+              <div className="rounded-xl border border-sapphire/35 bg-sapphire/10 p-3.5">
+                <p className="text-xs font-extrabold uppercase tracking-wider text-sapphire">
+                  🧩 {isBn ? 'আজকের কুইজ (Quiz)' : 'Daily Story Quiz'}
+                </p>
+                <p className="mt-1 text-lg font-extrabold text-ink sm:text-xl">
+                  {dailyLesson?.title
+                    ? `${dailyLesson.title} (${dailyQuiz?.questions?.length || 3} ${isBn ? 'টি প্রশ্ন' : 'Questions'})`
+                    : (isBn ? 'গল্পভিত্তিক কুইজ' : 'Story-based Quiz')}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Link
+                href={`/${lang}/lessons`}
+                className="primary-button flex min-h-[46px] w-full items-center justify-center bg-sapphire px-5 py-2.5 text-center text-sm font-extrabold text-on-sapphire"
+              >
+                📖 {isBn ? 'সকল পাঠ ও গল্প দেখুন' : 'Browse All Lessons & Stories'}
+              </Link>
+              <a
+                href="#home-story-quiz-box"
+                className="secondary-button flex min-h-[46px] w-full items-center justify-center px-5 py-2.5 text-center text-sm font-extrabold"
+              >
+                🧩 {isBn ? 'কুইজে অংশ নিন' : 'Jump to Story Quiz'}
+              </a>
+            </div>
           </div>
 
           {dailyLesson ? (
-            <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.2fr_.8fr]">
-              <div>
-                <h3 className="section-heading text-lg">{isBn ? 'আজকের ছোট গল্প' : "Today's short story"}</h3>
-                <div className="routine-tile mt-3 p-3 sm:p-4">
+            <div className="mt-6 space-y-6">
+              <div className="w-full space-y-4">
+                <div className="routine-tile w-full p-4 sm:p-6">
                   <StoryReader
                     lines={dailyLesson.content.split(/\r?\n/).filter(Boolean).map((line) => {
                       const match = line.match(/^\[([^\]]+)\]\s*:\s*(.*)$/);
@@ -261,28 +289,36 @@ export default async function HomePage(props) {
                 <AudioDramaPlayer title={dailyLesson.title} content={dailyLesson.content} lang={lang} />
               </div>
 
-              <aside className="routine-tile p-4 sm:p-5">
-                <h3 className="section-heading text-lg">{isBn ? 'গল্প থেকে কুইজ' : 'Quick story quiz'}</h3>
+              <aside id="home-story-quiz-box" className="routine-tile scroll-mt-6 p-4 sm:p-6">
+                <div className="rounded-xl border border-gold/35 bg-paper p-3.5">
+                  <h3 className="text-lg font-extrabold text-gold-soft">
+                    🧩 {isBn ? `গল্প থেকে কুইজ: ${dailyLesson.title}` : `Quick Story Quiz: ${dailyLesson.title}`}
+                  </h3>
+                </div>
                 {dailyQuiz?.questions?.length ? (
-                  <ol className="mt-3 space-y-4">
+                  <ol className="mt-4 grid gap-4 md:grid-cols-3">
                     {dailyQuiz.questions.map((question, questionIndex) => (
-                      <li key={questionIndex} className="rounded-xl border border-gold/20 bg-paper/60 p-3">
-                        <p className="text-sm font-semibold">{questionIndex + 1}. {question.text}</p>
-                        <ul className="mt-2 space-y-1 text-sm opacity-80">
+                      <li key={questionIndex} className="rounded-xl border border-gold/25 bg-paper/70 p-4">
+                        <p className="text-sm font-bold text-ink">{questionIndex + 1}. {question.text}</p>
+                        <ul className="mt-2.5 space-y-1.5 text-sm opacity-85">
                           {question.options.map((option, optionIndex) => (
-                            <li key={optionIndex}>{String.fromCharCode(65 + optionIndex)}. {option.text}</li>
+                            <li key={optionIndex} className="rounded-lg border border-sapphire/15 bg-paper/50 px-2.5 py-1.5">
+                              {String.fromCharCode(65 + optionIndex)}. {option.text}
+                            </li>
                           ))}
                         </ul>
                       </li>
                     ))}
                   </ol>
                 ) : <p className="mt-3 text-sm opacity-80">{isBn ? 'কুইজ তৈরি হচ্ছে।' : 'The quiz is being prepared.'}</p>}
-                <Link href="/app" className="primary-button mt-5 inline-flex w-full justify-center bg-sapphire px-5 py-3 text-center font-bold text-on-sapphire">
-                  {isBn ? 'নিজের রুটিন তৈরি করে শুরু করুন' : 'Create a free account to get started'}
-                </Link>
-                <p className="mt-2 text-center text-xs opacity-85">
-                  {isBn ? 'বিনামূল্যে · বাংলা ও ইংরেজি · আপনার পছন্দমতো ভয়েসে শুনুন' : 'Free to start · Bangla and English · Listen with your device voice'}
-                </p>
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Link href="/app" className="primary-button flex min-h-[46px] w-full items-center justify-center bg-sapphire px-5 py-3 text-center text-sm font-extrabold text-on-sapphire">
+                    🚀 {isBn ? 'অ্যাপে কুইজ জমা দিন ও রুটিন শুরু করুন' : 'Submit Quiz & Start Routine in App'}
+                  </Link>
+                  <Link href={`/${lang}/lessons`} className="secondary-button flex min-h-[46px] w-full items-center justify-center px-5 py-3 text-center text-sm font-extrabold">
+                    📚 {isBn ? 'আগের সব গল্প ও কুইজ দেখুন' : 'Explore Past Stories & Quizzes'}
+                  </Link>
+                </div>
               </aside>
             </div>
           ) : (

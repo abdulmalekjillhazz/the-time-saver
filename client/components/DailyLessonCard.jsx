@@ -1,9 +1,9 @@
-'use client'
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
 import { StoryReader } from './StoryReader.jsx';
-
-import { useState } from 'react';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
 
@@ -14,10 +14,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
   const [error, setError] = useState(null);
   const [loginRequired, setLoginRequired] = useState(false);
 
-  // Quality feedback states
   const [feedbackSent, setFeedbackSent] = useState(false);
-  const [isAccurate, setIsAccurate] = useState(null);
-  const [isHelpful, setIsHelpful] = useState(null);
   const [shared, setShared] = useState(false);
   const [reportedQuestion, setReportedQuestion] = useState({});
   const [dramaOpen, setDramaOpen] = useState(false);
@@ -26,10 +23,10 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
 
   const isBn = lang === 'bn';
   const copy = {
-    todayLesson: isBn ? 'আজকের দৈনিক পাঠ' : "Today's Daily Lesson",
+    todayLesson: isBn ? 'আজকের গল্প (Story)' : "Today's Story",
     takeaway: isBn ? 'মূল শিক্ষা' : 'Key Takeaway',
     vocab: isBn ? 'গুরুত্বপূর্ণ শব্দভাণ্ডার' : 'Vocabulary',
-    quizTitle: isBn ? 'দৈনিক কুইজ' : 'Daily Quiz',
+    quizTitle: isBn ? 'আজকের কুইজ (Quiz)' : 'Daily Quiz',
     submitQuiz: isBn ? 'কুইজ জমা দিন' : 'Submit Quiz',
     submitting: isBn ? 'যাচাই করা হচ্ছে...' : 'Submitting...',
     scoreTitle: isBn ? 'আপনার ফলাফল' : 'Your Score',
@@ -37,18 +34,17 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
     correct: isBn ? 'সঠিক' : 'Correct',
     incorrect: isBn ? 'ভুল' : 'Incorrect',
     helpfulPrompt: isBn ? 'এই পাঠটি কি সহায়ক ছিল?' : 'Was this lesson helpful?',
-    accuratePrompt: isBn ? 'তথ্যগুলো কি সঠিক ছিল?' : 'Was this accurate?',
     yes: isBn ? 'হ্যাঁ' : 'Yes',
     no: isBn ? 'না' : 'No',
     thankFeedback: isBn ? 'আপনার মতামতের জন্য ধন্যবাদ!' : 'Thank you for your feedback!',
-    share: isBn ? 'শেয়ার করুন' : 'Share Lesson',
-    copied: isBn ? 'লিঙ্ক কপি হয়েছে!' : 'Link copied!',
+    share: isBn ? '🔗 লিংক শেয়ার' : '🔗 Share Lesson',
+    copied: isBn ? '✓ লিংক কপি হয়েছে!' : '✓ Link copied!',
     reportQuestion: isBn ? 'প্রশ্নে ভুল রিপোর্ট করুন' : 'Report wrong answer',
     reported: isBn ? 'রিপোর্ট জমা হয়েছে' : 'Report submitted',
-    listenDrama: isBn ? '🎧 গল্প শুনুন' : '🎧 Learn English by Story',
-    closeDrama: isBn ? 'ড্রামা প্লেয়ার বন্ধ করুন' : 'Close drama player',
+    listenDrama: isBn ? '🎧 গল্পের অডিও শুনুন' : '🎧 Listen to Story Audio',
+    closeDrama: isBn ? '✕ অডিও প্লেয়ার বন্ধ করুন' : '✕ Close Audio Player',
+    goToQuiz: isBn ? '🧩 কুইজে অংশ নিন' : '🧩 Take Story Quiz',
     savedNarration: isBn ? 'AI কণ্ঠে সংরক্ষিত গল্প' : 'Saved AI narration',
-    midnightStory: isBn ? 'মধ্যরাতের গল্প • কুইজ • অডিও' : 'MIDNIGHT STORY • QUIZ • AUDIO',
     loginRequired: isBn ? 'কুইজ জমা দিতে আগে লগইন করুন।' : 'Sign in before submitting this quiz.',
     login: isBn ? 'লগইন করুন' : 'Sign in',
     requestFailed: isBn ? 'কুইজ জমা দেওয়া যায়নি। আবার চেষ্টা করুন।' : 'Could not submit the quiz. Please try again.',
@@ -101,9 +97,13 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
           return;
         }
         const serverMessage = data?.error?.message;
-        throw new Error(typeof serverMessage === 'object'
-          ? serverMessage[lang] || serverMessage.en || serverMessage.bn || copy.requestFailed
-          : typeof serverMessage === 'string' ? serverMessage : copy.requestFailed);
+        throw new Error(
+          typeof serverMessage === 'object'
+            ? serverMessage[lang] || serverMessage.en || serverMessage.bn || copy.requestFailed
+            : typeof serverMessage === 'string'
+              ? serverMessage
+              : copy.requestFailed
+        );
       }
       setSubmission(data);
     } catch (err) {
@@ -115,8 +115,6 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
   };
 
   const handleFeedback = async (helpful, accurate) => {
-    setIsHelpful(helpful);
-    setIsAccurate(accurate);
     setFeedbackSent(true);
     try {
       await fetch('/api/lessons/today/feedback', {
@@ -165,137 +163,108 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
     return match ? { speaker: match[1], text: match[2] } : { speaker: null, text: line };
   });
 
+  const questionCount = quiz?.questions?.length || 3;
+
   return (
-    <Card className="!p-0 overflow-hidden border-sapphire/20 bg-paper shadow-md">
-      <div className="relative isolate overflow-hidden bg-gradient-to-br from-sapphire via-sapphire to-ink px-6 py-5 text-white">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-35"
-          style={{
-            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,.7) 1px, transparent 1.5px)',
-            backgroundSize: '22px 22px',
-          }}
-        />
-        <div aria-hidden="true" className="pointer-events-none absolute -right-5 -top-9 rotate-12 text-white/10">
-          <svg viewBox="0 0 120 120" className="h-36 w-36 fill-current">
-            <path d="M67 12 76 39 104 40 82 57 90 84 67 68 44 84 52 57 30 40 58 39z" />
-            <path d="M25 73 30 87 45 88 33 97 37 112 25 103 13 112 17 97 5 88 20 87z" />
-          </svg>
-        </div>
-        <div className="relative flex items-center gap-4">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/20 bg-white/10 shadow-inner shadow-white/10 backdrop-blur">
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-7 w-7 fill-none stroke-current" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 18V5l12-2v13" />
-              <circle cx="6" cy="18" r="3" />
-              <circle cx="18" cy="16" r="3" />
-              <path d="m4 7 1 2 2 1-2 1-1 2-1-2-2-1 2-1z" />
-            </svg>
-          </span>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gold-soft">{copy.midnightStory}</p>
-            <p className="mt-1 text-sm text-white/85">
-              {isBn ? 'প্রতিদিন রাত ১২টায় নতুন গল্প ও কুইজ' : 'A fresh story and quiz every night at 12'}
+    <Card className="surface-card space-y-6 p-4 sm:p-6">
+      <div className="rounded-2xl border-2 border-gold/45 bg-paper p-4 sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-gold/30 bg-gold/10 p-3.5">
+            <p className="text-xs font-extrabold uppercase tracking-wider text-gold-soft">
+              📖 {copy.todayLesson} · {dailyLesson.date}
+            </p>
+            <h2 className="mt-1 text-lg font-extrabold text-ink sm:text-xl">
+              {dailyLesson.title}
+            </h2>
+          </div>
+
+          <div className="rounded-xl border border-sapphire/35 bg-sapphire/10 p-3.5">
+            <p className="text-xs font-extrabold uppercase tracking-wider text-sapphire">
+              🧩 {copy.quizTitle}
+            </p>
+            <p className="mt-1 text-lg font-extrabold text-ink sm:text-xl">
+              {dailyLesson.title} ({questionCount} {isBn ? 'টি প্রশ্ন' : 'Questions'})
             </p>
           </div>
         </div>
-      </div>
-      <div className="p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sapphire/10 pb-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-sapphire">
-          {copy.todayLesson} • {dailyLesson.date}
-        </span>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center rounded-md bg-sapphire/10 px-3 py-1 text-xs font-semibold text-sapphire">
-            {dailyLesson.category}
-          </span>
-          <span className="inline-flex items-center rounded-md border border-ink/30 px-3 py-1 text-xs font-semibold text-ink">
-            {dailyLesson.storyType}
-          </span>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <button
+            type="button"
+            aria-expanded={dramaOpen}
+            onClick={() => setDramaOpen((open) => !open)}
+            className="primary-button flex min-h-[46px] w-full items-center justify-center bg-sapphire px-4 py-2.5 text-sm font-extrabold text-on-sapphire"
+          >
+            {dramaOpen ? copy.closeDrama : copy.listenDrama}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const quizEl = document.getElementById('daily-lesson-quiz-box');
+              quizEl?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="secondary-button flex min-h-[46px] w-full items-center justify-center px-4 py-2.5 text-sm font-extrabold"
+          >
+            {copy.goToQuiz}
+          </button>
+
           <button
             type="button"
             onClick={handleShare}
-            className="ml-2 rounded-md border border-sapphire/20 bg-paper/90 px-2.5 py-1 text-xs font-medium text-ink transition hover:border-gold hover:bg-gold/10"
+            className="secondary-button flex min-h-[46px] w-full items-center justify-center px-4 py-2.5 text-sm font-extrabold"
           >
             {shared ? copy.copied : copy.share}
           </button>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-ink">{dailyLesson.title}</h2>
-        <button
-          type="button"
-          aria-expanded={dramaOpen}
-          onClick={() => setDramaOpen((open) => !open)}
-          className="rounded-xl border border-sapphire/25 bg-sapphire/5 px-4 py-2 text-sm font-bold text-sapphire transition hover:border-gold hover:bg-gold/10"
-        >
-          {dramaOpen ? copy.closeDrama : copy.listenDrama}
-        </button>
-      </div>
       {dailyLesson.audio?.status === 'ready' && dailyLesson.audio.url ? (
-        <div className="mt-4 rounded-xl border border-sapphire/20 bg-sapphire/5 p-4">
+        <div className="rounded-xl border border-sapphire/25 bg-sapphire/5 p-4">
           <p className="mb-2 text-xs font-bold uppercase tracking-wider text-sapphire">{copy.savedNarration}</p>
           <audio controls preload="none" src={dailyLesson.audio.url} className="w-full" aria-label={`${copy.savedNarration}: ${dailyLesson.title}`} />
         </div>
       ) : null}
-      {dailyLesson.generationSource === 'curated-fallback' ? (
-        <p className="mt-2 text-xs font-semibold text-amber-800" role="status">{copy.curatedFallback}</p>
-      ) : null}
-      {dramaOpen ? <AudioDramaPlayer title={dailyLesson.title} content={dailyLesson.content} lang={lang} onClose={() => setDramaOpen(false)} /> : null}
-      <p className="mt-1 text-sm font-medium italic text-ink/70">{dailyLesson.description}</p>
 
-      <div className="mt-4">
+      {dailyLesson.generationSource === 'curated-fallback' ? (
+        <p className="text-xs font-semibold text-gold-soft" role="status">{copy.curatedFallback}</p>
+      ) : null}
+
+      {dramaOpen ? (
+        <AudioDramaPlayer
+          title={dailyLesson.title}
+          content={dailyLesson.content}
+          lang={lang}
+          onClose={() => setDramaOpen(false)}
+        />
+      ) : null}
+
+      <div className="w-full">
         <StoryReader
           lines={dialogueLines}
           vocabulary={dailyLesson.vocabulary || []}
           lang={lang}
           keyTakeaway={dailyLesson.keyTakeaway || ''}
-          description=""
+          description={dailyLesson.description || ''}
         />
       </div>
 
-      {dailyLesson.keyTakeaway && (
-        <div className="routine-tile mt-6 p-4">
-          <h3 className="eyebrow">
-            {copy.takeaway}
-          </h3>
-          <p className="mt-1 text-base font-semibold">{dailyLesson.keyTakeaway}</p>
-        </div>
-      )}
-
-      {dailyLesson.vocabulary && dailyLesson.vocabulary.length > 0 && (
-        <div className="mt-6 rounded-xl border border-sapphire/20 bg-sapphire/5 p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-sapphire">
-            {copy.vocab}
-          </h3>
-          <dl className="mt-2 space-y-2">
-            {dailyLesson.vocabulary.map((v, i) => (
-              <div key={i} className="text-sm">
-                <dt className="font-semibold text-ink">{v.term}:</dt>
-                <dd className="text-ink/75">{v.definition}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
-
-      {/* User Quality Feedback & Inaccuracy Gatekeeper */}
-      <div className="mt-6 rounded-xl border border-sapphire/20 bg-paper/80 p-4">
+      <div className="rounded-xl border border-sapphire/20 bg-paper/80 p-4">
         {!feedbackSent ? (
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <span className="font-medium text-ink">{copy.helpfulPrompt}</span>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:w-56">
               <button
                 type="button"
                 onClick={() => handleFeedback(true, true)}
-                className="rounded-md border border-sapphire/20 bg-paper px-3 py-1 font-medium text-ink transition hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-700"
+                className="secondary-button flex min-h-[42px] w-full items-center justify-center px-3 py-1.5 text-xs font-bold"
               >
                 👍 {copy.yes}
               </button>
               <button
                 type="button"
                 onClick={() => handleFeedback(false, false)}
-                className="rounded-md border border-sapphire/20 bg-paper px-3 py-1 font-medium text-ink transition hover:border-gold hover:bg-gold/10"
+                className="secondary-button flex min-h-[42px] w-full items-center justify-center px-3 py-1.5 text-xs font-bold"
               >
                 👎 {copy.no}
               </button>
@@ -307,29 +276,36 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
       </div>
 
       {quiz && quiz.questions && quiz.questions.length > 0 && (
-        <section className="mt-8 border-t border-sapphire/10 pt-6">
-          <h3 className="text-xl font-bold text-ink">{copy.quizTitle}</h3>
+        <section id="daily-lesson-quiz-box" className="scroll-mt-6 border-t border-gold/25 pt-6">
+          <div className="rounded-xl border border-gold/35 bg-paper p-3.5 mb-4">
+            <h3 className="text-lg font-extrabold text-gold-soft">
+              🧩 {copy.quizTitle}: {dailyLesson.title}
+            </h3>
+          </div>
 
-          <div className="mt-4 space-y-6">
+          <div className="space-y-5">
             {quiz.questions.map((q, qIndex) => {
               const result = submission?.results?.[qIndex];
               return (
-                <fieldset key={qIndex} className="rounded-xl border border-sapphire/20 bg-paper p-4 shadow-sm sm:p-5">
-                  <legend className="text-base font-semibold leading-relaxed text-ink sm:text-lg">
-                    <span className="mr-2 inline-grid h-8 w-8 place-items-center rounded-full bg-sapphire text-sm font-bold text-on-sapphire">{qIndex + 1}</span>
-                    {q.text}
-                  </legend>
-                  <div className="mt-2 flex justify-end">
+                <fieldset key={qIndex} className="rounded-xl border border-sapphire/25 bg-paper p-4 shadow-sm sm:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <legend className="text-base font-semibold leading-relaxed text-ink sm:text-lg">
+                      <span className="mr-2 inline-grid h-8 w-8 place-items-center rounded-full bg-sapphire text-sm font-bold text-on-sapphire">
+                        {qIndex + 1}
+                      </span>
+                      {q.text}
+                    </legend>
                     <button
                       type="button"
                       onClick={() => handleReportQuestion(qIndex)}
-                      className="min-h-11 min-w-11 rounded-lg border border-sapphire/20 px-3 text-sm text-ink/70 transition hover:border-gold hover:bg-gold/10 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-sapphire"
+                      className="min-h-10 min-w-10 shrink-0 rounded-lg border border-sapphire/20 px-2.5 text-xs text-ink/70 transition hover:border-gold hover:bg-gold/10 hover:text-ink"
                       title={copy.reportQuestion}
                       aria-label={copy.reportQuestion}
                     >
                       {reportedQuestion[qIndex] ? copy.reported : '🚩'}
                     </button>
                   </div>
+
                   <div className="mt-3 space-y-2">
                     {q.options.map((opt, oIndex) => {
                       const isSelected = selectedAnswers[qIndex] === oIndex;
@@ -352,9 +328,9 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
                           disabled={Boolean(submission)}
                           aria-pressed={isSelected}
                           onClick={() => handleSelect(qIndex, oIndex)}
-                          className={`flex min-h-12 w-full items-start gap-3 rounded-xl border-2 px-4 py-3 text-left text-base leading-relaxed transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sapphire disabled:cursor-default ${buttonClass}`}
+                          className={`flex min-h-12 w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-base leading-relaxed transition-all disabled:cursor-default ${buttonClass}`}
                         >
-                          <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-bold ${
+                          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-bold ${
                             isSelected && !submission
                               ? 'border-white/60 bg-white/15 text-white'
                               : 'border-current/30'
@@ -386,14 +362,14 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
           </div>
 
           {error && (
-            <p role="alert" className="mt-3 text-sm text-rose-600">
+            <p role="alert" className="mt-3 text-sm text-rose-400">
               {error}{loginRequired ? <> <Link href="/app" className="font-semibold underline">{copy.login}</Link></> : null}
             </p>
           )}
 
           {!submission ? (
             <div className="mt-6">
-              <Button onClick={handleSubmit} disabled={submitting} kind="primary">
+              <Button onClick={handleSubmit} disabled={submitting} className="min-h-[48px] w-full text-base font-bold">
                 {submitting ? copy.submitting : copy.submitQuiz}
               </Button>
             </div>
@@ -409,7 +385,6 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
           )}
         </section>
       )}
-      </div>
     </Card>
   );
 }

@@ -2,25 +2,19 @@
 
 import { useRef, useState } from 'react';
 
-// Session memory cache to prevent spamming the internet API for identical words during active browsing
 const sessionWordCache = new Map();
 
-function normalizeWord(word = '') {
+export function normalizeWord(word = '') {
   return String(word || '')
     .toLowerCase()
-    .replace(/^[^a-z0-9ঀ-৿]+|[^a-z0-9ঀ-৿]+$/g, '');
+    .replace(/^[^a-z0-9\u0980-\u09FF]+|[^a-z0-9\u0980-\u09FF]+$/gi, '');
 }
 
-/**
- * Fetch word meaning directly from the internet.
- * If user is offline, strictly returns offline state so no meaning is shown.
- */
-async function fetchOnlineWordMeaning(rawWord, lang = 'bn') {
+export async function fetchOnlineWordMeaning(rawWord, lang = 'bn') {
   const isBn = lang === 'bn';
   const clean = normalizeWord(rawWord);
   if (!clean || clean.length < 2) return null;
 
-  // Strict offline check: if user goes offline, they cannot see the meaning
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return {
       term: clean,
@@ -29,71 +23,86 @@ async function fetchOnlineWordMeaning(rawWord, lang = 'bn') {
     };
   }
 
-  // Use session memory if already fetched while online
   if (sessionWordCache.has(clean)) {
     return sessionWordCache.get(clean);
   }
 
-  // 1. Try MyMemory Open Translation API (en -> bn) from the internet
-  try {
-    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=en|bn`;
-    const res = await fetch(myMemoryUrl, { signal: AbortSignal.timeout(4500) });
-    if (res.ok) {
-      const data = await res.json();
-      const translated = data?.responseData?.translatedText;
-      if (
-        translated &&
-        !translated.startsWith('MYMEMORY WARNING') &&
-        translated.toLowerCase() !== clean.toLowerCase()
-      ) {
-        const item = { term: clean, meaning: translated, isOffline: false };
-        sessionWordCache.set(clean, item);
-        return item;
-      }
-    }
-  } catch {
-    // If fetch failed due to losing connection during the request
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      return {
-        term: clean,
-        meaning: isBn ? '⚠️ অফলাইন: শব্দার্থ দেখতে ইন্টারনেট সংযোগ প্রয়োজন।' : '⚠️ Offline: Internet connection required.',
-        isOffline: true,
-      };
-    }
-  }
+  let banglaMeaning = '';
+  let englishDetails = '';
 
-  // 2. Fallback to Free Dictionary API (English definition & phonetics) from the internet
-  try {
-    const dictUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`;
-    const res = await fetch(dictUrl, { signal: AbortSignal.timeout(4500) });
-    if (res.ok) {
-      const data = await res.json();
-      const entry = Array.isArray(data) ? data[0] : null;
-      if (entry) {
-        const phonetic = entry.phonetic || entry.phonetics?.find((p) => p.text)?.text || '';
-        const def = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
-        const partOfSpeech = entry.meanings?.[0]?.partOfSpeech || '';
-        const display = [
-          phonetic ? `[${phonetic}]` : '',
-          partOfSpeech ? `(${partOfSpeech})` : '',
-          def,
-        ].filter(Boolean).join(' ');
+  const [gtxResult, myMemoryResult, dictResult] = await Promise.allSettled([
+    fetch(
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=bn&dt=t&dt=bd&q=${encodeURIComponent(clean)}`,
+      { signal: AbortSignal.timeout(4500) }
+    ).then((r) => (r.ok ? r.json() : null)),
+    fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=en|bn`,
+      { signal: AbortSignal.timeout(4500) }
+    ).then((r) => (r.ok ? r.json() : null)),
+    fetch(
+      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`,
+      { signal: AbortSignal.timeout(4500) }
+    ).then((r) => (r.ok ? r.json() : null)),
+  ]);
 
-        if (display) {
-          const item = { term: clean, meaning: display, isOffline: false };
-          sessionWordCache.set(clean, item);
-          return item;
+  if (gtxResult.status === 'fulfilled' && Array.isArray(gtxResult.value)) {
+    const data = gtxResult.value;
+    const primaryBn = data?.[0]?.[0]?.[0];
+    const dictSynonyms = [];
+    if (Array.isArray(data?.[1])) {
+      for (const posGroup of data[1]) {
+        if (Array.isArray(posGroup?.[1])) {
+          dictSynonyms.push(...posGroup[1].slice(0, 3));
         }
       }
     }
-  } catch {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      return {
-        term: clean,
-        meaning: isBn ? '⚠️ অফলাইন: শব্দার্থ দেখতে ইন্টারনেট সংযোগ প্রয়োজন।' : '⚠️ Offline: Internet connection required.',
-        isOffline: true,
-      };
+    const combinedBn = [
+      primaryBn && primaryBn.toLowerCase() !== clean ? primaryBn : '',
+      ...dictSynonyms.filter((w) => w && w !== primaryBn),
+    ].filter(Boolean);
+    if (combinedBn.length > 0) {
+      banglaMeaning = combinedBn.slice(0, 4).join(', ');
     }
+  }
+
+  if (!banglaMeaning && myMemoryResult.status === 'fulfilled' && myMemoryResult.value) {
+    const translated = myMemoryResult.value?.responseData?.translatedText;
+    if (
+      translated &&
+      !translated.startsWith('MYMEMORY WARNING') &&
+      translated.toLowerCase() !== clean.toLowerCase()
+    ) {
+      banglaMeaning = translated;
+    }
+  }
+
+  if (dictResult.status === 'fulfilled' && Array.isArray(dictResult.value)) {
+    const entry = dictResult.value[0];
+    if (entry) {
+      const phonetic = entry.phonetic || entry.phonetics?.find((p) => p.text)?.text || '';
+      const def = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
+      const partOfSpeech = entry.meanings?.[0]?.partOfSpeech || '';
+      englishDetails = [
+        phonetic ? `[${phonetic}]` : '',
+        partOfSpeech ? `(${partOfSpeech})` : '',
+        def,
+      ].filter(Boolean).join(' ');
+    }
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return {
+      term: clean,
+      meaning: isBn ? '⚠️ অফলাইন: শব্দার্থ দেখতে ইন্টারনেট সংযোগ প্রয়োজন।' : '⚠️ Offline: Internet connection required.',
+      isOffline: true,
+    };
+  }
+
+  const finalMeaning = [banglaMeaning, englishDetails].filter(Boolean).join(' — ');
+  if (finalMeaning) {
+    const item = { term: clean, meaning: finalMeaning, isOffline: false };
+    sessionWordCache.set(clean, item);
+    return item;
   }
 
   return {
@@ -112,12 +121,12 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn', keyTakea
   const copy = {
     meaningTitle: isBn ? 'গল্পের সারসংক্ষেপ ও শিক্ষা' : 'Story Meaning & Lessons',
     tapHint: isBn
-      ? '💡 যেকোনো ইংরেজি শব্দে মাউস রাখলে বা ট্যাপ করলে সরাসরি ইন্টারনেট থেকে অর্থ দেখাবে (অফলাইনে কাজ করবে না)'
-      : '💡 Hover or tap any English word to fetch its meaning online (requires internet connection)',
+      ? '💡 যেকোনো ইংরেজি বা কঠিন শব্দে ক্লিক/ট্যাপ করলে অথবা মাউস রাখলে সাথে সাথে বাংলা ও ইংরেজি অর্থ হাইলাইট হয়ে দেখাবে'
+      : '💡 Click, tap, or hover any complex English word to highlight it and see its Bengali & English meaning',
     takeaway: isBn ? 'মূল শিক্ষা' : 'Key takeaway',
     close: isBn ? '✕ বন্ধ' : '✕ Close',
-    vocabTitle: isBn ? 'গুরুত্বপূর্ণ শব্দভাণ্ডার' : 'Key Vocabulary',
-    searching: isBn ? 'অনলাইন থেকে খোঁজা হচ্ছে...' : 'Fetching online...',
+    vocabTitle: isBn ? 'গুরুত্বপূর্ণ শব্দভাণ্ডার (২০% অ্যাডভান্সড শব্দ)' : 'Key Vocabulary (20% Advanced Words)',
+    searching: isBn ? 'অনলাইন থেকে অর্থ খোঁজা হচ্ছে...' : 'Fetching meaning online...',
   };
 
   const handleWordClick = async (word) => {
@@ -163,7 +172,7 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn', keyTakea
   };
 
   return (
-    <div>
+    <div className="w-full">
       {(description || keyTakeaway) ? (
         <div className="routine-tile mb-3 p-4">
           <h4 className="eyebrow">✦ {copy.meaningTitle}</h4>
@@ -175,21 +184,29 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn', keyTakea
           ) : null}
           <p className="mt-2 text-xs font-semibold text-sapphire">{copy.tapHint}</p>
         </div>
-      ) : null}
+      ) : (
+        <p className="mb-3 rounded-xl border border-sapphire/30 bg-sapphire/10 px-3 py-2 text-xs font-semibold text-sapphire">
+          {copy.tapHint}
+        </p>
+      )}
 
-      {/* Selected word popup card on click / tap */}
       {selected ? (
-        <div className={`relative mb-3 flex items-center justify-between rounded-xl border p-3 text-sm shadow-md animate-in fade-in ${
-          selected.isOffline
-            ? 'border-rose-400/40 bg-rose-500/10 text-rose-300'
-            : 'border-gold bg-gold/15 text-ink'
-        }`}>
-          <div>
-            <span className="font-bold text-gold-soft">{selected.term}: </span>
-            <span className="font-medium">
+        <div
+          role="status"
+          className={`sticky top-2 z-30 mb-3 flex items-center justify-between rounded-xl border-2 p-3.5 text-sm shadow-lg ${
+            selected.isOffline
+              ? 'border-rose-400 bg-paper text-rose-300'
+              : 'border-gold bg-paper text-ink'
+          }`}
+        >
+          <div className="min-w-0 flex-1 pr-2">
+            <span className="inline-block rounded bg-gold px-2 py-0.5 text-xs font-extrabold text-on-gold mr-2">
+              {selected.term}
+            </span>
+            <span className="font-semibold leading-relaxed">
               {selected.loading ? (
                 <span className="inline-flex items-center gap-1.5 opacity-80">
-                  <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border border-gold border-t-transparent" />
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gold border-t-transparent" />
                   {selected.meaning}
                 </span>
               ) : (
@@ -200,16 +217,16 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn', keyTakea
           <button
             type="button"
             onClick={() => setSelected(null)}
-            className="ml-3 rounded-lg border border-gold/40 px-2.5 py-1 text-xs font-bold text-gold-soft hover:bg-gold/20"
+            className="shrink-0 rounded-lg border border-gold/50 px-3 py-1.5 text-xs font-bold text-gold-soft hover:bg-gold/20"
           >
             {copy.close}
           </button>
         </div>
       ) : null}
 
-      <div className="space-y-1.5">
+      <div className="w-full space-y-2">
         {lines.map((line, index) => (
-          <p key={index} className="rounded-lg px-2.5 py-2 text-sm leading-relaxed even:bg-sapphire/10">
+          <p key={index} className="rounded-xl px-3 py-2.5 text-base leading-relaxed even:bg-sapphire/10">
             {line.speaker ? (
               <span className="mr-2 inline-block rounded-full border border-gold/40 bg-gold/15 px-2.5 py-0.5 text-xs font-bold text-gold-soft">
                 {line.speaker}
@@ -232,28 +249,23 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn', keyTakea
                     onClick={() => handleWordClick(part)}
                     onMouseEnter={() => handleMouseEnter(part, wordKey)}
                     onMouseLeave={handleMouseLeave}
-                    className={`rounded px-0.5 transition underline decoration-dotted decoration-gold/60 underline-offset-4 cursor-pointer hover:bg-gold/30 hover:text-gold-soft ${
-                      isSelected ? 'bg-gold/40 font-bold' : ''
+                    className={`rounded px-1 py-0.5 transition underline decoration-dotted decoration-gold/60 underline-offset-4 cursor-pointer hover:bg-gold/30 hover:text-gold-soft ${
+                      isSelected ? 'bg-gold text-on-gold font-extrabold ring-2 ring-gold no-underline' : ''
                     }`}
                   >
                     {part}
                   </button>
 
-                  {/* Desktop Hover Tooltip */}
                   {isHovered ? (
                     <span
                       role="tooltip"
-                      className={`pointer-events-none absolute -top-8 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-xl ${
+                      className={`pointer-events-none absolute -top-9 left-1/2 z-40 max-w-xs -translate-x-1/2 truncate rounded-lg border px-2.5 py-1 text-xs font-semibold shadow-xl ${
                         hovered.isOffline
                           ? 'border-rose-400 bg-black/95 text-rose-300'
-                          : 'border-gold/70 bg-black/95 text-gold'
+                          : 'border-gold bg-black/95 text-gold-soft'
                       }`}
                     >
-                      {hovered.loading ? (
-                        <span className="opacity-70">...</span>
-                      ) : (
-                        hovered.meaning
-                      )}
+                      {hovered.loading ? '...' : hovered.meaning}
                     </span>
                   ) : null}
                 </span>
@@ -272,7 +284,11 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn', keyTakea
               const rawMeaning = entry?.definition || entry?.meaning || '';
               const meaning = typeof rawMeaning === 'string' ? rawMeaning : rawMeaning?.[lang] || rawMeaning?.en || rawMeaning?.bn || '';
               return (
-                <div key={entryIndex} className="rounded-lg border border-sapphire/20 bg-paper/60 p-2.5 text-sm">
+                <div
+                  key={entryIndex}
+                  onClick={() => handleWordClick(term)}
+                  className="cursor-pointer rounded-xl border border-gold/25 bg-paper/70 p-3 text-sm transition hover:border-gold"
+                >
                   <dt className="font-bold text-gold-soft">{term}</dt>
                   <dd className="mt-0.5 text-xs text-ink/85">{meaning}</dd>
                 </div>
