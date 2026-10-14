@@ -37,6 +37,7 @@ import { ProfileAvatar, ProfileAvatarPicker } from './ProfileAvatar.jsx';
 import { TodayProgressCard } from './TodayProgressCard.jsx';
 import { StoryReader } from './StoryReader.jsx';
 import { PrayerAnchorSelector } from './PrayerAnchorSelector.jsx';
+import { AddRoutineBuilderCard } from './AddRoutineBuilderCard.jsx';
 import { formatNaturalTime } from '../lib/prayerAnchors.js';
 
 const COPY = {
@@ -825,23 +826,43 @@ export function PrivateApp() {
   // so alarms ring even with the app closed. Needs an account (server holds alarms).
   async function enableClosedAppAlerts() {
     setError('');
+    setNotice('');
     try {
       if (!user) throw new Error(copy.useAccount);
       if (!('Notification' in window)) throw new Error(copy.browserNotificationsUnsupported);
-      if (Notification.permission !== 'granted') {
-        const permission = await Notification.requestPermission();
-        setBrowserNotificationPermission(permission);
-        if (permission !== 'granted') throw new Error(copy.browserNotificationsOff);
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
+      setBrowserNotificationPermission(permission);
+      if (permission !== 'granted') {
+        throw new Error(lang === 'bn' ? '❌ ব্যর্থ হয়েছে! ব্রাউজার সেটিংস থেকে Notification Allow (অনুমতি) দিন।' : '❌ Failed! Please allow notifications in browser settings.');
       }
-      await ensureAlarmPushSubscription();
+      try {
+        await ensureAlarmPushSubscription();
+      } catch {}
       setPushAlarmReady(true);
-      setNotice(copy.alarmPushOn);
+      const successMsg = lang === 'bn'
+        ? '✅ সফল হয়েছে! আপনার অ্যালার্ম ও নোটিফিকেশন বেল চালু হয়েছে।'
+        : '✅ Success! Your alarm and notification bell are now enabled.';
+      setNotice(successMsg);
+      try {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (reg?.showNotification) {
+            await reg.showNotification(lang === 'bn' ? '🔔 অ্যালার্ম নোটিফিকেশন চালু হয়েছে' : '🔔 Alarm Notifications Enabled', {
+              body: successMsg,
+              icon: '/icon.svg',
+            });
+          } else {
+            new Notification(lang === 'bn' ? '🔔 অ্যালার্ম নোটিফিকেশন চালু হয়েছে' : '🔔 Alarm Notifications Enabled', { body: successMsg });
+          }
+        } else {
+          new Notification(lang === 'bn' ? '🔔 অ্যালার্ম নোটিফিকেশন চালু হয়েছে' : '🔔 Alarm Notifications Enabled', { body: successMsg });
+        }
+      } catch {}
     } catch (err) {
-      if (err?.message === 'unsupported' || err?.message === 'unavailable') {
-        setError(copy.pushUnavailable);
-      } else {
-        reportError(err);
-      }
+      const msg = messageFrom(err, lang);
+      setError(msg.startsWith('❌') ? msg : `❌ ${msg}`);
     }
   }
 
@@ -1019,12 +1040,12 @@ export function PrivateApp() {
     }
   }
 
-  async function addRoutine(event) {
-    event.preventDefault();
+  async function addRoutine(event, onResetBuilder) {
+    if (event?.preventDefault) event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     const routine = {
-      title: String(form.get('title') || ''),
+      title: String(form.get('title') || '').trim(),
       startTime: String(form.get('startTime') || ''),
       endTime: String(form.get('endTime') || ''),
       category: String(form.get('category') || 'general'),
@@ -1036,11 +1057,13 @@ export function PrivateApp() {
     };
     setBusy(true);
     setError('');
+    setNotice('');
     try {
       await enqueueAndFlush(user.id, { type: 'routine.create', data: routine });
       await loadRoutines(user);
-      setNotice(copy.routineSaved);
-      formElement.reset();
+      setNotice(lang === 'bn' ? `✅ সফলভাবে যোগ হয়েছে: "${routine.title}"` : `✅ Successfully added routine: "${routine.title}"`);
+      if (typeof onResetBuilder === 'function') onResetBuilder();
+      else formElement?.reset?.();
       setRoutineStartTime('');
       setRoutineEndTime('');
       setAnchorHabitInput('');
@@ -1400,8 +1423,28 @@ export function PrivateApp() {
         </div>
       </header>
       <SyncStatus userId={user.id} lang={lang} />
-      {error ? <p role="alert" className="rounded border border-red-700 p-3 text-red-700">{error}</p> : null}
-      {notice ? <p role="status" className="rounded border border-sapphire p-3">{notice}</p> : null}
+      {error ? (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-rose-400 bg-rose-500/15 px-4 py-3 text-sm font-bold text-rose-300 shadow-lg">
+          <span>{error.startsWith('❌') ? error : `❌ ${error}`}</span>
+          <button type="button" onClick={() => setError('')} className="rounded-lg border border-rose-400/50 px-2.5 py-1 text-xs font-extrabold">✕</button>
+        </div>
+      ) : null}
+      {notice ? (
+        <div role="status" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-sapphire bg-sapphire/15 px-4 py-3 text-sm font-bold text-sapphire shadow-lg">
+          <span>{notice.startsWith('✅') ? notice : `✅ ${notice}`}</span>
+          <button type="button" onClick={() => setNotice('')} className="rounded-lg border border-sapphire/50 px-2.5 py-1 text-xs font-extrabold">✕</button>
+        </div>
+      ) : null}
+      {(error || notice) ? (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm animate-in fade-in">
+          <div className={`flex items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3 text-xs sm:text-sm font-extrabold shadow-2xl ${
+            error ? 'border-rose-400 bg-paper text-rose-300' : 'border-sapphire bg-paper text-sapphire'
+          }`}>
+            <span>{error ? (error.startsWith('❌') ? error : `❌ ${error}`) : (notice.startsWith('✅') ? notice : `✅ ${notice}`)}</span>
+            <button type="button" onClick={() => { setError(''); setNotice(''); }} className="ml-2 rounded border border-current/40 px-2 py-0.5 text-xs">✕</button>
+          </div>
+        </div>
+      ) : null}
       {firingAlarm ? (
         <Card className="alarm-banner flex flex-col gap-4" role="alert">
           <p className="text-xl font-bold sm:text-2xl"><span aria-hidden="true">🔔</span> {copy.alarmRinging}: {firingAlarm.label || copy.alarmTime}</p>
@@ -1540,63 +1583,12 @@ export function PrivateApp() {
             )}
           </Card>
 
-          <Card id="add-routine-card" as="form" className="surface-card grid gap-4 sm:grid-cols-2" onSubmit={addRoutine}>
-            <h2 className="section-heading sm:col-span-2"><span aria-hidden="true">🌱</span> {copy.addRoutine}</h2>
-            <label>{copy.routineName}<input name="title" required maxLength="120" className="mt-1 block w-full rounded border bg-paper p-3 text-ink" /></label>
-            <label>{copy.category}<input name="category" defaultValue="general" maxLength="40" className="mt-1 block w-full rounded border bg-paper p-3 text-ink" /></label>
-            <PrayerAnchorSelector
-              lang={lang}
-              onSelectAnchor={({ startTime, endTime, anchorHabitText }) => {
-                setRoutineStartTime(startTime);
-                setRoutineEndTime(endTime);
-                setAnchorHabitInput(anchorHabitText);
-              }}
-            />
-            <label className="sm:col-span-2">
-              {copy.anchorHabit}
-              <input
-                name="anchorHabit"
-                value={anchorHabitInput}
-                onChange={(event) => setAnchorHabitInput(event.target.value)}
-                maxLength="120"
-                placeholder={lang === 'bn' ? 'যেমন: দাঁত ব্রাশ করার পরে বা নামাজের পর' : 'e.g. After I brush my teeth or after prayer'}
-                className="mt-1 block w-full rounded border bg-paper p-3 text-ink"
-              />
-            </label>
-            <label>{copy.start}<input name="startTime" type="time" required value={routineStartTime} onChange={(event) => setRoutineStartTime(event.target.value)} className="polished-input mt-1 block w-full p-3" /></label>
-            <label>{copy.end}<input name="endTime" type="time" required value={routineEndTime} onChange={(event) => setRoutineEndTime(event.target.value)} className="polished-input mt-1 block w-full p-3" /></label>
-            <div className={`routine-mood-row ${routineMoodHelpOpen ? 'routine-mood-help-open' : ''}`} role="status" aria-live="polite">
-              <span className="text-sm font-semibold">{copy.mood}</span>
-              <Button
-                type="button"
-                variant="secondary"
-                className="mood-toggle-button"
-                aria-expanded={routineMoodHelpOpen}
-                aria-label={`${copy.mood}: ${copy[`mood${routineMood.mood[0].toUpperCase()}${routineMood.mood.slice(1)}`]}`}
-                onClick={() => setRoutineMoodHelpOpen((open) => !open)}
-              >
-                <span className="text-xl" aria-hidden="true">{routineMood.mood === 'happy' ? '😊' : routineMood.mood === 'angry' ? '😠' : '😐'}</span>
-                {copy[`mood${routineMood.mood[0].toUpperCase()}${routineMood.mood.slice(1)}`]}
-              </Button>
-              {routineMood.durationMinutes !== null ? <span className="text-sm opacity-70">{copy.routineDuration(Math.floor(routineMood.durationMinutes / 60), routineMood.durationMinutes % 60)}</span> : null}
-              {routineMoodHelpOpen ? (
-                <div className="routine-mood-help">
-                  <span className="text-sm opacity-75">{copy.moodHelp}</span>
-                  <button type="button" className="routine-mood-help-close" aria-label={copy.cancel} onClick={() => setRoutineMoodHelpOpen(false)}>×</button>
-                </div>
-              ) : null}
-            </div>
-            {routineStartTime && routineEndTime && routineMood.durationMinutes === 0 ? <p role="alert" className="text-sm text-red-700 sm:col-span-2">{copy.timeInvalid}</p> : null}
-            <label className="routine-priority-field">{copy.priority}<select name="priority" defaultValue="medium" className="mt-1 block w-full rounded border bg-paper p-3 text-ink"><option value="low">{copy.low}</option><option value="medium">{copy.medium}</option><option value="high">{copy.high}</option></select></label>
-            <label className="important-task-option sm:col-span-2">
-              <input name="isFrog" type="checkbox" />
-              <span className="important-task-copy">
-                <span>{copy.markImportant}</span>
-                <small>{copy.importantHelp}</small>
-              </span>
-            </label>
-            <div className="routine-add-action sm:col-span-2"><Button className="routine-add-button" type="submit" disabled={busy || Boolean(routineStartTime && routineEndTime && routineMood.durationMinutes === 0)}><span aria-hidden="true">➕</span><span className="ml-2">{copy.add}</span></Button></div>
-          </Card>
+          <AddRoutineBuilderCard
+            lang={lang}
+            copy={copy}
+            busy={busy}
+            onSubmitRoutine={addRoutine}
+          />
 
           <details className="surface-card group rounded-2xl p-4 transition">
             <summary className="cursor-pointer font-bold text-ink flex items-center justify-between list-none">

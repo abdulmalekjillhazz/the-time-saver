@@ -53,6 +53,7 @@ export function PrayerTimesCard({ lang = 'bn' }) {
   const [timezone, setTimezone] = useState('Asia/Dhaka');
   const [source, setSource] = useState('');
   const [error, setError] = useState('');
+  const [feedbackMsg, setFeedbackMsg] = useState(null);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [isPlayingAzan, setIsPlayingAzan] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -117,6 +118,10 @@ export function PrayerTimesCard({ lang = 'bn' }) {
         accuracy: position.coords.accuracy,
         isDefault: false,
       });
+      setFeedbackMsg({
+        type: 'success',
+        text: isBn ? '✅ সফল হয়েছে! আপনার সঠিক অবস্থান অনুযায়ী নামাজের ওয়াক্ত আপডেট হয়েছে।' : '✅ Success! Prayer times updated for your exact location.',
+      });
     } catch (locationError) {
       const messages = {
         GEOLOCATION_UNSUPPORTED: isBn
@@ -132,9 +137,11 @@ export function PrayerTimesCard({ lang = 'bn' }) {
           ? 'Location পেতে বেশি সময় লাগছে। আবার চেষ্টা করুন।'
           : 'Location lookup timed out. Please try again.',
       };
-      setError(messages[locationError.message || locationError.code] || (
+      const failText = messages[locationError.message || locationError.code] || (
         isBn ? 'Device location পাওয়া যায়নি। আবার চেষ্টা করুন।' : 'Could not get device location. Please try again.'
-      ));
+      );
+      setError(failText);
+      setFeedbackMsg({ type: 'error', text: `❌ ${failText}` });
     } finally {
       setLocating(false);
     }
@@ -283,6 +290,10 @@ export function PrayerTimesCard({ lang = 'bn' }) {
     if (notificationsEnabled) {
       stopAzanAudio();
       setNotificationsEnabled(false);
+      setFeedbackMsg({
+        type: 'info',
+        text: isBn ? 'ℹ️ আজান ও নামাজের নোটিফিকেশন বন্ধ করা হয়েছে।' : 'ℹ️ Azan notifications turned off.',
+      });
       return;
     }
     try {
@@ -300,13 +311,23 @@ export function PrayerTimesCard({ lang = 'bn' }) {
           ? await Notification.requestPermission()
           : Notification.permission;
         if (permission !== 'granted') {
-          setError(isBn ? 'Browser settings থেকে notification অনুমতি দিন।' : 'Allow notifications in your browser settings.');
+          const failMsg = isBn
+            ? '❌ ব্যর্থ হয়েছে! ব্রাউজার সেটিংস থেকে Notification Allow (অনুমতি) দিন।'
+            : '❌ Failed! Please allow notifications in your browser settings.';
+          setError(failMsg);
+          setFeedbackMsg({ type: 'error', text: failMsg });
           return;
         }
       }
 
       setError('');
       setNotificationsEnabled(true);
+      setFeedbackMsg({
+        type: 'success',
+        text: isBn
+          ? '✅ সফল হয়েছে! স্বয়ংক্রিয় আজান ও নামাজের নোটিফিকেশন চালু হয়েছে।'
+          : '✅ Success! Automatic Azan and prayer notifications are now enabled.',
+      });
 
       void getAzanPlaybackUrl().then((url) => {
         setAzanUrl(url);
@@ -420,7 +441,23 @@ export function PrayerTimesCard({ lang = 'bn' }) {
           );
         })}
       </div>
-      {error ? <p role="alert" className="mt-2 text-xs text-red-400">{error}</p> : null}
+      {feedbackMsg ? (
+        <div
+          role={feedbackMsg.type === 'error' ? 'alert' : 'status'}
+          className={`mt-3 flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-bold ${
+            feedbackMsg.type === 'error'
+              ? 'border-rose-400 bg-rose-500/15 text-rose-300'
+              : feedbackMsg.type === 'success'
+                ? 'border-sapphire bg-sapphire/15 text-sapphire'
+                : 'border-gold/50 bg-gold/15 text-gold-soft'
+          }`}
+        >
+          <span>{feedbackMsg.text}</span>
+          <button type="button" onClick={() => setFeedbackMsg(null)} className="px-1.5 text-xs font-extrabold opacity-80 hover:opacity-100">✕</button>
+        </div>
+      ) : error ? (
+        <p role="alert" className="mt-2 rounded-xl border border-rose-400 bg-rose-500/15 px-3 py-2 text-xs font-bold text-rose-300">{error}</p>
+      ) : null}
       <section className="routine-tile mt-2.5 p-3" aria-live="polite">
         <div className="flex items-center justify-between gap-2">
           <h4 className="section-heading text-xs sm:text-sm">

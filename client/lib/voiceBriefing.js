@@ -226,3 +226,63 @@ export function createFreeEnglishSpeech(text, { onEnd, onError } = {}) {
     errorMessage: 'The free English voice could not play this briefing.',
   });
 }
+
+export function buildDetailedRoutineBriefing({
+  name,
+  hour,
+  now = new Date(),
+  timeZone,
+  routines = [],
+  lang = 'bn',
+}) {
+  const base = buildVoiceBriefing({ name, hour, now, timeZone, routines, lang });
+  const isBn = lang === 'bn';
+  const sorted = [...(routines || [])]
+    .filter((r) => r && typeof r.title === 'string' && r.title.trim())
+    .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')));
+
+  if (!sorted.length) {
+    const emptyText = isBn
+      ? `${base.greeting}, ${base.name}! আজ আপনার তালিকায় এখনো কোনো রুটিন যোগ করা হয়নি। একটি ছোট রুটিন যোগ করে আজকের দিনটি শুরু করুন।`
+      : `${base.greeting}, ${base.name}! You do not have any routines scheduled for today yet. Add one small routine to begin your day.`;
+    return { ...base, text: emptyText };
+  }
+
+  const doneList = sorted.filter((r) => r.completionStatus === 'done');
+  const pendingList = sorted.filter((r) => r.completionStatus !== 'done');
+  const frogTask = pendingList.find((r) => r.isFrog);
+
+  if (isBn) {
+    const parts = [`${base.greeting}, ${base.name}!`];
+    parts.push(`আজ আপনার তালিকায় মোট ${sorted.length}টি রুটিন রয়েছে।`);
+    if (doneList.length > 0) {
+      parts.push(`আপনি ইতিমধ্যে সম্পন্ন করেছেন: ${doneList.map((r) => r.title.trim()).join(', ')}। দারুণ কাজ!`);
+    }
+    if (pendingList.length > 0) {
+      const namedItems = pendingList
+        .map((r) => `${r.startTime ? `${r.startTime} মিনিটে ` : ''}${r.title.trim()}`)
+        .join(', ');
+      parts.push(`আপনার আজকের রুটিনগুলো হলো: ${namedItems}।`);
+    }
+    if (frogTask) {
+      parts.push(`আজ আপনার সবচেয়ে গুরুত্বপূর্ণ কাজ হলো ${frogTask.title.trim()}—এটি সবার আগে শেষ করার চেষ্টা করুন।`);
+    }
+    return { ...base, text: parts.join(' ') };
+  }
+
+  const parts = [`${base.greeting}, ${base.name}!`];
+  parts.push(`You have ${sorted.length} routine${sorted.length === 1 ? '' : 's'} on your schedule today.`);
+  if (doneList.length > 0) {
+    parts.push(`You have already completed: ${doneList.map((r) => r.title.trim()).join(', ')}. Great job!`);
+  }
+  if (pendingList.length > 0) {
+    const namedItems = pendingList
+      .map((r) => `${r.title.trim()}${r.startTime ? ` at ${r.startTime}` : ''}`)
+      .join(', ');
+    parts.push(`Your upcoming routines are: ${namedItems}.`);
+  }
+  if (frogTask) {
+    parts.push(`Your most important priority today is ${frogTask.title.trim()}—give it your focus first.`);
+  }
+  return { ...base, text: parts.join(' ') };
+}

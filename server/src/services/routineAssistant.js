@@ -7,11 +7,45 @@ function routinesContext(routines) {
     const status = r.completionStatus ?? 'pending';
     const risk = typeof r.probability === 'number' ? `, miss-risk ${Math.round(r.probability * 100)}%` : '';
     const frog = r.isFrog ? ', FROG (most important task)' : '';
-    return `- ${r.title} (${r.startTime}-${r.endTime}, ${status}${risk}${frog})`;
+    const anchor = r.anchorHabit ? `, anchor: ${r.anchorHabit}` : '';
+    return `- ${r.title} (${r.startTime}-${r.endTime}, ${status}${risk}${frog}${anchor})`;
   }).join('\n');
 }
 
-// Free-form Q&A about the app and the user's own routines.
+export async function generatePersonalBriefing({ userName, lang = 'bn', routines = [], config }) {
+  const isBn = lang === 'bn';
+  const safeName = String(userName || '').trim() || (isBn ? 'বন্ধু' : 'friend');
+  const system = isBn
+    ? `তুমি Smart Routine অ্যাপের ব্যক্তিগত AI ভয়েস কোচ। ইউজারের নাম "${safeName}"। ইউজারের আজকের রুটিন তালিকা দেখে তাকে নাম ধরে সম্বোধন করে ৪ থেকে ৬ বাক্যের একটি অত্যন্ত আন্তরিক, উৎসাহব্যঞ্জক এবং ব্যক্তিগত ভয়েস ব্রিফিং তৈরি করো।
+নিয়মাবলী:
+১) শুরুতেই "${safeName}"-কে নাম ধরে ডাকবে।
+২) ইউজারের তালিকায় থাকা প্রতিটি রুটিনের নাম ও শুরুর সময় স্পষ্টভাবে এক এক করে উল্লেখ করে ডাকবে (যেমন: "সকাল ৭টায় আপনার সকালের হাঁটা, এরপর সকাল ৯টায় গণিত অনুশীলন...")।
+৩) কোনো রুটিন ইতিমধ্যে সম্পন্ন (done) হয়ে থাকলে সেটির প্রশংসা করবে এবং সবচেয়ে গুরুত্বপূর্ণ কাজটিতে (FROG) বিশেষ মনোযোগ দিতে বলবে।
+৪) কোনো মার্কডাউন (*, #) বা বুলেট পয়েন্ট ব্যবহার করবে না—এমনভাবে প্রাকৃতিক কথ্য বাংলায় লিখবে যেন সরাসরি ভয়েসে পড়ে শোনানো যায়।`
+    : `You are the personal AI Voice Coach for Smart Routine. The user's name is "${safeName}". Write a warm, motivating 4-to-6 sentence spoken voice briefing tailored specifically to ${safeName}.
+Rules:
+1) Greet "${safeName}" warmly by name at the very beginning.
+2) Explicitly call out each of the user's routines by its exact name and start time one by one (e.g., "At 7:00 AM you have Morning Walk, followed by Math Study at 9:00 AM...").
+3) Praise any routine already marked as done, and highlight their most important FROG task if present.
+4) Do NOT use markdown (*, #) or bullet points—write natural spoken sentences ready for text-to-speech.`;
+
+  const userPrompt = isBn
+    ? `ইউজারের নাম: ${safeName}\nআজকের রুটিন তালিকা:\n${routinesContext(routines)}\n\nএখন প্রতিটি রুটিনের নাম ধরে ডেকে একটি সুন্দর বাংলা ভয়েস ব্রিফিং দাও।`
+    : `User name: ${safeName}\nToday's routines:\n${routinesContext(routines)}\n\nGenerate the spoken voice briefing calling out each routine by name.`;
+
+  const { text } = await askAI({
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: userPrompt },
+    ],
+    config,
+    maxTokens: 600,
+    temperature: 0.65,
+  });
+
+  return String(text || '').replace(/[*#_`~>-]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export async function answerQuestion({ question, lang, routines, config }) {
   const system = lang === 'bn'
     ? `তুমি Smart Routine অ্যাপের AM's রুটিন সহকারী — একজন রুটিন ও হ্যাবিট কোচ। শুধু রুটিন তৈরি, সময় ব্যবস্থাপনা, অভ্যাস গঠন, "Eat That Frog" (সবচেয়ে কঠিন/গুরুত্বপূর্ণ কাজ আগে করা) আর 80/20 নিয়ম (যে ২০% কাজ ৮০% ফলাফল দেয় সেটায় ফোকাস করা) নিয়ে ইউজারের নিচে দেওয়া রুটিন ডেটার ভিত্তিতে সংক্ষিপ্ত, বাস্তবসম্মত পরামর্শ দাও। চিকিৎসা, আইনি বা জরুরি পরামর্শ দিও না। সংক্ষেপে বাংলায় উত্তর দাও।\n\nইউজারের আজকের রুটিন:\n${routinesContext(routines)}`
@@ -21,7 +55,6 @@ export async function answerQuestion({ question, lang, routines, config }) {
   return text;
 }
 
-// Turns a free-text goal into a small set of routine items, picking one "frog" task.
 export async function generateRoutineDraft({ intent, lang, config }) {
   const instructions = lang === 'bn'
     ? `তুমি একজন প্রোডাক্টিভিটি কোচ। ইউজারের লক্ষ্য পড়ে ৪ থেকে ৮টা দৈনিক রুটিন আইটেম বানাও। নিয়ম:\n1) "Eat That Frog" নীতি মেনে সবচেয়ে কঠিন/গুরুত্বপূর্ণ কাজটা সকালের দিকে রাখো আর "isFrog": true দাও (শুধু একটায়)।\n2) 80/20 নিয়ম মেনে যে কাজগুলো সবচেয়ে বেশি ফলাফল দেয় সেগুলোকে priority "high" দাও, বাকিদের "medium"/"low"।\n3) সময়গুলো একে অপরের সাথে ওভারল্যাপ করবে না, বাস্তবসম্মত সময় দাও (HH:MM, 24-ঘণ্টা ফরম্যাট)।\nশুধু নিচের JSON array ফরম্যাটে উত্তর দাও, অন্য কোনো টেক্সট ছাড়া:\n[{"title": string, "startTime": "HH:MM", "endTime": "HH:MM", "priority": "high"|"medium"|"low", "isFrog": boolean, "category": string}]`
@@ -58,7 +91,6 @@ export async function generateRoutineDraft({ intent, lang, config }) {
     }));
 
   if (!clean.length) throw failed();
-  // Only one frog, even if the model gave more than one.
   let frogSeen = false;
   for (const item of clean) {
     if (item.isFrog && frogSeen) item.isFrog = false;

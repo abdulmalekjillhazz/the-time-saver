@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { AppError, MSG } from '../lib/AppError.js';
-import { answerQuestion, generateRoutineDraft } from '../services/routineAssistant.js';
+import { answerQuestion, generateRoutineDraft, generatePersonalBriefing } from '../services/routineAssistant.js';
 import { generateAdaptiveReplan, completeMicroRoutine } from '../services/adaptiveReplan.js';
 
 const MINUTE = 60 * 1000;
@@ -10,7 +10,24 @@ const MINUTE = 60 * 1000;
 export function assistantRouter(config) {
   const r = Router();
   r.use(requireAuth);
-  r.use(rateLimit({ name: 'assistant', limit: 20, windowMs: MINUTE, by: 'user' }));
+  r.use(rateLimit({ name: 'assistant', limit: 25, windowMs: MINUTE, by: 'user' }));
+
+  r.post('/briefing', async (req, res, next) => {
+    try {
+      const lang = req.body?.lang === 'bn' ? 'bn' : 'en';
+      const routines = Array.isArray(req.body?.routines) ? req.body.routines : [];
+      const userName = req.user?.displayName || req.body?.userName || '';
+      const briefingText = await generatePersonalBriefing({
+        userName,
+        lang,
+        routines,
+        config,
+      });
+      res.json({ briefingText, source: 'gemini' });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   r.post('/ask', async (req, res, next) => {
     try {
