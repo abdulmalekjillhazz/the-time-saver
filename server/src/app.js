@@ -50,7 +50,7 @@ export function createApp({ config }) {
   );
   app.use(
     cors({
-      origin: config.CLIENT_ORIGIN,
+      origin: true,
       credentials: true,
       allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
@@ -95,27 +95,53 @@ export function createApp({ config }) {
 let serverlessApp = null;
 
 export default async function handler(req, res) {
-  if (!serverlessApp) {
+  const mongooseModule = await import('mongoose');
+  const mongoose = mongooseModule.default || mongooseModule;
+
+  let config;
+  try {
+    const { loadEnv } = await import('./config/env.js');
+    config = loadEnv();
+  } catch (envErr) {
+    console.warn('loadEnv fallback used:', envErr.message);
+    config = {
+      NODE_ENV: process.env.NODE_ENV || 'production',
+      PORT: Number(process.env.PORT) || 5000,
+      MONGODB_URI: (process.env.MONGODB_URI || '').trim(),
+      CLIENT_ORIGIN: (process.env.CLIENT_ORIGIN || 'https://made-your-dream-bigger.vercel.app').replace(/\/+$/, ''),
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      GROQ_API_KEY: process.env.GROQ_API_KEY,
+      GROQ_MODEL: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
+      ELEVENLABS_MODEL: process.env.ELEVENLABS_MODEL || 'eleven_v3',
+      ELEVENLABS_FATHER_VOICE_ID: process.env.ELEVENLABS_FATHER_VOICE_ID,
+      ELEVENLABS_MOTHER_VOICE_ID: process.env.ELEVENLABS_MOTHER_VOICE_ID,
+      ELEVENLABS_SON_VOICE_ID: process.env.ELEVENLABS_SON_VOICE_ID,
+      ELEVENLABS_STORYTELLER_VOICE_ID: process.env.ELEVENLABS_STORYTELLER_VOICE_ID,
+      CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+      CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+      CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+      VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+      VAPID_SUBJECT: process.env.VAPID_SUBJECT,
+      SCHEDULER_ENABLED: false,
+    };
+  }
+
+  // Always connect to MongoDB if not already connected
+  const mongoUri = config.MONGODB_URI || (process.env.MONGODB_URI || '').trim();
+  if (mongoose.connection.readyState !== 1 && mongoUri) {
     try {
-      const { loadEnv } = await import('./config/env.js');
-      const mongooseModule = await import('mongoose');
-      const mongoose = mongooseModule.default || mongooseModule;
-      const config = loadEnv();
-      if (mongoose.connection.readyState === 0 && config.MONGODB_URI) {
-        await mongoose.connect(config.MONGODB_URI, { serverSelectionTimeoutMS: 10_000 });
-      }
-      serverlessApp = createApp({ config });
-    } catch {
-      serverlessApp = createApp({
-        config: {
-          NODE_ENV: process.env.NODE_ENV || 'production',
-          CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || 'http://localhost:3000',
-          PORT: Number(process.env.PORT) || 5000,
-          MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/smart-routine',
-          SCHEDULER_ENABLED: false,
-        },
-      });
+      await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000 });
+    } catch (dbErr) {
+      console.error('MongoDB connection failed:', dbErr.message);
     }
+  }
+
+  if (!serverlessApp) {
+    serverlessApp = createApp({ config });
   }
   return serverlessApp(req, res);
 }
