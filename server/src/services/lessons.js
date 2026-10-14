@@ -224,3 +224,7 @@ export async function submitAttempt(lessonId, user, answers) {
   });
   return result;
 }
+
+export async function listAllLessons() {
+  return Lesson.find({}).sort({ updatedAt: -1 }).limit(100).lean();
+}

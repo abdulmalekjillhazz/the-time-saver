@@ -559,7 +559,6 @@ export function PrivateApp() {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
     const handleBeforeInstall = (e) => {
-      e.preventDefault();
       setPwaInstallPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
@@ -1212,6 +1211,20 @@ export function PrivateApp() {
               <p className="eyebrow">✦ SMART ROUTINE ✦</p>
             </div>
             <div className="flex items-center gap-2">
+              {pwaInstallPrompt ? (
+                <Button
+                  variant="primary"
+                  className="min-h-[40px] px-3 py-1.5 text-xs font-bold"
+                  onClick={async () => {
+                    pwaInstallPrompt.prompt();
+                    await pwaInstallPrompt.userChoice.catch(() => {});
+                    setPwaInstallPrompt(null);
+                  }}
+                >
+                  <span aria-hidden="true">📲</span>
+                  <span>{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install'}</span>
+                </Button>
+              ) : null}
               <Button
                 variant="secondary"
                 className="language-toggle-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
