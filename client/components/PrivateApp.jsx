@@ -545,7 +545,7 @@ export function PrivateApp() {
         }
       })
       .catch((err) => {
-        if (active && err.status !== 401) reportErrorRef.current(err);
+        if (active && err.status !== 401 && err.status !== 500 && err.status !== 503) reportErrorRef.current(err);
       })
       .finally(() => {
         if (active) setAuthReady(true);
@@ -1204,55 +1204,117 @@ export function PrivateApp() {
   if (!authReady) return <main className="mx-auto max-w-4xl"><p role="status">{copy.loading}</p></main>;
   if (!user) {
     return (
-      <main className="app-shell mx-auto my-8 max-w-lg space-y-5 rounded-[2rem] p-5 sm:p-8">
-        <header className="app-hero relative space-y-3 rounded-3xl p-6">
-          <Button
-            variant="secondary"
-            className="icon-button absolute right-4 top-4"
-            aria-label={copy.languageToggle}
-            title={copy.languageToggle}
-            onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
-          ><LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} /><span>{lang === 'bn' ? 'English' : 'বাংলা'}</span></Button>
-          <Button
-            variant="secondary"
-            className="icon-button absolute right-4 top-16"
-            aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
-            title={theme === 'dark' ? copy.themeLight : copy.themeDark}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >{theme === 'dark' ? '☀️' : '🌙'}</Button>
-          <div className="brand-orb" aria-hidden="true">✨</div>
-          <p className="eyebrow">✦ SMART ROUTINE ✦</p>
-          <h1 className="text-4xl font-bold">{copy.title}</h1><p>{copy.useAccount}</p>
+      <main className="app-shell mx-auto my-6 max-w-md space-y-5 rounded-[2rem] p-4 sm:my-10 sm:p-7">
+        <header className="app-hero relative overflow-hidden rounded-3xl p-6 sm:p-7">
+          <div className="relative z-10 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="brand-orb shrink-0" aria-hidden="true">✨</div>
+              <p className="eyebrow">✦ SMART ROUTINE ✦</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                className="language-toggle-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
+                aria-label={copy.languageToggle}
+                title={copy.languageToggle}
+                onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
+              >
+                <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
+                <span>{lang === 'bn' ? 'English' : 'বাংলা'}</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="icon-button min-h-[40px] min-w-[40px]"
+                aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
+                title={theme === 'dark' ? copy.themeLight : copy.themeDark}
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="relative z-10 mt-5 space-y-1.5">
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{copy.title}</h1>
+            <p className="text-sm text-white/85 leading-relaxed">{copy.useAccount}</p>
+          </div>
         </header>
-        <Card as="form" className="surface-card space-y-4" onSubmit={authenticate}>
-          <h2 className="text-xl font-semibold">{registering ? copy.register : copy.login}</h2>
-          {registering ? (
-            <>
-              <label className="block">{copy.name}<input name="displayName" required maxLength="60" className="mt-1 block w-full rounded border bg-paper p-3 text-ink" /></label>
-              <label className="block">{copy.locale}<select name="locale" value={lang} onChange={(event) => setStoredLanguage(event.target.value)} className="mt-1 block w-full rounded border bg-paper p-3 text-ink"><option value="bn">বাংলা</option><option value="en">English</option></select></label>
-            </>
+
+        <Card as="form" className="surface-card space-y-5 rounded-3xl p-6 sm:p-7" onSubmit={authenticate}>
+          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-gold/25 bg-paper/60 p-1.5">
+            <button
+              type="button"
+              onClick={() => { setRegistering(false); setError(''); }}
+              className={`min-h-[42px] rounded-xl text-sm font-bold transition ${!registering ? 'bg-sapphire text-on-sapphire shadow-md' : 'text-ink/75 hover:text-ink'}`}
+            >
+              {copy.login}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setRegistering(true); setError(''); }}
+              className={`min-h-[42px] rounded-xl text-sm font-bold transition ${registering ? 'bg-sapphire text-on-sapphire shadow-md' : 'text-ink/75 hover:text-ink'}`}
+            >
+              {copy.register}
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {registering ? (
+              <>
+                <label className="block text-sm font-semibold">
+                  {copy.name}
+                  <input name="displayName" required maxLength="60" placeholder={lang === 'bn' ? 'আপনার নাম' : 'Your name'} className="mt-1.5 block w-full rounded-xl border bg-paper p-3 text-ink" />
+                </label>
+                <label className="block text-sm font-semibold">
+                  {copy.locale}
+                  <select name="locale" value={lang} onChange={(event) => setStoredLanguage(event.target.value)} className="mt-1.5 block w-full rounded-xl border bg-paper p-3 text-ink">
+                    <option value="bn">বাংলা (Bangla)</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+              </>
+            ) : null}
+
+            <label className="block text-sm font-semibold">
+              {copy.email}
+              <input name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="mt-1.5 block w-full rounded-xl border bg-paper p-3 text-ink" />
+            </label>
+
+            <PasswordField
+              label={copy.password}
+              copy={copy}
+              name="password"
+              required
+              minLength={registering ? 4 : undefined}
+              maxLength="128"
+              pattern={registering ? '(?:[0-9]{4,6}|.{12,128})' : undefined}
+              inputMode={registering ? 'numeric' : undefined}
+              autoComplete={registering ? 'new-password' : 'current-password'}
+              hint={registering ? copy.passwordHint : undefined}
+            />
+          </div>
+
+          {error ? (
+            <p role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-3.5 py-2.5 text-xs font-semibold text-red-300">
+              ⚠️ {error}
+            </p>
           ) : null}
-          <label className="block">{copy.email}<input name="email" type="email" required autoComplete="email" className="mt-1 block w-full rounded border bg-paper p-3 text-ink" /></label>
-          <PasswordField
-            label={copy.password}
-            copy={copy}
-            name="password"
-            required
-            minLength={registering ? 4 : undefined}
-            maxLength="128"
-            pattern={registering ? '(?:[0-9]{4,6}|.{12,128})' : undefined}
-            inputMode={registering ? 'numeric' : undefined}
-            autoComplete={registering ? 'new-password' : 'current-password'}
-            hint={registering ? copy.passwordHint : undefined}
-          />
-          {error ? <p role="alert" className="text-red-700">{error}</p> : null}
-          <Button type="submit" disabled={busy}>{registering ? copy.create : copy.signIn}</Button>
-          <button type="button" className="ml-3 underline" onClick={() => { setRegistering(!registering); setError(''); }}>
-            {registering ? copy.switchLogin : copy.switchRegister}
-          </button>
+
+          <div className="space-y-3 pt-1">
+            <Button type="submit" disabled={busy} className="min-h-[48px] w-full text-base font-bold">
+              {registering ? copy.create : copy.signIn}
+            </Button>
+
+            <p className="text-center text-xs text-ink/75">
+              <button type="button" className="font-semibold text-gold-soft underline hover:text-gold" onClick={() => { setRegistering(!registering); setError(''); }}>
+                {registering ? copy.switchLogin : copy.switchRegister}
+              </button>
+            </p>
+          </div>
+
           {googleClientId ? (
-            <div className="space-y-2 border-t border-sapphire/15 pt-4">
-              <p className="text-center text-sm text-ink/70">{copy.googleSignIn}</p>
+            <div className="space-y-3 border-t border-gold/20 pt-4">
+              <p className="text-center text-xs font-semibold uppercase tracking-wider text-ink/60">{copy.googleSignIn}</p>
               <GoogleSignInButton
                 clientId={googleClientId}
                 lang={lang}

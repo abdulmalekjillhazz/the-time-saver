@@ -1129,10 +1129,14 @@ select:disabled {
 /* ---------- Extraordinary brand finish: running golden sparkle ---------- */
 /* Every primary action continuously sweeps a golden light streak + twinkles a
    star, so buttons feel alive. Pure CSS, no JavaScript, mobile-friendly. */
+.primary-button:not(.absolute),
+.secondary-button:not(.absolute),
+.landing-button:not(.absolute) {
+  position: relative;
+}
 .primary-button,
 .secondary-button,
 .landing-button {
-  position: relative;
   overflow: hidden;
   isolation: isolate;
 }

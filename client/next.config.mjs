@@ -1,9 +1,20 @@
 const apiOrigin = (() => {
-  try {
-    return new URL(process.env.API_URL || 'http://localhost:5000').origin;
-  } catch {
-    return 'http://localhost:5000';
+  const candidates = [
+    process.env.NEXT_PUBLIC_API_URL,
+    process.env.API_URL,
+    process.env.NODE_ENV === 'production' ? 'https://server-s3yn.vercel.app' : 'http://localhost:5000',
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      const origin = new URL(candidate).origin;
+      if (process.env.NODE_ENV === 'production' && origin.includes('localhost')) continue;
+      return origin;
+    } catch {
+      // try next
+    }
   }
+  return process.env.NODE_ENV === 'production' ? 'https://server-s3yn.vercel.app' : 'http://localhost:5000';
 })();
 
 // Script-src keeps 'unsafe-inline' because Next.js 14 inlines its hydration scripts. Replace it with nonces later.

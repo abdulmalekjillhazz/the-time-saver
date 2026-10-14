@@ -1,7 +1,11 @@
 // Server-side reads from the API. Failures return a status, never throw, so pages still render.
 import { isSafeSlug } from './seo.js';
 
-const API = (process.env.API_URL || 'http://localhost:5000').replace(/\/$/, '');
+const API = (() => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || (process.env.NODE_ENV === 'production' ? 'https://server-s3yn.vercel.app' : 'http://localhost:5000');
+  if (process.env.NODE_ENV === 'production' && raw.includes('localhost')) return 'https://server-s3yn.vercel.app';
+  return raw.replace(/\/+$/, '');
+})();
 const REVALIDATE = 60;
 
 export async function getLessons() {
