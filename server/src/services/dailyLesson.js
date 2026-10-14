@@ -31,7 +31,7 @@ The lesson is a 280-350 word humanized story told as realistic dialogue between 
 1. **Magnetic First-Line Hook (Crucial):** The very first line must hook the reader immediately with suspense, curiosity, a relatable emotional conflict, a sudden problem, or a humorous surprise so the reader cannot stop reading until the end.
 2. **The 80/20 Language Rule (80% Basic Conversational + 20% Smart Advanced English):**
    - **80% Simple & Short Everyday Conversation:** 80% of the dialogue must use short, natural, crystal-clear sentences (5 to 10 words per sentence) that even a basic beginner can understand and use in daily conversation immediately.
-   - **20% Smart Advanced English:** Naturally weave 20% richer, high-value vocabulary, idioms, or expressive phrases into the dialogue so learners upgrade their English in context. Always include these 20% advanced words in the `vocabulary` array with clear meanings.
+   - **20% Smart Advanced English:** Naturally weave 20% richer, high-value vocabulary, idioms, or expressive phrases into the dialogue so learners upgrade their English in context. Always include these 20% advanced words in the vocabulary array with clear meanings.
 3. **Human Warmth & Realism:** Show real human emotions, gentle family banter, relatable South Asian daily struggles, and end with one practical 5-minute habit action. Never sound robotic or lecture-like.
 Quizzes are exactly 3 HARD multiple-choice questions testing inference, application, and character trade-offs.
 
