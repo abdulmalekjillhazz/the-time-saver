@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link';
 import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
+import { StoryReader } from './StoryReader.jsx';
 
 import { useState } from 'react';
 import { Card } from './ui/Card.jsx';
@@ -243,25 +244,14 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
       {dramaOpen ? <AudioDramaPlayer title={dailyLesson.title} content={dailyLesson.content} lang={lang} onClose={() => setDramaOpen(false)} /> : null}
       <p className="mt-1 text-sm font-medium italic text-ink/70">{dailyLesson.description}</p>
 
-      <div className="mt-4 space-y-1 text-base leading-relaxed text-ink">
-        {dialogueLines.map(({ speaker, text }, i) => (
-          <div key={i} className="flex items-start gap-3 rounded-lg px-3 py-2.5 even:bg-sapphire/5">
-            {speaker ? (
-              <span className={`mt-0.5 inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                /child|sibling|rafi/i.test(speaker)
-                  ? 'bg-gold/15 text-ink'
-                  : /female|mother|asha/i.test(speaker)
-                    ? 'bg-emerald-100 text-emerald-900'
-                    : /male|father|rahim/i.test(speaker)
-                      ? 'bg-sapphire/10 text-sapphire'
-                      : 'bg-gold/10 text-ink'
-              }`}>
-                {speaker}
-              </span>
-            ) : null}
-            <p>{text}</p>
-          </div>
-        ))}
+      <div className="mt-4">
+        <StoryReader
+          lines={dialogueLines}
+          vocabulary={dailyLesson.vocabulary || []}
+          lang={lang}
+          keyTakeaway={dailyLesson.keyTakeaway || ''}
+          description=""
+        />
       </div>
 
       {dailyLesson.keyTakeaway && (

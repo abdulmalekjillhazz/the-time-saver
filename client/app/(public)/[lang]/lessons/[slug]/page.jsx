@@ -5,6 +5,7 @@ import { getDictionary } from '../../../../../i18n/dictionaries.js';
 import { getLesson, getLessons } from '../../../../../lib/api.js';
 import { JsonLd } from '../../../../../components/JsonLd.jsx';
 import { AudioDramaPlayer } from '../../../../../components/AudioDramaPlayer.jsx';
+import { StoryReader } from '../../../../../components/StoryReader.jsx';
 import { PageHero } from '../../../../../components/PageHero.jsx';
 
 export const revalidate = 300;
@@ -73,8 +74,15 @@ export default async function LessonPage(props) {
       {lesson.media?.type === 'audio' && lesson.media.url ? (
         <audio src={lesson.media.url} controls preload="metadata" className="mt-4 w-full" />
       ) : null}
-      <div className="surface-card prose-brand mt-6 space-y-3 p-6 sm:p-8">
-        {paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+      <div className="surface-card mt-6 p-5 sm:p-8">
+        <StoryReader
+          lines={paragraphs.map((line) => {
+            const match = line.match(/^\[([^\]]+)\]\s*:\s*(.*)$/);
+            return match ? { speaker: match[1], text: match[2] } : { speaker: null, text: line };
+          })}
+          vocabulary={lesson.vocabulary || []}
+          lang={lang}
+        />
       </div>
       <AudioDramaPlayer title={lesson.title[lang]} content={lesson.body[lang]} lang={lang} />
       {lesson.vocabulary?.length ? (

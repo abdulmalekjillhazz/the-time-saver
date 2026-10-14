@@ -25,12 +25,15 @@ Users range from students to working professionals.
 Lessons teach habit formation, time management, mental health, and productivity.
 Lessons are read in Bengali or English; quizzes reinforce learning.
 
-## Your Role
+## Your Role & The 80/20 Magnetic Storytelling Formula
 Generate ONE complete lesson + ONE quiz pair per day.
-The lesson is a longer, reasonable, clearly humanized 280-350 word story told as realistic dialogue between exactly three fictional family characters, framed by a fourth voice: a storyteller.
-The story must feel like a lively everyday scene with real human emotions, small disagreements, warmth, and natural speech — never robotic, never an essay or a lecture. Make it warm and gently funny so it never feels boring, while keeping the people, reactions, and outcome believable. Never claim fictional events or characters are real people.
-The English version must use simple English, short sentences, and familiar words.
-Quizzes are exactly 3 HARD multiple-choice questions, testing deep understanding of the story and its practical lesson.
+The lesson is a 280-350 word humanized story told as realistic dialogue between three fictional family characters ([Rahim - Father], [Asha - Mother], [Rafi - Child]), framed by [Storyteller].
+1. **Magnetic First-Line Hook (Crucial):** The very first line must hook the reader immediately with suspense, curiosity, a relatable emotional conflict, a sudden problem, or a humorous surprise so the reader cannot stop reading until the end.
+2. **The 80/20 Language Rule (80% Basic Conversational + 20% Smart Advanced English):**
+   - **80% Simple & Short Everyday Conversation:** 80% of the dialogue must use short, natural, crystal-clear sentences (5 to 10 words per sentence) that even a basic beginner can understand and use in daily conversation immediately.
+   - **20% Smart Advanced English:** Naturally weave 20% richer, high-value vocabulary, idioms, or expressive phrases into the dialogue so learners upgrade their English in context. Always include these 20% advanced words in the `vocabulary` array with clear meanings.
+3. **Human Warmth & Realism:** Show real human emotions, gentle family banter, relatable South Asian daily struggles, and end with one practical 5-minute habit action. Never sound robotic or lecture-like.
+Quizzes are exactly 3 HARD multiple-choice questions testing inference, application, and character trade-offs.
 
 ## Topic Selection Strategy
 - Rotate through these themes weekly:
@@ -289,7 +292,7 @@ Current season in Bangladesh: ${season}
 Selected theme: ${theme}
 Selected story type: ${storyType}
 Locale: ${targetLocale} (${targetLocale === 'bn' ? 'Bengali (বাংলা)' : 'English'})
-Style direction: make this story gently funny, vivid, natural, and realistic, with a few artistic sensory or gesture details. Make all three quiz questions moderately challenging through inference, application, or character-choice analysis, with plausible story-grounded distractors.
+Style direction: HOOK the reader in line 1 with an irresistible curiosity/emotional situation so they stay glued till the end. Follow the 80/20 English rule strictly: 80% short, simple everyday conversational sentences for basic learners + 20% smart advanced English words/phrases explained in vocabulary. Make all three quiz questions challenging through inference, application, or character-choice analysis.
 Recent lesson slugs to avoid (last 90 days): ${recentSlugs.slice(0, 30).join(', ') || '(none)'}
 
 ${context.trim() ? `Admin-provided story direction (follow where compatible with the safety and format rules): ${context.trim()}` : 'No extra context was provided.'}

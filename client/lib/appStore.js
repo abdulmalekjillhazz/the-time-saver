@@ -46,7 +46,7 @@ export const useAppStore = create(persist(
     resetStopwatch: () => set({ stopwatchElapsedMs: 0, stopwatchStartedAt: null }),
 
     // --- persisted: prayer preferences ---
-    showPrayerTimes: false,
+    showPrayerTimes: true,
     prayerNotificationsEnabled: false,
     lastPrayerNotificationId: '',
     setShowPrayerTimes: (showPrayerTimes) => set({ showPrayerTimes }),
