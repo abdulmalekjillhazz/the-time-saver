@@ -273,20 +273,13 @@ export default async function HomePage(props) {
 
           {dailyLesson ? (
             <div className="mt-6 space-y-6">
-              <div className="w-full space-y-4">
-                <div className="routine-tile w-full p-4 sm:p-6">
-                  <StoryReader
-                    lines={dailyLesson.content.split(/\r?\n/).filter(Boolean).map((line) => {
-                      const match = line.match(/^\[([^\]]+)\]\s*:\s*(.*)$/);
-                      return match ? { speaker: match[1], text: match[2] } : { speaker: null, text: line };
-                    })}
-                    vocabulary={dailyLesson.vocabulary || []}
-                    lang={lang}
-                    keyTakeaway={dailyLesson.keyTakeaway || ''}
-                    description={dailyLesson.description || ''}
-                  />
-                </div>
-                <AudioDramaPlayer title={dailyLesson.title} content={dailyLesson.content} lang={lang} />
+              <div className="w-full">
+                <AudioDramaPlayer
+                  title={dailyLesson.title}
+                  content={dailyLesson.content}
+                  vocabulary={dailyLesson.vocabulary || []}
+                  lang={lang}
+                />
               </div>
 
               <aside id="home-story-quiz-box" className="routine-tile scroll-mt-6 p-4 sm:p-6">

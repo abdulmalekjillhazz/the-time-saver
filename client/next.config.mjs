@@ -17,14 +17,13 @@ const apiOrigin = (() => {
   return process.env.NODE_ENV === 'production' ? 'https://server-s3yn.vercel.app' : 'http://localhost:5000';
 })();
 
-// Script-src keeps 'unsafe-inline' because Next.js 14 inlines its hydration scripts. Replace it with nonces later.
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/",
   "img-src 'self' data: https://res.cloudinary.com",
-  "media-src 'self' data: blob: https://res.cloudinary.com",
-  `connect-src 'self' ${apiOrigin} https://api.cloudinary.com https://res.cloudinary.com https://accounts.google.com/gsi/`,
+  "media-src 'self' data: blob: https://res.cloudinary.com https://translate.google.com https://translate.googleapis.com",
+  `connect-src 'self' ${apiOrigin} https://api.cloudinary.com https://res.cloudinary.com https://accounts.google.com/gsi/ https://translate.googleapis.com https://api.mymemory.translated.net https://api.dictionaryapi.dev https://api.aladhan.com`,
   'frame-src https://accounts.google.com/gsi/',
   "font-src 'self'",
   "object-src 'none'",

@@ -1804,15 +1804,12 @@ export function PrivateApp() {
                       </p>
                       <h2 className="mt-1 text-xl font-extrabold text-ink sm:text-2xl">{localized(lesson.title, lang)}</h2>
                     </div>
-                    <StoryReader
-                      lines={String(localized(lesson.body, lang) || '').split(/\r?\n/).filter(Boolean).map((line) => {
-                        const match = line.match(/^\[([^\]]+)\]\s*:\s*(.*)$/);
-                        return match ? { speaker: match[1], text: match[2] } : { speaker: null, text: line };
-                      })}
+                    <AudioDramaPlayer
+                      title={localized(lesson.title, lang)}
+                      content={localized(lesson.body, lang)}
                       vocabulary={lesson.vocabulary || []}
                       lang={lang}
                     />
-                    <AudioDramaPlayer title={localized(lesson.title, lang)} content={localized(lesson.body, lang)} lang={lang} />
                     {lesson.quiz?.length ? (
                       <div className="space-y-4">
                         <h3 className="text-xl font-semibold">{copy.quiz}</h3>

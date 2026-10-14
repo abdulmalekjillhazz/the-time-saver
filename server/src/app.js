@@ -62,6 +62,70 @@ export function createApp({ config }) {
   // Health and readiness go before CSRF and the database guard, so monitors can always reach them.
   app.use('/api', healthRouter(config));
 
+  // Public online word meaning proxy so mobile browsers are never blocked by CSP or CORS
+  const serverWordCache = new Map();
+  app.get('/api/word-meaning', async (req, res) => {
+    const raw = String(req.query.word || '').trim().toLowerCase();
+    const clean = raw.replace(/['’]s$/i, '').replace(/^[^a-z0-9\u0980-\u09FF]+ert{}[^a-z0-9\u0980-\u09FF]+$/gi, '');
+    if (!clean || clean.length < 1) {
+      return res.status(400).json({ ok: false, meaning: '' });
+    }
+    if (serverWordCache.has(clean)) {
+      return res.json({ ok: true, term: clean, meaning: serverWordCache.get(clean) });
+    }
+    try {
+      let banglaMeaning = '';
+      let englishDetails = '';
+      const [gtxRes, mmRes, dictRes] = await Promise.allSettled([
+        fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=bn&dt=t&dt=bd&q=${encodeURIComponent(clean)}`, { signal: AbortSignal.timeout(4500) }).then((r) => (r.ok ? r.json() : null)),
+        fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=en|bn`, { signal: AbortSignal.timeout(4500) }).then((r) => (r.ok ? r.json() : null)),
+        fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`, { signal: AbortSignal.timeout(4500) }).then((r) => (r.ok ? r.json() : null)),
+      ]);
+
+      if (gtxRes.status === 'fulfilled' && Array.isArray(gtxRes.value)) {
+        const data = gtxRes.value;
+        const primaryBn = data?.[0]?.[0]?.[0];
+        const synonyms = [];
+        if (Array.isArray(data?.[1])) {
+          for (const group of data[1]) {
+            if (Array.isArray(group?.[1])) synonyms.push(...group[1].slice(0, 3));
+          }
+        }
+        const combined = [
+          primaryBn && primaryBn.toLowerCase() !== clean ? primaryBn : '',
+          ...synonyms.filter((w) => w && w !== primaryBn),
+        ].filter(Boolean);
+        if (combined.length > 0) banglaMeaning = combined.slice(0, 4).join(', ');
+      }
+
+      if (!banglaMeaning && mmRes.status === 'fulfilled' && mmRes.value) {
+        const translated = mmRes.value?.responseData?.translatedText;
+        if (translated && !translated.startsWith('MYMEMORY WARNING') && translated.toLowerCase() !== clean) {
+          banglaMeaning = translated;
+        }
+      }
+
+      if (dictRes.status === 'fulfilled' && Array.isArray(dictRes.value)) {
+        const entry = dictRes.value[0];
+        if (entry) {
+          const phonetic = entry.phonetic || entry.phonetics?.find((p) => p.text)?.text || '';
+          const def = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
+          const pos = entry.meanings?.[0]?.partOfSpeech || '';
+          englishDetails = [phonetic ? `[${phonetic}]` : '', pos ? `(${pos})` : '', def].filter(Boolean).join(' ');
+        }
+      }
+
+      const finalMeaning = [banglaMeaning, englishDetails].filter(Boolean).join(' — ');
+      if (finalMeaning) {
+        serverWordCache.set(clean, finalMeaning);
+        return res.json({ ok: true, term: clean, meaning: finalMeaning });
+      }
+      return res.json({ ok: false, term: clean, meaning: '' });
+    } catch {
+      return res.json({ ok: false, term: clean, meaning: '' });
+    }
+  });
+
   app.use('/api', csrfProtection(config));
   app.use('/api', dbRequired);
 

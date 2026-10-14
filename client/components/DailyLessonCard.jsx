@@ -17,7 +17,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [shared, setShared] = useState(false);
   const [reportedQuestion, setReportedQuestion] = useState({});
-  const [dramaOpen, setDramaOpen] = useState(false);
+  const [autoPlaySignal, setAutoPlaySignal] = useState(0);
 
   if (!dailyLesson) return null;
 
@@ -191,11 +191,10 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <button
             type="button"
-            aria-expanded={dramaOpen}
-            onClick={() => setDramaOpen((open) => !open)}
+            onClick={() => setAutoPlaySignal((n) => n + 1)}
             className="primary-button flex min-h-[46px] w-full items-center justify-center bg-sapphire px-4 py-2.5 text-sm font-extrabold text-on-sapphire"
           >
-            {dramaOpen ? copy.closeDrama : copy.listenDrama}
+            {copy.listenDrama}
           </button>
 
           <button
@@ -230,22 +229,13 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
         <p className="text-xs font-semibold text-gold-soft" role="status">{copy.curatedFallback}</p>
       ) : null}
 
-      {dramaOpen ? (
+      <div className="w-full">
         <AudioDramaPlayer
           title={dailyLesson.title}
           content={dailyLesson.content}
-          lang={lang}
-          onClose={() => setDramaOpen(false)}
-        />
-      ) : null}
-
-      <div className="w-full">
-        <StoryReader
-          lines={dialogueLines}
           vocabulary={dailyLesson.vocabulary || []}
           lang={lang}
-          keyTakeaway={dailyLesson.keyTakeaway || ''}
-          description={dailyLesson.description || ''}
+          autoPlaySignal={autoPlaySignal}
         />
       </div>
 

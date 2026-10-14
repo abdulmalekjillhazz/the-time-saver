@@ -74,17 +74,14 @@ export default async function LessonPage(props) {
       {lesson.media?.type === 'audio' && lesson.media.url ? (
         <audio src={lesson.media.url} controls preload="metadata" className="mt-4 w-full" />
       ) : null}
-      <div className="surface-card mt-6 p-5 sm:p-8">
-        <StoryReader
-          lines={paragraphs.map((line) => {
-            const match = line.match(/^\[([^\]]+)\]\s*:\s*(.*)$/);
-            return match ? { speaker: match[1], text: match[2] } : { speaker: null, text: line };
-          })}
+      <div className="mt-6">
+        <AudioDramaPlayer
+          title={lesson.title[lang]}
+          content={lesson.body[lang]}
           vocabulary={lesson.vocabulary || []}
           lang={lang}
         />
       </div>
-      <AudioDramaPlayer title={lesson.title[lang]} content={lesson.body[lang]} lang={lang} />
       {lesson.vocabulary?.length ? (
         <section className="surface-card mt-6 p-6 sm:p-8">
           <h2 className="section-heading text-xl">{d.vocabulary}</h2>
