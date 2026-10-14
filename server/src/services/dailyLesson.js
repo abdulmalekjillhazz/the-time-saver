@@ -369,7 +369,7 @@ Generate today's complete lesson and quiz pair according to the Master Prompt ru
   }
   if (existingForDate?.audio?.status === 'ready' && existingForDate.audio.publicId && !keepAudio) {
     try {
-      await cloudinary().client.destroy(existingForDate.audio.publicId, 'video');
+      // Keep audio permanently in Cloudinary: // await cloudinary().client.destroy(existingForDate.audio.publicId, 'video');
     } catch (err) {
       logger.warn({ lessonId: String(existingForDate._id), errName: err.name }, 'could not remove superseded daily lesson narration');
     }
@@ -483,7 +483,7 @@ export async function generateAdminDailyLessonAudio(id, config) {
     }
     if (previousAudio?.publicId && previousAudio.publicId !== audio.publicId) {
       try {
-        await cloudinary().client.destroy(previousAudio.publicId, 'video');
+        // Keep audio permanently in Cloudinary: // await cloudinary().client.destroy(previousAudio.publicId, 'video');
       } catch (err) {
         logger.warn({ lessonId: String(lesson._id), errName: err.name }, 'could not remove replaced daily lesson narration');
       }
@@ -593,7 +593,7 @@ export async function updateAdminDailyLesson(id, payload) {
   await lesson.save();
   if (contentChanged && previousAudio?.publicId && previousAudio.status === 'ready') {
     try {
-      await cloudinary().client.destroy(previousAudio.publicId, 'video');
+      // Keep audio permanently in Cloudinary: // await cloudinary().client.destroy(previousAudio.publicId, 'video');
     } catch (err) {
       logger.warn({ lessonId: String(lesson._id), errName: err.name }, 'could not remove superseded daily lesson narration');
     }

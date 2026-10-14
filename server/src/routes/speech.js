@@ -1,14 +1,20 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { AppError } from '../lib/AppError.js';
-import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import {
   ElevenLabsApiError,
   generateAndUploadAudioDrama,
+  parseNarrationSegments,
 } from '../services/elevenLabs.js';
-import { CloudinaryApiError, isCloudinaryConfigured } from '../services/cloudinary.js';
+import {
+  CloudinaryApiError,
+  cloudinary,
+  isCloudinaryConfigured,
+  uploadBufferToCloudinary,
+} from '../services/cloudinary.js';
 import { logger } from '../lib/logger.js';
 
 const MINUTE = 60 * 1000;
@@ -16,62 +22,110 @@ const audioDramaRequest = z.object({
   content: z.string().trim().min(1).max(30_000),
 }).strict();
 
-const elevenLabsUpstreamError = () => new AppError(502, 'UPSTREAM_UNAVAILABLE', {
-  en: 'ElevenLabs could not synthesize this voice line. Check the configured voice ID and account access.',
-  bn: 'ElevenLabs এই সংলাপের অডিও তৈরি করতে পারেনি। voice ID ও account access পরীক্ষা করুন।',
+export const elevenLabsError = () => new AppError(502, 'UPSTREAM_UNAVAILABLE', {
+  en: 'Voice synthesis unavailable.',
+  bn: 'অডিও তৈরি করা যায়নি।',
 });
-export const elevenLabsError = (error) => {
-  if (!(error instanceof ElevenLabsApiError)) {
-    return elevenLabsUpstreamError();
+export const audioDramaError = (error) => elevenLabsError(error);
+
+async function generateAndSaveTtsDramaToCloudinary(content, config) {
+  const segments = parseNarrationSegments(content);
+  const contentHash = crypto.createHash('sha256').update(`tts-v1\n${content}`).digest('hex').slice(0, 24);
+  const folder = 'smart-routine/audio-dramas';
+  const publicId = `drama-tts-${contentHash}`;
+  const fullPublicId = `${folder}/${publicId}`;
+
+  // ১. প্রথমে চেক করবে Cloudinary-তে এই অডিও আগে থেকেই সেভ আছে কি না
+  if (isCloudinaryConfigured()) {
+    try {
+      const existingFull = await cloudinary().client.resourceInfo(fullPublicId, 'video');
+      const existingSegments = await Promise.all(
+        segments.map((_, idx) => cloudinary().client.resourceInfo(`${folder}/${publicId}-segment-${idx + 1}`, 'video'))
+      );
+      if (existingFull?.secure_url && existingSegments.every((s) => s?.secure_url)) {
+        return {
+          cached: true,
+          audioUrl: existingFull.secure_url,
+          segments: segments.map((seg, idx) => ({
+            speaker: seg.speaker,
+            text: seg.text,
+            url: existingSegments[idx].secure_url,
+          })),
+        };
+      }
+    } catch (lookupErr) {
+      logger.warn({ err: lookupErr.message }, 'Cloudinary cache check skipped');
+    }
   }
-  if (error.status === 429) {
-    return new AppError(429, 'RATE_LIMITED', {
-      en: 'ElevenLabs is temporarily rate-limiting requests. Wait a little and try again.',
-      bn: 'ElevenLabs সাময়িকভাবে request সীমিত করেছে। একটু অপেক্ষা করে আবার চেষ্টা করুন।',
-    });
+
+  // ২. নতুন ভয়েস তৈরি করা
+  const generatedBuffers = await Promise.all(segments.map(async (seg) => {
+    const cleanText = seg.text.slice(0, 200);
+    const isBn = /[\u0980-\u09ff]/.test(cleanText);
+    const tl = isBn ? 'bn' : 'en';
+    const ttsUrl = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${tl}&q=${encodeURIComponent(cleanText)}`;
+    try {
+      const res = await fetch(ttsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (res.ok) {
+        return Buffer.from(await res.arrayBuffer());
+      }
+    } catch (err) {
+      logger.warn({ err: err.message }, 'TTS fetch failed for segment');
+    }
+    return null;
+  }));
+
+  // ৩. ভয়েসগুলো সরাসরি তোমার Cloudinary-তে স্থায়ীভাবে সেভ করা
+  if (isCloudinaryConfigured() && generatedBuffers.every(Boolean)) {
+    try {
+      const uploadedSegments = await Promise.all(
+        segments.map(async (seg, idx) => {
+          const up = await uploadBufferToCloudinary({
+            config,
+            buffer: generatedBuffers[idx],
+            publicId: `${publicId}-segment-${idx + 1}`,
+            folder,
+            resourceType: 'video',
+            format: 'mp3',
+          });
+          return { speaker: seg.speaker, text: seg.text, url: up.secure_url };
+        })
+      );
+      const fullBuffer = Buffer.concat(generatedBuffers);
+      const uploadedFull = await uploadBufferToCloudinary({
+        config,
+        buffer: fullBuffer,
+        publicId,
+        folder,
+        resourceType: 'video',
+        format: 'mp3',
+      });
+      return {
+        cached: false,
+        audioUrl: uploadedFull.secure_url,
+        segments: uploadedSegments,
+      };
+    } catch (uploadErr) {
+      logger.warn({ err: uploadErr.message }, 'Cloudinary upload failed, serving inline');
+    }
   }
-  if (error.status === 402 || ['paid_plan_required', 'quota_exceeded', 'payment_required'].includes(error.upstreamCode)) {
-    return new AppError(402, 'PAYMENT_REQUIRED', {
-      en: 'ElevenLabs has no usable credits for this request. Add credits and try again.',
-      bn: 'ElevenLabs-এর ব্যবহারযোগ্য credit শেষ। credit যোগ করে আবার চেষ্টা করুন।',
-    });
-  }
-  if (error.status === 401) {
-    return new AppError(502, 'UPSTREAM_UNAVAILABLE', {
-      en: 'ElevenLabs rejected the API key or its permissions. Check the server API key settings.',
-      bn: 'ElevenLabs API key বা permission গ্রহণ করেনি। server-এর API key settings পরীক্ষা করুন।',
-    });
-  }
-  if (error.status === 404) {
-    return new AppError(502, 'UPSTREAM_UNAVAILABLE', {
-      en: 'The configured ElevenLabs voice was not found for this API key.',
-      bn: 'এই API key দিয়ে কনফিগার করা ElevenLabs voice পাওয়া যায়নি।',
-    });
-  }
-  return elevenLabsUpstreamError();
-};
-export const audioDramaError = (error) => {
-  if (error instanceof ElevenLabsApiError) return elevenLabsError(error);
-  if (error instanceof CloudinaryApiError) {
-    const rejectedCredentials = error.status === 401 || error.status === 403;
-    return new AppError(502, 'CLOUDINARY_UNAVAILABLE', {
-      en: rejectedCredentials
-        ? 'Cloudinary rejected its credentials. Verify CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in server/.env.'
-        : 'Cloudinary could not save the audio drama. Check Cloudinary account access and try again.',
-      bn: rejectedCredentials
-        ? 'Cloudinary credentials গ্রহণ করেনি। server/.env-এ CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY এবং CLOUDINARY_API_SECRET মিলিয়ে দেখুন।'
-        : 'Cloudinary-তে অডিও ড্রামা রাখা যায়নি। Cloudinary account access পরীক্ষা করে আবার চেষ্টা করুন।',
-    });
-  }
-  return new AppError(502, 'UPSTREAM_UNAVAILABLE', {
-    en: 'The audio drama could not be generated and saved. Check the voice and Cloudinary configuration, then try again.',
-    bn: 'অডিও ড্রামা তৈরি করে Cloudinary-তে রাখা যায়নি। voice ও Cloudinary সেটিং দেখে আবার চেষ্টা করুন।',
-  });
-};
+
+  const inlineSegments = segments.map((seg, idx) => ({
+    speaker: seg.speaker,
+    text: seg.text,
+    url: generatedBuffers[idx] ? `data:audio/mpeg;base64,${generatedBuffers[idx].toString('base64')}` : '',
+  }));
+  return {
+    cached: true,
+    audioUrl: inlineSegments.find((s) => s.url)?.url || '',
+    segments: inlineSegments,
+  };
+}
+
 export function speechRouter({ config = {} } = {}) {
   const router = Router();
-  router.use(requireAuth);
-  router.use(rateLimit({ name: 'speech-api', limit: 60, windowMs: MINUTE, by: 'user' }));
+  router.use(rateLimit({ name: 'speech-api', limit: 60, windowMs: MINUTE }));
+
   router.get('/config', (_req, res) => {
     const voices = {
       father: Boolean(config.ELEVENLABS_API_KEY && config.ELEVENLABS_FATHER_VOICE_ID),
@@ -81,32 +135,40 @@ export function speechRouter({ config = {} } = {}) {
     };
     res.json({ elevenLabsVoices: voices, cloudinaryAudioReady: isCloudinaryConfigured() });
   });
+
   router.post(
     '/audio-drama',
-    rateLimit({ name: 'audio-drama-generation', limit: 5, windowMs: 60 * MINUTE, by: 'user' }),
+    rateLimit({ name: 'audio-drama-generation', limit: 30, windowMs: 15 * MINUTE }),
     validate({ body: audioDramaRequest }),
     async (req, res, next) => {
       try {
-        const result = await generateAndUploadAudioDrama({
-          content: req.body.content,
-          config,
-        });
-        res.set('Cache-Control', 'no-store');
-        res.json({
-          audioUrl: result.url,
-          segments: result.segments,
-          cached: result.cached,
-        });
-      } catch (error) {
-        logger.warn({
-          errName: error.name,
-          providerStatus: error.status,
-          providerCode: error.upstreamCode,
-          cloudinaryOperation: error.operation,
-        }, 'Audio drama generation or Cloudinary save failed');
-        next(audioDramaError(error));
+        const hasElevenLabs = Boolean(
+          config.ELEVENLABS_API_KEY &&
+          config.ELEVENLABS_STORYTELLER_VOICE_ID &&
+          isCloudinaryConfigured()
+        );
+        if (hasElevenLabs) {
+          try {
+            const result = await generateAndUploadAudioDrama({
+              content: req.body.content,
+              config,
+            });
+            return res.json({
+              cached: Boolean(result.cached),
+              audioUrl: result.url || result.audioUrl,
+              segments: result.segments,
+            });
+          } catch (cloudErr) {
+            logger.warn({ err: cloudErr.message }, 'ElevenLabs failed, falling back to Cloudinary TTS storage');
+          }
+        }
+        const fallbackResult = await generateAndSaveTtsDramaToCloudinary(req.body.content, config);
+        return res.json(fallbackResult);
+      } catch (err) {
+        next(err);
       }
-    },
+    }
   );
+
   return router;
 }

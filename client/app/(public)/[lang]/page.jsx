@@ -14,14 +14,14 @@ export const revalidate = 60;
 export async function generateMetadata(props) {
   const params = await props.params;
   if (!isLang(params.lang)) return {};
-  const isBn = params.lang === 'bn';
-  const title = isBn 
-    ? 'স্মার্ট রুটিন — এআই হ্যাবিট কোচ ও দৈনিক রুটিন প্ল্যানার'
-    : 'Smart Routine — AI Habit Coach & Daily Routine Planner';
-  const description = isBn
-    ? 'দৈনিক এআই পাঠ, ৫-মিনিটের মাইক্রো রুটিন, বাৎসরিক হিটম্যাপ ও এআই ভয়েস ব্রিফিং সহ আধুনিক রুটিন ট্র্যাকার। সম্পূর্ণ ফ্রি ও অফলাইন-ফার্স্ট।'
-    : 'Build lasting habits with daily AI lessons, 5-minute adaptive re-planning, 365-day heatmaps, and audio coaching. Free & offline-friendly.';
-  return pageMetadata({ lang: params.lang, path: '', title: `${title} | ${BRAND}`, description });
+  const d = getDictionary(params.lang).home;
+  const fullTitle = `${d.title} | ${BRAND}`;
+  return pageMetadata({
+    lang: params.lang,
+    path: '',
+    title: fullTitle.length <= 60 ? fullTitle : d.title,
+    description: d.description,
+  });
 }
 
 export default async function HomePage(props) {
@@ -128,6 +128,13 @@ export default async function HomePage(props) {
   ];
 
   const structuredData = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: BRAND,
+      url: SITE_URL,
+      logo: `${SITE_URL}/icon.svg`,
+    },
     {
       '@context': 'https://schema.org',
       '@type': 'WebApplication',

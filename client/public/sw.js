@@ -1,3 +1,30 @@
+const CACHE_NAME = 'smart-routine-pwa-v2';
+const PRECACHE_URLS = ['/app', '/icon.svg'];
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS).catch(() => {}))
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/')) return;
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
+  );
+});
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -6,10 +33,6 @@ self.addEventListener('push', (event) => {
     payload = {};
   }
 
-  // Alarms must grab attention even with the app closed: vibrate, stay on
-  // screen until dismissed, and offer Open / Snooze actions. A custom voice
-  // or azan file cannot play from a service worker (no audio APIs), so the
-  // phone's default notification sound is used.
   const isAlarm = typeof payload.tag === 'string' && payload.tag.startsWith('smart-routine-alarm-');
   const actions = Array.isArray(payload.actions)
     ? payload.actions.slice(0, 2).map((action) => ({ action: String(action.action || 'open'), title: String(action.title || '') }))
@@ -34,8 +57,6 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
-  // The snooze action deep-links back into the app, which snoozes the alarm
-  // itself (the worker cannot call the authenticated API).
   const target = event.action === 'snooze' && data.snoozeUrl
     ? new URL(data.snoozeUrl, self.location.origin).href
     : new URL(data.url || '/app', self.location.origin).href;

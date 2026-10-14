@@ -440,6 +440,7 @@ export function PrivateApp() {
   const [missedAlarms, setMissedAlarms] = useState([]);
   const [pushAlarmReady, setPushAlarmReady] = useState(false);
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [pwaInstallPrompt, setPwaInstallPrompt] = useState(null);
   const [reflectionModalOpen, setReflectionModalOpen] = useState(false);
 
   const [replanRoutine, setReplanRoutine] = useState(null);
@@ -551,6 +552,19 @@ export function PrivateApp() {
       });
     return () => { active = false; };
   }, [uiReady, setStoredLanguage]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setPwaInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1282,6 +1296,19 @@ export function PrivateApp() {
           </p>
         </div>
         <div className="app-hero-actions relative z-10 flex items-center gap-2">
+          {pwaInstallPrompt ? (
+            <Button
+              variant="primary"
+              onClick={async () => {
+                pwaInstallPrompt.prompt();
+                await pwaInstallPrompt.userChoice.catch(() => {});
+                setPwaInstallPrompt(null);
+              }}
+            >
+              <span aria-hidden="true">📲</span>
+              <span>{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install App'}</span>
+            </Button>
+          ) : null}
           <Button variant="secondary" onClick={() => setVoiceModalOpen(true)}>
             <span aria-hidden="true">🎧</span><span>{copy.voiceBriefing}</span>
           </Button>
