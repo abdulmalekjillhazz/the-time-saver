@@ -61,6 +61,12 @@ describe('offline audio drama', () => {
     expect(parseStoryScript('[Rahim - Father]: বাবা।\n[Asha - Mother]: মা।\n[Rafi - Child]: ছেলে।')
       .filter(({ role }) => role !== 'storyteller')
       .map(({ role }) => role)).toEqual(['male', 'female', 'child']);
+    expect(parseStoryScript('[Mina - Adult Female]: Hello.\n[Tariq - Adult Male]: Hi.')
+      .filter(({ role }) => role !== 'storyteller')
+      .map(({ character, role }) => ({ character, role }))).toEqual([
+      { character: 'Mina - Adult Female', role: 'female' },
+      { character: 'Tariq - Adult Male', role: 'male' },
+    ]);
   });
 
   it('adds storyteller framing in Bengali for older stories that lack narrator lines', () => {
@@ -158,7 +164,7 @@ describe('offline audio drama', () => {
     expect(progress.mock.calls.some(([event]) => event.source === 'cloudinary')).toBe(true);
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/speech/audio-drama', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ content: '[Storyteller]: The story begins. Dad lost a shoe.' }),
+      body: JSON.stringify({ content: '[Storyteller]: The story begins.\n[Father]: Dad lost a shoe.' }),
     }));
     audioInstances[0].onended();
     player.play();

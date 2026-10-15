@@ -9,6 +9,7 @@ import {
 } from '../../src/services/dailyLesson.js';
 import { DailyLesson } from '../../src/models/DailyLesson.js';
 import { createCuratedDailyLesson } from '../../src/services/dailyLessonFallback.js';
+import { getNarrationVoiceConfigVersion } from '../../src/services/elevenLabs.js';
 import { dailyLessonPayloadSchema, routineCreateSchema } from '@smart-routine/shared';
 
 afterEach(() => vi.restoreAllMocks());
@@ -20,7 +21,16 @@ describe('Daily Lesson: pure utilities and validation', () => {
       audio: {
         status: 'ready',
         url: 'https://media.example/story.mp3',
-        voiceConfigVersion: 'eleven_multilingual_v2:father-voice:mother-voice:son-voice:storyteller-voice:0.5:0.75:mp3_44100_128',
+        voiceConfigVersion: getNarrationVoiceConfigVersion({
+          ELEVENLABS_MODEL: 'eleven_v3',
+          ELEVENLABS_FATHER_VOICE_ID: 'father-voice',
+          ELEVENLABS_MOTHER_VOICE_ID: 'mother-voice',
+          ELEVENLABS_SON_VOICE_ID: 'son-voice',
+          ELEVENLABS_STORYTELLER_VOICE_ID: 'storyteller-voice',
+          ELEVENLABS_STABILITY: 0.5,
+          ELEVENLABS_SIMILARITY_BOOST: 0.75,
+          ELEVENLABS_OUTPUT_FORMAT: 'mp3_44100_128',
+        }),
       },
     };
     vi.spyOn(DailyLesson, 'findById').mockResolvedValue(saved);
@@ -28,7 +38,7 @@ describe('Daily Lesson: pure utilities and validation', () => {
 
     const result = await generateAdminDailyLessonAudio('lesson-id', {
       ELEVENLABS_API_KEY: 'test',
-      ELEVENLABS_MODEL: 'eleven_multilingual_v2',
+      ELEVENLABS_MODEL: 'eleven_v3',
       ELEVENLABS_FATHER_VOICE_ID: 'father-voice',
       ELEVENLABS_MOTHER_VOICE_ID: 'mother-voice',
       ELEVENLABS_SON_VOICE_ID: 'son-voice',
@@ -54,7 +64,7 @@ describe('Daily Lesson: pure utilities and validation', () => {
 
     await expect(generateAdminDailyLessonAudio('lesson-id', {
       ELEVENLABS_API_KEY: 'test',
-      ELEVENLABS_MODEL: 'eleven_multilingual_v2',
+      ELEVENLABS_MODEL: 'eleven_v3',
       ELEVENLABS_FATHER_VOICE_ID: 'father-voice',
       ELEVENLABS_MOTHER_VOICE_ID: 'mother-voice',
       ELEVENLABS_SON_VOICE_ID: 'son-voice',
@@ -217,6 +227,26 @@ describe('Daily Lesson: pure utilities and validation', () => {
       const parsed = parseAndValidateDailyLessonPayload(validJson);
       expect(parsed.lesson.slug).toBe('sleep-first-productivity');
       expect(parsed.quiz.questions).toHaveLength(3);
+    });
+
+    it('accepts new random character names and role tags', () => {
+      const varied = JSON.parse(validJson);
+      varied.lesson.content = varied.lesson.content
+        .replaceAll('Rahim - Father', 'Tariq - Adult Male')
+        .replaceAll('Asha - Mother', 'Mina - Adult Female')
+        .replaceAll('Rafi - Child', 'Nila - Child')
+        .replaceAll('The family', 'The neighbours');
+      expect(parseAndValidateDailyLessonPayload(JSON.stringify(varied)).lesson.content)
+        .toContain('[Tariq - Adult Male]');
+    });
+
+    it('rejects stories above the multi-voice provider character limit', () => {
+      const tooLong = JSON.parse(validJson);
+      tooLong.lesson.content = tooLong.lesson.content.replace(
+        '[Storyteller]: The family starts with that one small step.',
+        `[Storyteller]: ${'x'.repeat(2001)}`,
+      );
+      expect(() => parseAndValidateDailyLessonPayload(JSON.stringify(tooLong))).toThrow(/short English story/);
     });
 
     it('rejects Bengali story or quiz text so daily output stays English-only', () => {

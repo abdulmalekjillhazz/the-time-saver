@@ -6,6 +6,7 @@ import { validate } from '../middleware/validate.js';
 import {
   ElevenLabsApiError,
   generateAndUploadAudioDrama,
+  hasCompleteNarrationVoiceConfig,
 } from '../services/elevenLabs.js';
 import { CloudinaryApiError, isCloudinaryConfigured } from '../services/cloudinary.js';
 import { logger } from '../lib/logger.js';
@@ -65,13 +66,13 @@ export function speechRouter({ config = {} } = {}) {
       try {
         const hasElevenLabs = Boolean(
           config.ELEVENLABS_API_KEY &&
-          config.ELEVENLABS_STORYTELLER_VOICE_ID &&
+          hasCompleteNarrationVoiceConfig(config) &&
           isCloudinaryConfigured()
         );
         if (!hasElevenLabs) {
           throw new AppError(503, 'UNAVAILABLE', {
-            en: 'Configure ElevenLabs and Cloudinary before generating story audio.',
-            bn: 'গল্পের অডিও তৈরির আগে ElevenLabs ও Cloudinary কনফিগার করুন।',
+            en: 'Configure ElevenLabs, all four narration voices, and Cloudinary before generating story audio.',
+            bn: 'গল্পের অডিও তৈরির আগে ElevenLabs-এর চারটি voice এবং Cloudinary কনফিগার করুন।',
           });
         }
         const result = await generateAndUploadAudioDrama({

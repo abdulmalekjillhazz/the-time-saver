@@ -11,7 +11,7 @@ function looksLikeSpeakerName(name = '') {
   const normalized = String(name || '').trim();
   if (!normalized) return false;
   const compact = normalized.toLowerCase().replace(/[^a-z0-9\u0980-\u09ff]+/g, ' ');
-  return /(?:father|dad|papa|mother|mom|asha|rahim|rahi|story ?teller|narrator|child|son|daughter|rafi|রহিম|আশা|রাফি|মা|শিশু|বাচ্চা|গল্পকথক|বর্ণনাকারী)/.test(compact);
+  return /(?:father|dad|papa|adult male|male|mother|mom|adult female|female|asha|rahim|rahi|story ?teller|narrator|child|son|daughter|rafi|রহিম|আশা|রাফি|মা|শিশু|বাচ্চা|গল্পকথক|বর্ণনাকারী)/.test(compact);
 }
 
 function characterSettings(name = '') {
@@ -129,7 +129,7 @@ export function narrationSpeakerForRole(role) {
 const savedStoryAudioCache = new Map();
 
 async function createSavedAudioDrama(lines, signal, lang) {
-  const content = `[Storyteller]: ${lines.map((line) => line.text).join(' ')}`;
+  const content = lines.map((line) => `[${line.character}]: ${line.text}`).join('\n');
   const cached = savedStoryAudioCache.get(content);
   if (cached) return cached;
 
@@ -204,7 +204,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   const cleanupAudio = () => {
     requestAbortController?.abort();
     requestAbortController = null;
-    const cacheKey = `[Storyteller]: ${lines.map((line) => line.text).join(' ')}`;
+    const cacheKey = lines.map((line) => `[${line.character}]: ${line.text}`).join('\n');
     if (!savedStoryAudioCache.has(cacheKey)) savedAudioDramaPromise = null;
     if (currentAudio) {
       currentAudio.onended = null;
@@ -274,7 +274,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       emitProgress(0);
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
-      if (savedAudioDramaPromise && !savedStoryAudioCache.has(`[Storyteller]: ${lines.map((line) => line.text).join(' ')}`)) {
+      if (savedAudioDramaPromise && !savedStoryAudioCache.has(lines.map((line) => `[${line.character}]: ${line.text}`).join('\n'))) {
         savedAudioDramaPromise = null;
       }
       fail(error.message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play audio.'));

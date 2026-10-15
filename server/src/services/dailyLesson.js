@@ -11,7 +11,11 @@ import { logger } from '../lib/logger.js';
 import { evaluateAndAwardBadges } from './gamification.js';
 import { hasCompleteStoryScript } from './geminiLessons.js';
 import { createCuratedDailyLesson } from './dailyLessonFallback.js';
-import { generateAndUploadLessonAudio, getNarrationVoiceConfigVersion } from './elevenLabs.js';
+import {
+  generateAndUploadLessonAudio,
+  getNarrationVoiceConfigVersion,
+  hasCompleteNarrationVoiceConfig,
+} from './elevenLabs.js';
 
 const NARRATION_PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -26,7 +30,7 @@ All stories, vocabulary, and quizzes are English-only so learners can practise s
 
 ## Your Role & The 80/20 Magnetic Storytelling Formula
 Generate ONE complete English lesson + ONE English quiz pair per day.
-The lesson is a funny, 220-300 word humanized story told as realistic dialogue between three fictional family characters ([Rahim - Father], [Asha - Mother], [Rafi - Child]), framed by [Storyteller].
+The lesson is a funny, 160-220 word humanized story told as realistic dialogue among three original fictional characters with distinct, randomly chosen English names: one adult male, one adult female, and one child, framed by [Storyteller].
 1. **Magnetic First-Line Hook (Crucial):** The very first line must hook the reader immediately with suspense, curiosity, a relatable emotional conflict, a sudden problem, or a humorous surprise so the reader cannot stop reading until the end.
 2. **Simple English:** Use short, natural sentences that a beginner can understand. Include gentle, situation-based humour and 5-8 useful English vocabulary words with simple English definitions.
 3. **Human Warmth & Realism:** Show real human emotions, gentle family banter, relatable South Asian daily struggles, and end with one practical 5-minute habit action. Never sound robotic or lecture-like.
@@ -40,10 +44,10 @@ Quizzes are exactly 3 HARD multiple-choice questions testing inference, applicat
   Week 4: Relationships & Social Habits (Mon-Sun)
   Week 5: Learning & Growth (Mon-Sun)
   
-- Vary story types:
-  * Personal story (day 1-2): a fictional family's relatable experience
-  * Science explainer (day 3-4): explain a practical idea through family dialogue, without invented claims
-  * Myth-buster (day 5): clarify a common belief through family dialogue
+- Vary story types, character names, relationships, setting, problem, and solution. Never reuse the names Rahim, Asha, or Rafi:
+  * Personal story (day 1-2): fictional characters' relatable experience
+  * Science explainer (day 3-4): explain a practical idea through dialogue, without invented claims
+  * Myth-buster (day 5): clarify a common belief through dialogue
   * Tool/technique (day 6-7): act out an actionable method
   
 - Avoid repeating lessons within 90 days.
@@ -55,7 +59,7 @@ Quizzes are exactly 3 HARD multiple-choice questions testing inference, applicat
   "slug": "kebab-case-title",
   "title": "Human-readable title (5-10 words)",
   "description": "1-2 sentence hook (under 100 chars)",
-  "content": "A 220-300 word funny English dialogue script with one tagged speaker per line (12-16 dialogue lines)",
+  "content": "A 160-220 word funny English dialogue script with one tagged speaker per line (12-16 dialogue lines), under 2000 spoken characters",
   "category": "sleep|focus|health|social|growth",
   "locale": "en",
   "storyType": "personal|science|myth|tool",
@@ -66,13 +70,13 @@ Quizzes are exactly 3 HARD multiple-choice questions testing inference, applicat
 }
 
 ### Lesson Content Guidelines
-1. Use exactly these four voice tags and keep them unchanged in both languages:
-    - [Rahim - Father]: (adult male)
-    - [Asha - Mother]: (adult female)
-    - [Rafi - Child]: (child)
+1. Use exactly these four voice tags, choosing a new English name for each character each day and using each tag consistently:
+    - [Name - Adult Male]: (adult male)
+    - [Name - Adult Female]: (adult female)
+    - [Name - Child]: (child)
     - [Storyteller]: (storyteller voice; not a fourth family character)
-2. Every non-empty content line must start with exactly one speaker tag. The story must be 12-16 dialogue lines: start with a short storyteller introduction, alternate the three family characters through the story with real back-and-forth (reactions, questions, gentle disagreement), add a short storyteller transition or observation around the middle, and end with a storyteller closing line after the family's agreed action.
-3. Give the family a believable everyday problem connected to the selected theme. Let them react like real humans — show feelings, ask questions, disagree gently, laugh a little, and work out one small practical step together. The outcome must stay reasonable and achievable.
+2. Every non-empty content line must start with exactly one speaker tag. The story must be 12-16 dialogue lines and under 2,000 spoken characters: start with a short storyteller introduction, alternate the three characters through the story with real back-and-forth (reactions, questions, gentle disagreement), add a short storyteller transition or observation around the middle, and end with a storyteller closing line after the characters' agreed action.
+3. Give the characters a believable everyday problem connected to the selected theme. Let them react like real humans — show feelings, ask questions, disagree gently, laugh a little, and work out one small practical step together. Vary the names, setting, relationships, and problem; the outcome must stay reasonable and achievable.
 4. Make the characters sound distinct and natural. Use simple English throughout; do not write Bengali story or quiz text.
 5. End with one small action they agree to try within five minutes.
 6. Always include 5-8 useful English vocabulary entries from the story, each with a short English definition.
@@ -203,14 +207,18 @@ export function parseAndValidateDailyLessonPayload(rawText) {
     });
   }
 
+  const spokenCharacterCount = payload.lesson.content
+    .split(/\r?\n/)
+    .reduce((total, line) => total + line.replace(/^\[[^\]]+\]\s*:?\s*/, '').length, 0);
   if (
     payload.quiz.questions.length !== 3
     || !hasCompleteStoryScript(payload.lesson.content)
+    || spokenCharacterCount > 2000
     || /[\u0980-\u09ff]/.test(JSON.stringify(payload))
   ) {
     throw new AppError(502, 'UPSTREAM_UNAVAILABLE', {
-      en: 'AI lesson must be a three-character story with a three-question quiz.',
-      bn: 'AI পাঠে তিনটি চরিত্রের গল্প ও তিনটি কুইজ প্রশ্ন থাকতে হবে।',
+      en: 'AI lesson must be a short English story with three character voices and a three-question quiz.',
+      bn: 'AI পাঠে তিনটি চরিত্রের voice-সহ সংক্ষিপ্ত ইংরেজি গল্প ও তিনটি কুইজ প্রশ্ন থাকতে হবে।',
     });
   }
 
@@ -273,6 +281,7 @@ export async function generateDailyLesson({ date, config, force = false, context
   const season = getSeasonBangladesh(d);
   const theme = getThemeForDate(d);
   const storyType = getStoryTypeForDate(d);
+  const storyVariationSeed = crypto.randomUUID();
 
   const recentSlugs = await DailyLesson.distinct('slug', {
     createdAt: { $gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
@@ -284,8 +293,9 @@ Current day of week: ${dayOfWeek}
 Current season in Bangladesh: ${season}
 Selected theme: ${theme}
 Selected story type: ${storyType}
+Fresh story variation seed: ${storyVariationSeed} (use it to invent new names, relationships, setting, and plot details; do not repeat an earlier template)
 Locale: English only, regardless of the user's app language.
-Style direction: Write a funny, engaging story in simple everyday English. Use a curious or funny hook in line 1. Keep sentences short and beginner-friendly. Include 5-8 useful English vocabulary entries with simple English definitions. Make all three quiz questions challenging through inference, application, or character-choice analysis. Do not include Bengali text anywhere.
+Style direction: Write a funny, engaging story of 160-220 words in simple everyday English, under 2,000 spoken characters. Choose fresh English names for an adult male, an adult female, and a child; use [Name - Adult Male], [Name - Adult Female], and [Name - Child] speaker tags consistently, plus [Storyteller]. Vary their relationships, setting, everyday problem, and practical solution; do not use Rahim, Asha, or Rafi. Use a curious or funny hook in line 1. Keep sentences short and beginner-friendly. Include 5-8 useful English vocabulary entries with simple English definitions. Make all three quiz questions challenging through inference, application, or character-choice analysis. Do not include Bengali text anywhere.
 Recent lesson slugs to avoid (last 90 days): ${recentSlugs.slice(0, 30).join(', ') || '(none)'}
 
 ${context.trim() ? `Admin-provided story direction (follow where compatible with the safety and format rules): ${context.trim()}` : 'No extra context was provided.'}
@@ -303,7 +313,7 @@ Generate today's complete lesson and quiz pair according to the Master Prompt ru
       ],
       config,
       maxTokens: 4096,
-      temperature: 0.6,
+      temperature: 0.85,
       allowFallback: !strictAI,
     });
     payload = parseAndValidateDailyLessonPayload(text);
@@ -392,10 +402,10 @@ Generate today's complete lesson and quiz pair according to the Master Prompt ru
 }
 
 export async function generateAdminDailyLessonAudio(id, config) {
-  if (!config?.ELEVENLABS_API_KEY || !config?.CLOUDINARY_CLOUD_NAME || !config?.CLOUDINARY_API_KEY || !config?.CLOUDINARY_API_SECRET) {
+  if (!config?.ELEVENLABS_API_KEY || !hasCompleteNarrationVoiceConfig(config) || !config?.CLOUDINARY_CLOUD_NAME || !config?.CLOUDINARY_API_KEY || !config?.CLOUDINARY_API_SECRET) {
     throw new AppError(503, 'UNAVAILABLE', {
-      en: 'Configure ElevenLabs and Cloudinary on the server before generating narration.',
-      bn: 'নির্দেশিত অডিও তৈরির আগে সার্ভারে ElevenLabs ও Cloudinary কনফিগার করুন।',
+      en: 'Configure ElevenLabs, all four narration voices, and Cloudinary before generating narration.',
+      bn: 'নির্দেশিত অডিও তৈরির আগে ElevenLabs-এর চারটি voice এবং Cloudinary কনফিগার করুন।',
     });
   }
 

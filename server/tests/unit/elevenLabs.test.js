@@ -7,10 +7,12 @@ import {
 import { audioDramaError, elevenLabsError } from '../../src/routes/speech.js';
 import {
   ElevenLabsApiError,
+  buildElevenLabsDialogueRequest,
   generateAndUploadLessonAudio,
   generateAndUploadAudioDrama,
   generateElevenLabsAudio,
   generateNarrationAudio,
+  hasCompleteNarrationVoiceConfig,
   parseNarrationSegments,
   resolveNarrationVoice,
 } from '../../src/services/elevenLabs.js';
@@ -18,7 +20,7 @@ import { hasCompleteStoryScript } from '../../src/services/geminiLessons.js';
 
 const config = {
   ELEVENLABS_API_KEY: 'test-elevenlabs-key',
-  ELEVENLABS_MODEL: 'eleven_multilingual_v2',
+  ELEVENLABS_MODEL: 'eleven_v3',
   ELEVENLABS_FATHER_VOICE_ID: 'father-voice',
   ELEVENLABS_MOTHER_VOICE_ID: 'mother-voice',
   ELEVENLABS_SON_VOICE_ID: 'son-voice',
@@ -118,6 +120,66 @@ describe('Daily lesson narration', () => {
     expect(resolveNarrationVoice({ ...config, ELEVENLABS_STORYTELLER_VOICE_ID: undefined }, 'storyteller')).toBeNull();
   });
 
+  it('requires four distinct voice IDs for the character roles', () => {
+    expect(hasCompleteNarrationVoiceConfig(config)).toBe(true);
+    expect(hasCompleteNarrationVoiceConfig({
+      ...config,
+      ELEVENLABS_STORYTELLER_VOICE_ID: config.ELEVENLABS_FATHER_VOICE_ID,
+    })).toBe(false);
+  });
+
+  it('builds one dialogue request with a distinct configured voice for each speaker role', () => {
+    const segments = [
+      { speaker: 'storyteller', text: 'A story starts.' },
+      { speaker: 'father', text: 'I found a clue.' },
+      { speaker: 'mother', text: 'Let us check.' },
+      { speaker: 'son', text: 'It was under my book!' },
+    ];
+    const request = buildElevenLabsDialogueRequest({ segments, config });
+
+    expect(request.url).toBe('https://api.elevenlabs.io/v1/text-to-dialogue?output_format=mp3_44100_128');
+    expect(JSON.parse(request.body)).toMatchObject({
+      model_id: 'eleven_v3',
+      inputs: [
+        { text: 'A story starts.', voice_id: 'storyteller-voice' },
+        { text: 'I found a clue.', voice_id: 'father-voice' },
+        { text: 'Let us check.', voice_id: 'mother-voice' },
+        { text: 'It was under my book!', voice_id: 'son-voice' },
+      ],
+    });
+  });
+
+  it('accepts randomly named characters with role-based voice tags', () => {
+    const content = [
+      '[Mina - Adult Female]: The kettle is singing again.',
+      '[Tariq - Adult Male]: It thinks it is in a choir.',
+      '[Nila - Child]: Then it needs to practise quietly.',
+      '[Storyteller]: They laughed and made a plan.',
+    ].join('\n');
+
+    expect(parseNarrationSegments(content).map(({ speaker }) => speaker)).toEqual([
+      'mother',
+      'father',
+      'son',
+      'storyteller',
+    ]);
+    expect(hasCompleteStoryScript([
+      '[Storyteller]: A new story begins.',
+      '[Mina - Adult Female]: I have an idea.',
+      '[Tariq - Adult Male]: Let us try it.',
+      '[Nila - Child]: I can help.',
+      '[Storyteller]: They start together.',
+      '[Storyteller]: That is the end.',
+    ].join('\n'))).toBe(true);
+  });
+
+  it('rejects dialogue that exceeds ElevenLabs multi-voice character limit', () => {
+    expect(() => buildElevenLabsDialogueRequest({
+      segments: [{ speaker: 'storyteller', text: 'a'.repeat(2001) }],
+      config,
+    })).toThrow(/2000 text characters/);
+  });
+
   it('adds Bengali storyteller framing when narrating an older saved story', () => {
     expect(parseNarrationSegments('[Rahim - Father]: চলুন শুরু করি।').map(({ speaker, text }) => ({ speaker, text }))).toEqual([
       { speaker: 'storyteller', text: 'গল্পটি শুরু হচ্ছে।' },
@@ -140,7 +202,7 @@ describe('Daily lesson narration', () => {
     expect(hasCompleteStoryScript(complete.replace('[Storyteller]: মাঝের কথা।\n', ''))).toBe(false);
   });
 
-  it('generates a whole lesson narration with one ElevenLabs request', async () => {
+  it('generates a whole lesson with one multi-voice ElevenLabs request', async () => {
     const uploadBuffer = vi.fn(async ({ buffer, publicId }) => ({
       secure_url: 'https://media.example/family-story.mp3',
       public_id: `smart-routine/daily-lessons/${publicId}`,
@@ -170,6 +232,12 @@ describe('Daily lesson narration', () => {
       publicId: expect.stringMatching(/^smart-routine\/daily-lessons\/family-focus-[a-f0-9]{20}$/),
     });
     expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0][0]).toContain('/text-to-dialogue?');
+    expect(JSON.parse(fetch.mock.calls[0][1].body).inputs.map(({ voice_id }) => voice_id)).toEqual([
+      'storyteller-voice',
+      'father-voice',
+      'mother-voice',
+    ]);
     expect(uploadBuffer).toHaveBeenCalledTimes(1);
     expect(uploadBuffer.mock.calls[0][0].buffer).toEqual(Buffer.from([1, 2, 3]));
   });
@@ -250,15 +318,23 @@ describe('Daily lesson narration', () => {
     vi.stubGlobal('fetch', providerRequest);
 
     const result = await generateNarrationAudio({
-      lesson: { content: '[Father]: First sentence.\n[Mother]: Second sentence.' },
+      lesson: { content: [
+        '[Storyteller]: The story begins.',
+        '[Father]: First sentence.',
+        '[Mother]: Second sentence.',
+        '[Storyteller]: The story ends.',
+      ].join('\n') },
       config,
     });
 
     expect(providerRequest).toHaveBeenCalledOnce();
-    const spokenStory = JSON.parse(providerRequest.mock.calls[0][1].body).text;
-    expect(spokenStory).toContain('First sentence.');
-    expect(spokenStory).toContain('Second sentence.');
-    expect(spokenStory.indexOf('First sentence.')).toBeLessThan(spokenStory.indexOf('Second sentence.'));
+    const dialogue = JSON.parse(providerRequest.mock.calls[0][1].body);
+    expect(dialogue.inputs).toEqual([
+      { text: 'The story begins.', voice_id: 'storyteller-voice' },
+      { text: 'First sentence.', voice_id: 'father-voice' },
+      { text: 'Second sentence.', voice_id: 'mother-voice' },
+      { text: 'The story ends.', voice_id: 'storyteller-voice' },
+    ]);
     expect(result.audioBuffer).toEqual(Buffer.from([4, 5, 6]));
   });
 

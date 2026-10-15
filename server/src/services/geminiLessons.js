@@ -12,15 +12,29 @@ const failed = () => new AppError(502, 'UPSTREAM_UNAVAILABLE', {
   en: 'Gemini could not create lesson drafts. Please try again later.',
   bn: 'Gemini পাঠের খসড়া তৈরি করতে পারেনি। পরে আবার চেষ্টা করুন।',
 });
-const STORY_SPEAKER_TAG = /^\[(?:Rahim - Father|Asha - Mother|Rafi - Child|Storyteller)\]:/;
+const STORY_SPEAKER_TAG = /^\[(?:[A-Za-z][A-Za-z'’-]*(?:\s+[A-Za-z][A-Za-z'’-]*)*\s*-\s*(?:Father|Mother|Child|Adult Male|Adult Female)|Storyteller)\]:/i;
 
 export function hasCompleteStoryScript(body) {
   const lines = body.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  const storytellerLines = lines.flatMap((line, index) => line.startsWith('[Storyteller]:') ? [index] : []);
+  const storytellerLines = lines.flatMap((line, index) => /^\[Storyteller\]:/i.test(line) ? [index] : []);
+  const characterNames = new Map();
+  const roles = new Set(lines.flatMap((line) => {
+    const match = line.match(/^\[[^\]]+\s*-\s*(Father|Mother|Child|Adult Male|Adult Female)\]:/i);
+    if (!match) return [];
+    const role = match[1].toLowerCase();
+    const characterRole = role === 'father' || role === 'adult male'
+      ? 'male'
+      : role === 'mother' || role === 'adult female'
+        ? 'female'
+        : 'child';
+    const name = line.match(/^\[([^\]]+?)\s*-\s*(?:Father|Mother|Child|Adult Male|Adult Female)\]:/i)?.[1]?.trim().toLowerCase();
+    if (name) characterNames.set(characterRole, name);
+    return [characterRole];
+  }));
   return lines.length > 0
     && lines.every((line) => STORY_SPEAKER_TAG.test(line))
-    && ['Rahim - Father', 'Asha - Mother', 'Rafi - Child', 'Storyteller']
-      .every((speaker) => body.includes(`[${speaker}]:`))
+    && ['male', 'female', 'child'].every((role) => roles.has(role))
+    && new Set(characterNames.values()).size === 3
     && storytellerLines.length >= 3
     && storytellerLines[0] === 0
     && storytellerLines.at(-1) === lines.length - 1;
@@ -92,7 +106,7 @@ export async function generateLessonDraftsWithGemini(config, author, count = 12,
       body: JSON.stringify({
         systemInstruction: {
           parts: [{
-            text: 'Create practical, original, safe learning lessons about routines, focus, habit formation, time management, rest, and wellbeing. Return only a JSON array. Stories, vocabulary definitions, quiz questions, and answer options must all be in simple English only; fill both bn and en fields with the exact same English text for compatibility. Each lesson must have a unique lowercase-hyphen slug, an informative title, and a funny, humanized 220-300 word story (12-16 dialogue lines) as realistic dialogue between exactly three fictional family characters plus a storyteller voice (not a fourth family character). Use these unchanged speaker tags, one turn per line: [Storyteller]:, [Rahim - Father]:, [Asha - Mother]:, [Rafi - Child]:. Start with a funny or curious hook, include natural back-and-forth and gentle humour, and end with one practical action. Keep sentences short, clear, and beginner-friendly. Include 5-8 useful English vocabulary entries with simple English definitions. Generate exactly three challenging quiz questions based only on the story; each needs inference or application, four believable answer options, and a correct answerIndex from 0 to 3. Never include Bengali text, medical advice, invented research claims, or user data. Output objects with exactly: slug, title {bn,en}, body {bn,en}, vocabulary [{word, meaning {bn,en}} x5-8], quiz [{question {bn,en}, options [{bn,en} x4], answerIndex} x3].',
+            text: 'Create practical, original, safe learning lessons about routines, focus, habit formation, time management, rest, and wellbeing. Return only a JSON array. Stories, vocabulary definitions, quiz questions, and answer options must all be in simple English only; fill both bn and en fields with the exact same English text for compatibility. Each lesson must have a unique lowercase-hyphen slug, an informative title, and a funny, humanized 160-220 word story (12-16 dialogue lines, under 2,000 spoken characters) with three original fictional characters with fresh English names: one adult male, one adult female, and one child, plus a storyteller voice. Use one consistent tag for each character, following [Name - Adult Male]:, [Name - Adult Female]:, [Name - Child]:, and [Storyteller]:. Avoid fixed names and vary the relationships, setting, problem, and solution. Start with a funny or curious hook, include natural back-and-forth and gentle humour, and end with one practical action. Keep sentences short, clear, and beginner-friendly. Include 5-8 useful English vocabulary entries with simple English definitions. Generate exactly three challenging quiz questions based only on the story; each needs inference or application, four believable answer options, and a correct answerIndex from 0 to 3. Never include Bengali text, medical advice, invented research claims, or user data. Output objects with exactly: slug, title {bn,en}, body {bn,en}, vocabulary [{word, meaning {bn,en}} x5-8], quiz [{question {bn,en}, options [{bn,en} x4], answerIndex} x3].',
           }],
         },
         contents: [{
