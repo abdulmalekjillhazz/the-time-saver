@@ -7,6 +7,14 @@ import { enqueueAndFlush } from '../lib/outboxClient.js';
 import { useAppStore } from '../lib/appStore.js';
 import { answerWithLocalModel } from '../lib/localAssistant.js';
 import { apiRequest } from '../lib/apiClient.js';
+import {
+  cacheOfflineLesson,
+  clearOfflineStoryCache,
+  getOfflineCacheConsent,
+  getOfflineLesson,
+  listOfflineLessons,
+  setOfflineCacheConsent,
+} from '../lib/offlineStoryCache.js';
 import { base64UrlToBytes, bengaliCalendarMonthRange, buildCalendarDays } from '../lib/calendar.js';
 import { getRoutineMood } from '../lib/routineMood.js';
 import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
@@ -414,9 +422,14 @@ export function PrivateApp() {
   const [holidayNotificationsEnabled, setHolidayNotificationsEnabled] = useState(false);
   const [holidayPushBusy, setHolidayPushBusy] = useState(false);
   const [lessons, setLessons] = useState([]);
+  const [offlineSavedLessons, setOfflineSavedLessons] = useState([]);
   const [dailyLesson, setDailyLesson] = useState(null);
   const [dailyQuiz, setDailyQuiz] = useState(null);
   const [lesson, setLesson] = useState(null);
+  const [offlineLessonPreview, setOfflineLessonPreview] = useState(null);
+  const [offlineCacheAllowed, setOfflineCacheAllowed] = useState(false);
+  const [offlineConsentOpen, setOfflineConsentOpen] = useState(false);
+  const [offlineCacheStatus, setOfflineCacheStatus] = useState('');
   const lessonFocusTargetRef = useRef('story');
   const [model, setModel] = useState(null);
   const [answers, setAnswers] = useState([]);
@@ -505,7 +518,20 @@ export function PrivateApp() {
     if (publishedResult.status === 'fulfilled') {
       setLessons(publishedResult.value.lessons);
     } else {
-      reportError(publishedResult.reason);
+      try {
+        const cachedLessons = getOfflineCacheConsent() === true
+          ? await listOfflineLessons()
+          : [];
+        if (cachedLessons.length) {
+          setLessons(cachedLessons);
+          setOfflineSavedLessons(cachedLessons);
+          setNotice('ইন্টারনেট সংযোগ নেই। এই ডিভাইসে আগে সংরক্ষিত পাঠগুলো দেখানো হচ্ছে।');
+        } else {
+          reportError(publishedResult.reason);
+        }
+      } catch (cacheError) {
+        reportError(cacheError);
+      }
     }
     if (dailyResult.status === 'fulfilled') {
       setDailyLesson(dailyResult.value.dailyLesson || null);
@@ -568,7 +594,9 @@ export function PrivateApp() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      navigator.serviceWorker.register('/sw.js').catch((registrationError) => {
+        reportErrorRef.current(registrationError);
+      });
     }
     const handleBeforeInstall = (e) => {
       setPwaInstallPrompt(e);
@@ -593,6 +621,36 @@ export function PrivateApp() {
         else reportError(err);
       });
   }, [user, loadLessons, loadRoutines, reportError]);
+
+  useEffect(() => {
+    if (!user || !uiReady) return;
+    try {
+      const allowed = getOfflineCacheConsent();
+      setOfflineCacheAllowed(allowed === true);
+      if (allowed === null) setOfflineConsentOpen(true);
+    } catch (consentError) {
+      reportError(consentError);
+    }
+  }, [user, uiReady, reportError]);
+
+  useEffect(() => {
+    if (!uiReady) return undefined;
+    let active = true;
+    try {
+      if (getOfflineCacheConsent() !== true) {
+        setOfflineSavedLessons([]);
+        return undefined;
+      }
+      listOfflineLessons()
+        .then((savedLessons) => {
+          if (active) setOfflineSavedLessons(savedLessons);
+        })
+        .catch(reportError);
+    } catch (cacheError) {
+      reportError(cacheError);
+    }
+    return () => { active = false; };
+  }, [uiReady, offlineCacheAllowed, reportError]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -1191,7 +1249,7 @@ export function PrivateApp() {
       setProfileAvatarId(result.user.avatarId || 'sunrise');
       if (registering) setStoredLanguage(String(form.get('locale') || 'bn'));
       else if (!useAppStore.getState().language) setStoredLanguage(result.user.locale === 'en' ? 'en' : 'bn');
-      setNotice(registering ? COPY[result.user.locale === 'en' ? 'en' : 'bn'].create : COPY[result.user.locale === 'en' ? 'en' : 'bn'].signIn);
+      setNotice('');
     } catch (err) {
       reportError(err);
     } finally {
@@ -1215,7 +1273,7 @@ export function PrivateApp() {
       setProfileName(result.user.displayName);
       setProfileAvatarId(result.user.avatarId || 'sunrise');
       if (!useAppStore.getState().language) setStoredLanguage(result.user.locale === 'en' ? 'en' : 'bn');
-      setNotice(COPY[result.user.locale === 'en' ? 'en' : 'bn'].signIn);
+      setNotice('');
     } catch (err) {
       reportError(err);
     } finally {
@@ -1363,10 +1421,58 @@ export function PrivateApp() {
       setLesson(result.lesson);
       setAnswers([]);
       setQuizResult(null);
+      setOfflineCacheStatus('');
+      if (getOfflineCacheConsent() === true) {
+        setOfflineCacheStatus('গল্প ও শব্দার্থ অফলাইনে সংরক্ষণ করা হচ্ছে…');
+        cacheOfflineLesson(result.lesson, request)
+          .then(async ({ lessonSaved, meaningsSaved, meaningsMissing }) => {
+            if (!lessonSaved) return;
+            setOfflineCacheStatus(meaningsMissing
+              ? `গল্পটি অফলাইনে রাখা হয়েছে; ${meaningsSaved}টি শব্দার্থ সংরক্ষিত, ${meaningsMissing}টির অর্থ পাওয়া যায়নি।`
+              : `গল্পটি অফলাইনে রাখা হয়েছে; ${meaningsSaved}টি শব্দার্থও সংরক্ষিত।`);
+            setOfflineSavedLessons(await listOfflineLessons());
+          })
+          .catch((cacheError) => {
+            setOfflineCacheStatus('অফলাইনে সংরক্ষণ সম্পূর্ণ হয়নি।');
+            reportError(cacheError);
+          });
+      }
     } catch (err) {
-      reportError(err);
+      try {
+        const cachedLesson = getOfflineCacheConsent() === true
+          ? await getOfflineLesson(slug)
+          : null;
+        if (cachedLesson) {
+          lessonFocusTargetRef.current = focusTarget;
+          setLesson(cachedLesson);
+          setAnswers([]);
+          setQuizResult(null);
+          setNotice('ইন্টারনেট সংযোগ নেই। এই গল্পটি এই ডিভাইস থেকে খোলা হয়েছে।');
+        } else {
+          reportError(err);
+        }
+      } catch (cacheError) {
+        reportError(cacheError);
+      }
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function updateOfflineCacheConsent(allowed) {
+    try {
+      const wasAllowed = getOfflineCacheConsent() === true;
+      if (allowed) await listOfflineLessons();
+      setOfflineCacheConsent(allowed);
+      setOfflineCacheAllowed(allowed);
+      setOfflineConsentOpen(false);
+      if (!allowed) {
+        setOfflineCacheStatus('');
+        if (wasAllowed) await clearOfflineStoryCache();
+        setOfflineSavedLessons([]);
+      }
+    } catch (consentError) {
+      reportError(consentError);
     }
   }
 
@@ -1432,52 +1538,46 @@ export function PrivateApp() {
   if (!user) {
     return (
       <main className="app-shell mx-auto my-6 max-w-md space-y-5 rounded-[2rem] p-4 sm:my-10 sm:p-7">
-        <header className="app-hero relative overflow-hidden rounded-3xl p-6 sm:p-7">
-          <div className="relative z-10 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="brand-orb shrink-0" aria-hidden="true">✨</div>
-              <p className="eyebrow">✦ SMART ROUTINE ✦</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {pwaInstallPrompt ? (
-                <Button
-                  variant="primary"
-                  className="min-h-[40px] px-3 py-1.5 text-xs font-bold"
-                  onClick={async () => {
-                    pwaInstallPrompt.prompt();
-                    await pwaInstallPrompt.userChoice.catch(() => {});
-                    setPwaInstallPrompt(null);
-                  }}
-                >
-                  <span aria-hidden="true">📲</span>
-                  <span>{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install'}</span>
-                </Button>
-              ) : null}
-              <Button
-                variant="secondary"
-                className="language-toggle-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
-                aria-label={copy.languageToggle}
-                title={copy.languageToggle}
-                onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
-              >
-                <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
-                <span>{lang === 'bn' ? 'English' : 'বাংলা'}</span>
-              </Button>
-              <Button
-                variant="secondary"
-                className="icon-button min-h-[40px] min-w-[40px]"
-                aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
-                title={theme === 'dark' ? copy.themeLight : copy.themeDark}
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                {theme === 'dark' ? '☀️' : '🌙'}
-              </Button>
-            </div>
+        <header className="app-hero relative space-y-4 overflow-hidden rounded-3xl p-6 sm:p-7">
+          <div className="relative z-10 space-y-1.5">
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{copy.title}</h1>
+            <p className="text-sm leading-relaxed text-white/85">{copy.useAccount}</p>
           </div>
 
-          <div className="relative z-10 mt-5 space-y-1.5">
-            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{copy.title}</h1>
-            <p className="text-sm text-white/85 leading-relaxed">{copy.useAccount}</p>
+          <div className="app-auth-controls relative z-10 flex items-center justify-between gap-2">
+            {pwaInstallPrompt ? (
+              <Button
+                variant="primary"
+                className="min-h-[40px] px-3 py-1.5 text-xs font-bold"
+                onClick={async () => {
+                  pwaInstallPrompt.prompt();
+                  await pwaInstallPrompt.userChoice.catch(() => {});
+                  setPwaInstallPrompt(null);
+                }}
+              >
+                <span aria-hidden="true">📲</span>
+                <span>{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install'}</span>
+              </Button>
+            ) : null}
+            <Button
+              variant="secondary"
+              className="language-toggle-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
+              aria-label={copy.languageToggle}
+              title={copy.languageToggle}
+              onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
+            >
+              <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
+              <span>{lang === 'bn' ? 'English' : 'বাংলা'}</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="icon-button min-h-[40px] min-w-[40px]"
+              aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
+              title={theme === 'dark' ? copy.themeLight : copy.themeDark}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </Button>
           </div>
         </header>
 
@@ -1565,36 +1665,60 @@ export function PrivateApp() {
             </div>
           ) : null}
         </Card>
+        {offlineSavedLessons.length ? (
+          <Card className="surface-card space-y-4 rounded-3xl p-5">
+            <div>
+              <h2 className="text-lg font-extrabold text-ink">অফলাইনে সংরক্ষিত গল্প</h2>
+              <p className="mt-1 text-sm text-ink/75">অ্যাকাউন্টে সাইন ইন না করেও এই ডিভাইসে রাখা গল্প পড়তে পারবেন।</p>
+            </div>
+            <ul className="space-y-2">
+              {offlineSavedLessons.map((savedLesson) => (
+                <li key={savedLesson.slug}>
+                  <button
+                    type="button"
+                    className="w-full rounded-xl border border-sapphire/30 bg-paper/70 p-3 text-left font-semibold text-ink hover:border-sapphire"
+                    onClick={() => setOfflineLessonPreview(savedLesson)}
+                  >
+                    {localized(savedLesson.title, 'en')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {offlineLessonPreview ? (
+              <div className="space-y-3 border-t border-gold/20 pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-bold text-ink">{localized(offlineLessonPreview.title, 'en')}</h3>
+                  <Button
+                    variant="secondary"
+                    className="min-h-[40px] px-3"
+                    onClick={() => setOfflineLessonPreview(null)}
+                  >
+                    বন্ধ করুন
+                  </Button>
+                </div>
+                <AudioDramaPlayer
+                  title={localized(offlineLessonPreview.title, 'en')}
+                  content={localized(offlineLessonPreview.body, 'en')}
+                  vocabulary={offlineLessonPreview.vocabulary || []}
+                  lang={lang}
+                />
+              </div>
+            ) : null}
+          </Card>
+        ) : null}
       </main>
     );
   }
 
   return (
-    <main className="app-shell mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7">
+    <main className="app-shell app-shell-main mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7">
       <header className="app-hero relative flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl px-5 py-6 sm:px-8 sm:py-8">
         <div className="relative z-10">
-          <p className="eyebrow">✦ MAKE SPACE FOR WHAT MATTERS ✦</p>
           <h1 className="app-title mt-2 text-3xl font-extrabold tracking-tight sm:text-5xl">
             {copy.title}
           </h1>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm opacity-90 sm:text-base">
-            <button
-              type="button"
-              className="hero-user-pill inline-flex max-w-full items-center gap-2 rounded-full border border-gold/45 px-3 py-1 font-semibold shadow-sm"
-              aria-label={copy.editProfile}
-              title={copy.editProfile}
-              onClick={() => setTab('settings')}
-            >
-              <ProfileAvatar avatarId={user.avatarId || 'sunrise'} size="sm" />
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M3.5 12h17M12 3c2.3 2.4 3.4 5.4 3.4 9S14.3 18.6 12 21c-2.3-2.4-3.4-5.4-3.4-9S9.7 5.4 12 3Z" />
-              </svg>
-              <span className="truncate">{user.displayName}</span>
-            </button>
-            <span className="hero-description">{copy.description}</span>
-          </div>
-          <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-4 py-1.5 font-mono text-sm">
+          <p className="hero-description mt-3 text-sm opacity-90 sm:text-base">{copy.description}</p>
+          <p className="app-hero-clock mt-4 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-4 py-1.5 font-mono text-sm">
             <span aria-hidden="true">🕰️</span>{new Date(clockNow).toLocaleTimeString(lang === 'bn' ? 'bn-BD' : 'en', { hour: '2-digit', minute: '2-digit' })}
           </p>
         </div>
@@ -1602,34 +1726,49 @@ export function PrivateApp() {
           {pwaInstallPrompt ? (
             <Button
               variant="primary"
-              onClick={async () => {
-                pwaInstallPrompt.prompt();
-                await pwaInstallPrompt.userChoice.catch(() => {});
-                setPwaInstallPrompt(null);
-              }}
+                className="app-hero-action"
+                aria-label={lang === 'bn' ? 'অ্যাপ ইনস্টল করুন' : 'Install app'}
+                title={lang === 'bn' ? 'অ্যাপ ইনস্টল করুন' : 'Install app'}
+                onClick={async () => {
+                  pwaInstallPrompt.prompt();
+                  await pwaInstallPrompt.userChoice.catch(() => {});
+                  setPwaInstallPrompt(null);
+                }}
             >
-              <span aria-hidden="true">📲</span>
-              <span>{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install App'}</span>
+                <span aria-hidden="true">📲</span><span className="app-hero-action-label">{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install App'}</span>
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={() => setVoiceModalOpen(true)}>
-            <span aria-hidden="true">🎧</span><span>{copy.voiceBriefing}</span>
+          <Button
+            variant="secondary"
+            className="app-hero-action"
+            aria-label={copy.voiceBriefing}
+            title={copy.voiceBriefing}
+            onClick={() => setVoiceModalOpen(true)}
+          >
+            <span aria-hidden="true">🎧</span><span className="app-hero-action-label">{copy.voiceBriefing}</span>
           </Button>
           <Button
             variant="secondary"
-            className="language-toggle-button"
+            className="app-hero-action language-toggle-button"
             aria-label={copy.languageToggle}
             title={copy.languageToggle}
             onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
-          ><span className="language-toggle-globe" aria-hidden="true">🌐</span><LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} /><span>{lang === 'bn' ? 'English' : 'বাংলা'}</span></Button>
+          ><span className="language-toggle-globe" aria-hidden="true">🌐</span><LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} /><span className="app-hero-action-label">{lang === 'bn' ? 'English' : 'বাংলা'}</span></Button>
           <Button
             variant="secondary"
-            className="icon-button"
+            className="app-hero-action icon-button"
             aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
             title={theme === 'dark' ? copy.themeLight : copy.themeDark}
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           >{theme === 'dark' ? '☀️' : '🌙'}</Button>
-          <Button variant="secondary" className="account-logout" onClick={signOut} disabled={busy}><span aria-hidden="true">🚪</span><span>{copy.logout}</span></Button>
+          <Button
+            variant="secondary"
+            className="app-hero-action account-logout"
+            aria-label={copy.logout}
+            title={copy.logout}
+            onClick={signOut}
+            disabled={busy}
+          ><span aria-hidden="true">🚪</span><span className="app-hero-action-label">{copy.logout}</span></Button>
         </div>
       </header>
       <SyncStatus userId={user.id} lang={lang} />
@@ -1645,16 +1784,6 @@ export function PrivateApp() {
           <button type="button" onClick={() => setNotice('')} className="rounded-lg border border-sapphire/50 px-2.5 py-1 text-xs font-extrabold">✕</button>
         </div>
       ) : null}
-      {(error || notice) ? (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm animate-in fade-in">
-          <div className={`flex items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3 text-xs sm:text-sm font-extrabold shadow-2xl ${
-            error ? 'border-rose-400 bg-paper text-rose-300' : 'border-sapphire bg-paper text-sapphire'
-          }`}>
-            <span>{error ? (error.startsWith('❌') ? error : `❌ ${error}`) : (notice.startsWith('✅') ? notice : `✅ ${notice}`)}</span>
-            <button type="button" onClick={() => { setError(''); setNotice(''); }} className="ml-2 rounded border border-current/40 px-2 py-0.5 text-xs">✕</button>
-          </div>
-        </div>
-      ) : null}
       {firingAlarm ? (
         <Card className="alarm-banner flex flex-col gap-4" role="alert">
           <p className="text-xl font-bold sm:text-2xl"><span aria-hidden="true">🔔</span> {copy.alarmRinging}: {firingAlarm.label || copy.alarmTime}</p>
@@ -1666,10 +1795,24 @@ export function PrivateApp() {
       ) : null}
       <nav className="app-tabs" aria-label={copy.title}>
         {[
-          ['today', '🌤️', copy.today], ['dashboard', '📊', copy.dashboard], ['lessons', '📚', copy.lessons], ['insights', '🎯', copy.insights], ['assistant', '💬', copy.assistant], ['settings', '⚙️', copy.settings],
-        ].map(([key, icon, label]) => (
-          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
-            <span className="tab-icon" aria-hidden="true">{icon}</span><span>{label}</span>
+          ['today', '🌤️', copy.today, lang === 'bn' ? 'আজ' : 'Today'],
+          ['dashboard', '📊', copy.dashboard, lang === 'bn' ? 'হোম' : 'Home'],
+          ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
+          ['insights', '🎯', copy.insights, lang === 'bn' ? 'ঝুঁকি' : 'Insights'],
+          ['assistant', '💬', copy.assistant, lang === 'bn' ? 'সহায়ক' : 'Assistant'],
+          ['settings', '⚙️', copy.settings, lang === 'bn' ? 'সেটিংস' : 'Settings'],
+        ].map(([key, icon, label, shortLabel]) => (
+          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
+            <span className={`tab-icon tab-icon-${key}`} aria-hidden="true">
+              {key === 'settings' ? (
+                <>
+                  <span className="tab-settings-gear">{icon}</span>
+                  <ProfileAvatar avatarId={user.avatarId || 'sunrise'} size="sm" className="tab-settings-avatar" />
+                </>
+              ) : icon}
+            </span>
+            <span className="tab-label-desktop">{label}</span>
+            <span className="tab-label-mobile" aria-hidden="true">{shortLabel}</span>
           </Button>
         ))}
       </nav>
@@ -1969,6 +2112,16 @@ export function PrivateApp() {
 
       {tab === 'lessons' ? (
         <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {offlineCacheStatus ? <p role="status" className="text-sm text-ink/80">{offlineCacheStatus}</p> : <span />}
+            <Button
+              variant="secondary"
+              className="min-h-[40px] text-xs font-bold"
+              onClick={() => setOfflineConsentOpen(true)}
+            >
+              {offlineCacheAllowed ? 'অফলাইন সংরক্ষণ সেটিংস' : 'অফলাইনে পড়ার জন্য সংরক্ষণ'}
+            </Button>
+          </div>
           {dailyLesson ? <DailyLessonCard dailyLesson={dailyLesson} quiz={dailyQuiz} lang={lang} collapsible /> : null}
           {lessons.length ? (
             <div className="space-y-4">
@@ -2145,7 +2298,7 @@ export function PrivateApp() {
               <button
                 type="button"
                 onClick={() => setShowPrayerTimes(!showPrayerTimes)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${showPrayerTimes ? 'bg-emerald-600' : 'bg-gray-300'}`}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${showPrayerTimes ? 'bg-sapphire-deep' : 'bg-gray-300'}`}
               >
                 <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${showPrayerTimes ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
@@ -2214,6 +2367,42 @@ export function PrivateApp() {
           onSaved={() => loadRoutines(user)}
         />
       )}
+      {offlineConsentOpen ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="offline-story-cache-title"
+            className="surface-card w-full max-w-lg space-y-4 rounded-3xl border border-sapphire/40 p-5 shadow-2xl sm:p-7"
+          >
+            <div aria-hidden="true" className="text-3xl">📥</div>
+            <h2 id="offline-story-cache-title" className="text-xl font-extrabold text-ink sm:text-2xl">
+              অফলাইনে পড়ার জন্য গল্প ও শব্দার্থ সংরক্ষণ করবেন?
+            </h2>
+            <p className="leading-relaxed text-ink/85">
+              অনুমতি দিলে নির্বাচিত ইংরেজি গল্প ও শব্দের বাংলা অর্থ এই ডিভাইসে রাখা হবে, যাতে ইন্টারনেট ছাড়াও পড়তে পারেন।
+            </p>
+            <p className="rounded-xl border border-gold/30 bg-paper/70 p-3 text-sm leading-relaxed text-ink/75">
+              এতে ইন্টারনেট ডেটা ও ডিভাইসের জায়গা লাগবে। ব্রাউজার বা ডিভাইসের স্টোরেজ পরিষ্কার করলে সংরক্ষিত পাঠ মুছে যেতে পারে। অনুমতি না দিলে গল্প ও শব্দার্থ সংরক্ষণ করা হবে না।
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="secondary"
+                className="min-h-[44px]"
+                onClick={() => updateOfflineCacheConsent(false)}
+              >
+                {offlineCacheAllowed ? 'সংরক্ষণ বন্ধ করে মুছুন' : 'এখন নয়'}
+              </Button>
+              <Button
+                className="min-h-[44px]"
+                onClick={() => updateOfflineCacheConsent(true)}
+              >
+                {offlineCacheAllowed ? 'সংরক্ষণ চালু রাখুন' : 'অনুমতি দিন'}
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

@@ -203,7 +203,7 @@ export default async function HomePage(props) {
           </div>
 
           {/* Interactive Preview Widget — same tokens as app routine tiles */}
-          <div className="surface-card mt-8 p-5 lg:mt-0" aria-hidden="true">
+          <div className="surface-card w-full max-w-xl justify-self-center p-4 sm:p-5 lg:max-w-none" aria-hidden="true">
             <div className="flex items-center justify-between border-b border-gold/20 pb-3 text-xs font-bold">
               <span className="eyebrow">✦ {isBn ? 'আজকের ফোকাস রুটিন' : "Today's Focus"}</span>
               <span className="rounded-full border border-gold/50 bg-gold/15 px-2.5 py-0.5 text-gold-soft">🔥 7-Day Streak</span>

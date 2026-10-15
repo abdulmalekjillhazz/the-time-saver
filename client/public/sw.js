@@ -1,17 +1,19 @@
-const CACHE_NAME = 'smart-routine-pwa-v2';
+const CACHE_NAME = 'smart-routine-pwa-v3';
 const PRECACHE_URLS = ['/app', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS).catch(() => {}))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys
+        .filter((key) => key.startsWith('smart-routine-pwa-') && key !== CACHE_NAME)
+        .map((key) => caches.delete(key)))
     ).then(() => self.clients.claim())
   );
 });
@@ -20,8 +22,28 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api/')) return;
+  const isAppShell = event.request.mode === 'navigate'
+    && url.pathname.replace(/\/$/, '') === '/app'
+    && !url.search;
+  const isNextAsset = url.origin === self.location.origin
+    && url.pathname.startsWith('/_next/static/')
+    && ['script', 'style', 'font', 'image', 'worker'].includes(event.request.destination);
+  if (!isAppShell && !isNextAsset) return;
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    (async () => {
+      const cached = await caches.match(event.request);
+      try {
+        const response = await fetch(event.request);
+        if (response.ok && url.origin === self.location.origin) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
+        }
+        return response;
+      } catch (error) {
+        if (cached) return cached;
+        throw error;
+      }
+    })()
   );
 });
 

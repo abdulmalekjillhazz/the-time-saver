@@ -68,6 +68,7 @@ export const DICTIONARIES = {
       body: [
         'Draft. This policy needs legal review before launch.',
         'We store your account details, your routines, and your completions, so the app can work.',
+        'If you allow offline saving, selected stories and word meanings are stored in this browser on your device. You can turn this off and clear saved stories in the app; your browser may also remove this storage.',
         'Model training is optional. We use it only with your consent, and only with pseudonymised data.',
         'You can export your data after entering your password, and you can delete your account.',
       ],
@@ -162,6 +163,7 @@ export const DICTIONARIES = {
       body: [
         'খসড়া। প্রকাশের আগে আইনি পর্যালোচনা লাগবে।',
         'অ্যাপ চালানোর জন্য আমরা আপনার অ্যাকাউন্ট, রুটিন ও সম্পন্ন তথ্য রাখি।',
+        'আপনি অফলাইনে সংরক্ষণের অনুমতি দিলে নির্বাচিত গল্প ও শব্দার্থ এই ডিভাইসের ব্রাউজারে রাখা হয়। অ্যাপ থেকে এই সুবিধা বন্ধ করে সংরক্ষিত গল্প মুছতে পারবেন; ব্রাউজারও এই তথ্য মুছে দিতে পারে।',
         'মডেল প্রশিক্ষণ ঐচ্ছিক। আপনার সম্মতি থাকলেই এবং শুধু ছদ্মনামকৃত তথ্য দিয়ে এটি ব্যবহার হয়।',
         'পাসওয়ার্ড দিয়ে আপনি আপনার তথ্য রপ্তানি করতে এবং অ্যাকাউন্ট মুছতে পারেন।',
       ],

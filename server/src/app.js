@@ -3,10 +3,13 @@ import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
+import { z } from 'zod';
 import { logger, serializeRequest } from './lib/logger.js';
 import { requestId } from './middleware/requestId.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { dbRequired } from './middleware/dbRequired.js';
+import { rateLimit } from './middleware/rateLimit.js';
+import { validate } from './middleware/validate.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
 import { meRouter } from './routes/me.js';
@@ -31,6 +34,21 @@ import { telegramRouter } from './routes/telegram.js';
 import { configureCloudinary } from './services/cloudinary.js';
 import { speechRouter } from './routes/speech.js';
 import { islamicReflectionsRouter } from './routes/islamicReflections.js';
+
+function normalizeWord(raw) {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/['\u2019]s$/i, '')
+    .replace(/^[^a-z0-9\u0980-\u09FF]+|[^a-z0-9\u0980-\u09FF]+$/gi, '');
+}
+
+const wordMeaningBatchSchema = z.object({
+  lang: z.enum(['bn', 'en']),
+  words: z.array(z.string().trim().min(1).max(80)).max(300)
+    .transform((words) => [...new Set(words.map(normalizeWord).filter(Boolean))])
+    .pipe(z.array(z.string().min(1)).min(1).max(300)),
+}).strict();
 
 // config is passed in, so tests can build the app without reading the real environment.
 export function createApp({ config }) {
@@ -63,71 +81,140 @@ export function createApp({ config }) {
   // Health and readiness go before CSRF and the database guard, so monitors can always reach them.
   app.use('/api', healthRouter(config));
 
-  // Public online word meaning proxy so mobile browsers are never blocked by CSP or CORS
+  // Public word lookup proxy so mobile browsers are never blocked by CSP or CORS.
   const serverWordCache = new Map();
+  const wordMeaningInflight = new Map();
+  const lookupWordMeaning = async (clean, lang) => {
+    const cacheKey = `${lang}:${clean}`;
+    if (serverWordCache.has(cacheKey)) return serverWordCache.get(cacheKey);
+    if (wordMeaningInflight.has(cacheKey)) return wordMeaningInflight.get(cacheKey);
+
+    const lookup = (async () => {
+      let translatedMeaning = '';
+      let englishDetails = '';
+      const [translationResult, dictionaryResult] = await Promise.all([
+        lang === 'bn'
+          ? Promise.allSettled([
+          fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=bn&dt=t&dt=bd&q=${encodeURIComponent(clean)}`, { signal: AbortSignal.timeout(4500) })
+            .then((response) => (response.ok ? response.json() : null)),
+          ])
+          : Promise.resolve([]),
+        Promise.allSettled([
+          fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`, { signal: AbortSignal.timeout(4500) })
+            .then((response) => (response.ok ? response.json() : null)),
+        ]),
+      ]);
+
+      if (translationResult[0]?.status === 'fulfilled' && Array.isArray(translationResult[0].value)) {
+        const data = translationResult[0].value;
+        const primary = data?.[0]?.[0]?.[0];
+        const alternatives = [];
+        if (Array.isArray(data?.[1])) {
+          for (const group of data[1]) {
+            if (Array.isArray(group?.[1])) alternatives.push(...group[1].slice(0, 3));
+          }
+        }
+        translatedMeaning = [
+          primary && primary.toLowerCase() !== clean ? primary : '',
+          ...alternatives.filter((word) => word && word !== primary),
+        ].filter(Boolean).slice(0, 4).join(', ');
+      }
+
+      if (dictionaryResult[0].status === 'fulfilled' && Array.isArray(dictionaryResult[0].value)) {
+        const entry = dictionaryResult[0].value[0];
+        if (entry) {
+          const phonetic = entry.phonetic || entry.phonetics?.find((item) => item.text)?.text || '';
+          const definition = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
+          const partOfSpeech = entry.meanings?.[0]?.partOfSpeech || '';
+          englishDetails = [
+            phonetic ? `[${phonetic}]` : '',
+            partOfSpeech ? `(${partOfSpeech})` : '',
+            definition,
+          ].filter(Boolean).join(' ');
+        }
+      }
+
+      if (!translatedMeaning && lang === 'bn') {
+        const memoryResult = await Promise.allSettled([
+          fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=en|bn`, { signal: AbortSignal.timeout(4500) })
+            .then((response) => (response.ok ? response.json() : null)),
+        ]);
+        const translated = memoryResult[0]?.status === 'fulfilled'
+          ? memoryResult[0].value?.responseData?.translatedText
+          : '';
+        if (
+          translated &&
+          !translated.startsWith('MYMEMORY WARNING') &&
+          translated.toLowerCase() !== clean
+        ) {
+          translatedMeaning = translated;
+        }
+      }
+
+      const meaning = [translatedMeaning, englishDetails].filter(Boolean).join(' — ');
+      if (meaning) {
+        serverWordCache.set(cacheKey, meaning);
+        if (serverWordCache.size > 3000) serverWordCache.delete(serverWordCache.keys().next().value);
+      }
+      return meaning;
+    })();
+
+    wordMeaningInflight.set(cacheKey, lookup);
+    try {
+      return await lookup;
+    } finally {
+      wordMeaningInflight.delete(cacheKey);
+    }
+  };
+
   app.get('/api/word-meaning', async (req, res) => {
-    const raw = String(req.query.word || '').trim().toLowerCase();
-    const clean = raw.replace(/['\u2019]s$/i, '').replace(/^[^a-z0-9\u0980-\u09FF]+|[^a-z0-9\u0980-\u09FF]+$/gi, '');
+    const clean = normalizeWord(req.query.word);
     if (!clean || clean.length < 1) {
       return res.status(400).json({ ok: false, meaning: '' });
     }
-    if (serverWordCache.has(clean)) {
-      return res.json({ ok: true, term: clean, meaning: serverWordCache.get(clean) });
-    }
+    const lang = req.query.lang === 'en' ? 'en' : 'bn';
     try {
-      let banglaMeaning = '';
-      let englishDetails = '';
-      const [gtxRes, mmRes, dictRes] = await Promise.allSettled([
-        fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=bn&dt=t&dt=bd&q=${encodeURIComponent(clean)}`, { signal: AbortSignal.timeout(4500) }).then((r) => (r.ok ? r.json() : null)),
-        fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(clean)}&langpair=en|bn`, { signal: AbortSignal.timeout(4500) }).then((r) => (r.ok ? r.json() : null)),
-        fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`, { signal: AbortSignal.timeout(4500) }).then((r) => (r.ok ? r.json() : null)),
-      ]);
-
-      if (gtxRes.status === 'fulfilled' && Array.isArray(gtxRes.value)) {
-        const data = gtxRes.value;
-        const primaryBn = data?.[0]?.[0]?.[0];
-        const synonyms = [];
-        if (Array.isArray(data?.[1])) {
-          for (const group of data[1]) {
-            if (Array.isArray(group?.[1])) synonyms.push(...group[1].slice(0, 3));
-          }
-        }
-        const combined = [
-          primaryBn && primaryBn.toLowerCase() !== clean ? primaryBn : '',
-          ...synonyms.filter((w) => w && w !== primaryBn),
-        ].filter(Boolean);
-        if (combined.length > 0) banglaMeaning = combined.slice(0, 4).join(', ');
-      }
-
-      if (!banglaMeaning && mmRes.status === 'fulfilled' && mmRes.value) {
-        const translated = mmRes.value?.responseData?.translatedText;
-        if (translated && !translated.startsWith('MYMEMORY WARNING') && translated.toLowerCase() !== clean) {
-          banglaMeaning = translated;
-        }
-      }
-
-      if (dictRes.status === 'fulfilled' && Array.isArray(dictRes.value)) {
-        const entry = dictRes.value[0];
-        if (entry) {
-          const phonetic = entry.phonetic || entry.phonetics?.find((p) => p.text)?.text || '';
-          const def = entry.meanings?.[0]?.definitions?.[0]?.definition || '';
-          const pos = entry.meanings?.[0]?.partOfSpeech || '';
-          englishDetails = [phonetic ? `[${phonetic}]` : '', pos ? `(${pos})` : '', def].filter(Boolean).join(' ');
-        }
-      }
-
-      const finalMeaning = [banglaMeaning, englishDetails].filter(Boolean).join(' — ');
-      if (finalMeaning) {
-        serverWordCache.set(clean, finalMeaning);
-        return res.json({ ok: true, term: clean, meaning: finalMeaning });
-      }
-      return res.json({ ok: false, term: clean, meaning: '' });
+      const meaning = await lookupWordMeaning(clean, lang);
+      return res.json({ ok: Boolean(meaning), term: clean, meaning });
     } catch {
-      return res.json({ ok: false, term: clean, meaning: '' });
+      return res.status(502).json({ ok: false, term: clean, meaning: '' });
     }
   });
 
   app.use('/api', csrfProtection(config));
+
+  app.post(
+    '/api/word-meanings',
+    validate({ body: wordMeaningBatchSchema }),
+    dbRequired,
+    rateLimit({ name: 'word-meaning-batch', limit: 10, windowMs: 60 * 1000, by: 'ip' }),
+    async (req, res, next) => {
+      try {
+        const { words, lang } = req.body;
+        const meanings = new Array(words.length);
+        let nextIndex = 0;
+        const worker = async () => {
+          while (nextIndex < words.length) {
+            const index = nextIndex;
+            nextIndex += 1;
+            const meaning = await lookupWordMeaning(words[index], lang);
+            if (meaning) meanings[index] = { term: words[index], meaning };
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(10, words.length) }, worker));
+
+        const availableMeanings = meanings.filter(Boolean);
+        if (availableMeanings.length === 0) {
+          return res.status(502).json({ ok: false, error: { message: 'Word meanings are temporarily unavailable.' } });
+        }
+        const unavailable = words.filter((_, index) => !meanings[index]);
+        return res.json({ ok: true, meanings: availableMeanings, unavailable });
+      } catch (error) {
+        return next(error);
+      }
+    },
+  );
+
   app.use('/api', dbRequired);
 
   app.use('/api/auth', authRouter(config));

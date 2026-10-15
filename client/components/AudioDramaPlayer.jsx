@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { parseStoryScript, playDrama } from '../lib/audioDrama.js';
-import { fetchOnlineWordMeaning, normalizeWord } from './StoryReader.jsx';
+import { lookupStoryWordMeaning, normalizeWord } from './StoryReader.jsx';
 
 function characterIcon(role) {
   if (role === 'male') return '👨';
@@ -134,37 +134,25 @@ export function AudioDramaPlayer({
     const clean = normalizeWord(rawWord);
     if (!clean) return;
 
-    const vocabMatch = (vocabulary || []).find(
-      (v) => normalizeWord(v?.term || v?.word || '') === clean
-    );
-    if (vocabMatch) {
-      const rawMeaning = vocabMatch.definition || vocabMatch.meaning || '';
-      const localDef = typeof rawMeaning === 'string'
-        ? rawMeaning
-        : rawMeaning?.[lang] || rawMeaning?.bn || rawMeaning?.en || '';
-      if (localDef && typeof navigator !== 'undefined' && navigator.onLine) {
-        setSelectedWord({ keyId, term: clean, meaning: localDef, loading: false });
-      }
-    }
-
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      setSelectedWord({
-        keyId,
-        term: clean,
-        meaning: isBn ? '⚠️ অফলাইন: ইন্টারনেট সংযোগ প্রয়োজন।' : '⚠️ Offline: Internet connection required.',
-        isOffline: true,
-      });
-      return;
-    }
-
     setSelectedWord((prev) => (prev?.keyId === keyId && prev?.meaning ? prev : {
       keyId,
       term: clean,
       meaning: '...',
       loading: true,
     }));
-    const res = await fetchOnlineWordMeaning(clean, lang);
-    if (res) setSelectedWord({ ...res, keyId });
+    try {
+      const result = await lookupStoryWordMeaning(clean, vocabulary, lang);
+      if (result) setSelectedWord({ ...result, keyId });
+    } catch (lookupError) {
+      setSelectedWord({
+        keyId,
+        term: clean,
+        meaning: isBn
+          ? `শব্দার্থ লোড করা যায়নি: ${lookupError.message}`
+          : `Meaning could not be loaded: ${lookupError.message}`,
+        isOffline: false,
+      });
+    }
   };
 
   const startPlayback = (startAt = 0) => {

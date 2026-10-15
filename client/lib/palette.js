@@ -1,10 +1,10 @@
-// Brand colours: forest green and gold. Every text pair is checked for WCAG 2.2 AA by scripts/contrast-check.mjs.
+// Brand colours: deep blue and gold. Every text pair is checked for WCAG 2.2 AA by scripts/contrast-check.mjs.
 export const PALETTE = Object.freeze({
-  paper: '#061B12',
-  ink: '#F0FDF4',
-  sapphire: '#4ADE80',
-  sapphireDeep: '#22A95A',
-  onSapphire: '#052E16',
+  paper: '#061426',
+  ink: '#F0F6FF',
+  sapphire: '#60A5FA',
+  sapphireDeep: '#3B82F6',
+  onSapphire: '#061426',
   gold: '#F2C14E',
   goldSoft: '#FCE9B0',
   onGold: '#1B1B1F',

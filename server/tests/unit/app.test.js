@@ -24,6 +24,44 @@ describe('app guards (no database needed)', () => {
     expect(res.body.error.code).toBe('CSRF_FAILED');
   });
 
+  it('the batch word-meaning endpoint requires a CSRF token', async () => {
+    const res = await request(app)
+      .post('/api/word-meanings')
+      .send({ words: ['story'], lang: 'bn' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CSRF_FAILED');
+  });
+
+  it('the batch word-meaning endpoint validates its payload before database access', async () => {
+    const token = 'dddddddddddddddddddddddddddddddddddddddddddd';
+    const res = await request(app)
+      .post('/api/word-meanings')
+      .set('Cookie', `sr_csrf=${token}`)
+      .set('X-CSRF-Token', token)
+      .send({ words: 'not-an-array', lang: 'bn' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('the batch word-meaning endpoint requires a database before contacting translation providers', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      throw new Error('Translation providers should not be contacted without a database.');
+    };
+    const token = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+    try {
+      const res = await request(app)
+        .post('/api/word-meanings')
+        .set('Cookie', `sr_csrf=${token}`)
+        .set('X-CSRF-Token', token)
+        .send({ words: ['story', 'story'], lang: 'bn' });
+      expect(res.status).toBe(503);
+      expect(res.body.error.code).toBe('UNAVAILABLE');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('a CSRF header that does not match the cookie is refused', async () => {
     const res = await request(app)
       .post('/api/auth/login')
