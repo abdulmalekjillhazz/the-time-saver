@@ -221,86 +221,99 @@ export function speakWithVoice(text, { lang = 'en-US', onEnd, onError, errorMess
 }
 
 export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, onError } = {}) {
-  const AudioConstructor = globalThis.window?.Audio;
-  if (typeof AudioConstructor !== 'function') {
-    throw new Error('This browser cannot play audio.');
-  }
+  const AudioContextConstructor = globalThis.window?.AudioContext
+    || globalThis.window?.webkitAudioContext;
+  if (typeof AudioContextConstructor !== 'function') throw new Error('This browser cannot play audio.');
 
   const requestController = new AbortController();
-  let audio = null;
-  let objectUrl = '';
+  const audioContext = new AudioContextConstructor();
+  let audioBuffer = null;
+  let source = null;
+  let playbackOffset = 0;
+  let playbackStartedAt = 0;
   let paused = false;
   let stopped = false;
   let finished = false;
 
-  const releaseAudio = () => {
-    if (objectUrl) {
-      globalThis.window.URL.revokeObjectURL(objectUrl);
-      objectUrl = '';
-    }
-    if (audio) {
-      audio.onended = null;
-      audio.onerror = null;
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-      audio = null;
-    }
+  const closeContext = () => {
+    if (audioContext.state !== 'closed') void audioContext.close();
   };
 
   const finish = () => {
     if (stopped || finished) return;
     finished = true;
-    releaseAudio();
+    source = null;
+    closeContext();
     onEnd?.();
   };
 
   const fail = (error) => {
     if (stopped || finished) return;
     finished = true;
-    releaseAudio();
+    source = null;
+    closeContext();
     onError?.(error instanceof Error ? error : new Error('Google voice playback failed.'));
   };
 
-  const play = () => {
+  const playBuffer = async () => {
+    if (!audioBuffer || stopped || finished || paused || source) return;
     try {
-      const result = audio?.play();
-      if (result && typeof result.catch === 'function') result.catch(fail);
+      await audioContext.resume();
+      if (stopped || finished || paused || source) return;
+      const nextSource = audioContext.createBufferSource();
+      nextSource.buffer = audioBuffer;
+      nextSource.connect(audioContext.destination);
+      nextSource.onended = () => {
+        if (source !== nextSource) return;
+        source = null;
+        playbackOffset = 0;
+        finish();
+      };
+      source = nextSource;
+      playbackStartedAt = audioContext.currentTime;
+      nextSource.start(0, playbackOffset);
     } catch (error) {
       fail(error);
     }
   };
 
+  // Resume the audio context synchronously from the click gesture, before the network request.
+  void audioContext.resume().catch(fail);
+
   void apiRequestAudio('/api/speech/briefing', {
     body: { text, lang },
     locale,
     signal: requestController.signal,
-  }).then((blob) => {
+  }).then(async (audioData) => {
     if (stopped) return;
-    objectUrl = globalThis.window.URL.createObjectURL(blob);
-    audio = new AudioConstructor(objectUrl);
-    audio.onended = finish;
-    audio.onerror = () => fail(new Error('Google voice audio could not be played.'));
-    if (!paused) play();
+    audioBuffer = await audioContext.decodeAudioData(audioData);
+    await playBuffer();
   }).catch(fail);
 
   const stop = () => {
     if (stopped || finished) return;
     stopped = true;
     requestController.abort();
-    releaseAudio();
+    source?.stop();
+    source = null;
+    closeContext();
   };
 
   return {
     pause: () => {
-      if (stopped || finished) return;
+      if (stopped || finished || paused) return;
       paused = true;
-      audio?.pause();
+      if (source) {
+        playbackOffset += audioContext.currentTime - playbackStartedAt;
+        const currentSource = source;
+        source = null;
+        currentSource.stop();
+      }
     },
     resume: () => {
-      if (stopped || finished) return;
+      if (stopped || finished || !paused) return;
       paused = false;
-      if (audio) play();
+      void playBuffer();
     },
     stop,
     close: stop,

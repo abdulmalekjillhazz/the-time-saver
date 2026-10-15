@@ -49,5 +49,5 @@ export async function apiRequestAudio(path, { body, locale = 'en', signal } = {}
     const message = data?.error?.message;
     throw new Error(typeof message === 'string' ? message : message?.[locale] || message?.en || 'Request failed');
   }
-  return response.blob();
+  return response.arrayBuffer();
 }

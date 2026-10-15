@@ -10,63 +10,78 @@ afterEach(() => {
 });
 
 describe('free Google Translate voice briefing playback', () => {
-  it('sends Bengali text with CSRF protection and supports audio controls', async () => {
-    class FakeAudio {
-      static instances = [];
+  class FakeAudioContext {
+    static instances = [];
 
-      constructor(source) {
-        this.src = source;
-        this.play = vi.fn(() => Promise.resolve());
-        this.pause = vi.fn();
-        this.load = vi.fn();
-        this.removeAttribute = vi.fn();
-        FakeAudio.instances.push(this);
-      }
+    constructor() {
+      this.currentTime = 0;
+      this.destination = {};
+      this.state = 'running';
+      this.sources = [];
+      this.resume = vi.fn(async () => {});
+      this.decodeAudioData = vi.fn(async () => ({ duration: 60 }));
+      this.close = vi.fn(async () => { this.state = 'closed'; });
+      FakeAudioContext.instances.push(this);
     }
-    const createObjectURL = vi.fn(() => 'blob:google-tts');
-    const revokeObjectURL = vi.fn();
-    globalThis.window = {
-      Audio: FakeAudio,
-      URL: { createObjectURL, revokeObjectURL },
-    };
+
+    createBufferSource() {
+      const source = {
+        connect: vi.fn(),
+        start: vi.fn(),
+        stop: vi.fn(() => source.onended?.()),
+      };
+      this.sources.push(source);
+      return source;
+    }
+  }
+
+  function stubAudioApi(fetchMock) {
+    globalThis.window = { AudioContext: FakeAudioContext };
+    vi.stubGlobal('fetch', fetchMock);
+  }
+
+  it('unlocks audio on the user gesture, sends Bengali text with CSRF protection, and supports audio controls', async () => {
+    FakeAudioContext.instances = [];
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'csrf-test-token' }) })
-      .mockResolvedValueOnce({ ok: true, blob: async () => new Blob(['audio']) });
-    vi.stubGlobal('fetch', fetchMock);
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    stubAudioApi(fetchMock);
     const onEnd = vi.fn();
     const onError = vi.fn();
 
     const controller = speakWithGoogleTts('শুভ সকাল!', { lang: 'bn', locale: 'bn', onEnd, onError });
-    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
-    const [audio] = FakeAudio.instances;
-    const request = fetchMock.mock.calls[1];
+    const [context] = FakeAudioContext.instances;
+    expect(context.resume).toHaveBeenCalledOnce();
 
+    await vi.waitFor(() => expect(context.sources).toHaveLength(1));
+    const request = fetchMock.mock.calls[1];
     expect(request[0]).toBe('/api/speech/briefing');
     expect(request[1].headers['X-CSRF-Token']).toBe('csrf-test-token');
     expect(JSON.parse(request[1].body)).toEqual({ text: 'শুভ সকাল!', lang: 'bn' });
-    expect(audio.play).toHaveBeenCalledOnce();
+    expect(context.sources[0].start).toHaveBeenCalledWith(0, 0);
 
+    context.currentTime = 4;
     controller.pause();
-    expect(audio.pause).toHaveBeenCalledOnce();
+    expect(context.sources[0].stop).toHaveBeenCalledOnce();
     controller.resume();
-    expect(audio.play).toHaveBeenCalledTimes(2);
-    audio.onended();
+    await vi.waitFor(() => expect(context.sources).toHaveLength(2));
+    expect(context.sources[1].start).toHaveBeenCalledWith(0, 4);
+
+    context.sources[1].onended();
     expect(onEnd).toHaveBeenCalledOnce();
     expect(onError).not.toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:google-tts');
+    expect(context.close).toHaveBeenCalledOnce();
   });
 
   it('surfaces provider errors instead of silently falling back to another voice', async () => {
-    globalThis.window = {
-      Audio: class {},
-      URL: { createObjectURL: vi.fn(), revokeObjectURL: vi.fn() },
-    };
-    vi.stubGlobal('fetch', vi.fn()
+    FakeAudioContext.instances = [];
+    const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'csrf-test-token' }) })
       .mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: { message: { en: 'Google voice is temporarily unavailable.', bn: 'Google voice সাময়িকভাবে চালানো যাচ্ছে না।' } } }),
-      }));
+      });
+    stubAudioApi(fetchMock);
     const onError = vi.fn();
 
     speakWithGoogleTts('শুভ সকাল!', { lang: 'bn', locale: 'bn', onError });
