@@ -3,18 +3,37 @@ import { z } from 'zod';
 import { AppError } from '../lib/AppError.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 import {
   ElevenLabsApiError,
   generateAndUploadAudioDrama,
   hasCompleteNarrationVoiceConfig,
 } from '../services/elevenLabs.js';
 import { CloudinaryApiError, isCloudinaryConfigured } from '../services/cloudinary.js';
+import { generateGoogleTtsAudio, GoogleTtsApiError } from '../services/googleTts.js';
 import { logger } from '../lib/logger.js';
 
 const MINUTE = 60 * 1000;
 const audioDramaRequest = z.object({
   content: z.string().trim().min(1).max(5000),
 }).strict();
+const briefingRequest = z.object({
+  text: z.string().trim().min(1).max(1500),
+  lang: z.enum(['bn', 'en']),
+}).strict();
+
+export const googleTtsError = (error) => {
+  if (error instanceof GoogleTtsApiError && error.status === 429) {
+    return new AppError(429, 'RATE_LIMITED', {
+      en: 'Google voice service is busy. Please try again shortly.',
+      bn: 'Google voice service ব্যস্ত আছে। একটু পরে আবার চেষ্টা করুন।',
+    });
+  }
+  return new AppError(502, 'VOICE_UNAVAILABLE', {
+    en: 'Google voice could not generate audio. Check the server TTS configuration and try again.',
+    bn: 'Google voice অডিও তৈরি করতে পারেনি। সার্ভারের TTS configuration যাচাই করে আবার চেষ্টা করুন।',
+  });
+};
 
 export const elevenLabsError = (error) => {
   if (error instanceof ElevenLabsApiError && error.status === 402) {
@@ -55,8 +74,39 @@ export function speechRouter({ config = {} } = {}) {
       son: Boolean(config.ELEVENLABS_API_KEY && config.ELEVENLABS_SON_VOICE_ID),
       storyteller: Boolean(config.ELEVENLABS_API_KEY && config.ELEVENLABS_STORYTELLER_VOICE_ID),
     };
-    res.json({ elevenLabsVoices: voices, cloudinaryAudioReady: isCloudinaryConfigured() });
+    res.json({
+      elevenLabsVoices: voices,
+      cloudinaryAudioReady: isCloudinaryConfigured(),
+    });
   });
+
+  router.post(
+    '/briefing',
+    requireAuth,
+    rateLimit({ name: 'google-tts-briefing', limit: 20, windowMs: 15 * MINUTE, by: 'user' }),
+    validate({ body: briefingRequest }),
+    async (req, res, next) => {
+      try {
+        const audio = await generateGoogleTtsAudio({
+          text: req.body.text,
+          lang: req.body.lang,
+        });
+        res.set({
+          'Cache-Control': 'private, no-store',
+          'Content-Length': String(audio.length),
+          'Content-Type': 'audio/mpeg',
+        });
+        return res.send(audio);
+      } catch (error) {
+        logger.warn({
+          errName: error.name,
+          status: error.status,
+          upstreamCode: error.upstreamCode,
+        }, 'Google TTS briefing synthesis failed');
+        return next(googleTtsError(error));
+      }
+    }
+  );
 
   router.post(
     '/audio-drama',

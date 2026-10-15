@@ -175,8 +175,7 @@ export function pickSpeechVoice(voices, lang = 'en-US') {
     || list.find((voice) => speaks(voice) && voice.localService)
     || (prefix === 'en' ? list.find((voice) => isEnUS(voice)) : undefined)
     || list.find((voice) => speaks(voice))
-    || list.find((voice) => voice.default)
-    || list[0];
+    || (prefix === 'bn' ? undefined : list.find((voice) => voice.default) || list[0]);
 }
 
 export function speakWithVoice(text, { lang = 'en-US', onEnd, onError, errorMessage } = {}) {
@@ -191,6 +190,9 @@ export function speakWithVoice(text, { lang = 'en-US', onEnd, onError, errorMess
   utterance.rate = 0.96;
   utterance.pitch = 1;
   const voice = pickSpeechVoice(speechSynthesis.getVoices(), lang);
+  if (String(lang).toLowerCase().startsWith('bn') && !voice) {
+    throw new Error('No Bengali text-to-speech voice is installed on this device.');
+  }
   if (voice) utterance.voice = voice;
 
   let stopped = false;
@@ -213,6 +215,93 @@ export function speakWithVoice(text, { lang = 'en-US', onEnd, onError, errorMess
   return {
     pause: () => { if (!stopped) speechSynthesis.pause(); },
     resume: () => { if (!stopped) speechSynthesis.resume(); },
+    stop,
+    close: stop,
+  };
+}
+
+export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, onError } = {}) {
+  const AudioConstructor = globalThis.window?.Audio;
+  if (typeof AudioConstructor !== 'function') {
+    throw new Error('This browser cannot play audio.');
+  }
+
+  const requestController = new AbortController();
+  let audio = null;
+  let objectUrl = '';
+  let paused = false;
+  let stopped = false;
+  let finished = false;
+
+  const releaseAudio = () => {
+    if (objectUrl) {
+      globalThis.window.URL.revokeObjectURL(objectUrl);
+      objectUrl = '';
+    }
+    if (audio) {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      audio = null;
+    }
+  };
+
+  const finish = () => {
+    if (stopped || finished) return;
+    finished = true;
+    releaseAudio();
+    onEnd?.();
+  };
+
+  const fail = (error) => {
+    if (stopped || finished) return;
+    finished = true;
+    releaseAudio();
+    onError?.(error instanceof Error ? error : new Error('Google voice playback failed.'));
+  };
+
+  const play = () => {
+    try {
+      const result = audio?.play();
+      if (result && typeof result.catch === 'function') result.catch(fail);
+    } catch (error) {
+      fail(error);
+    }
+  };
+
+  void apiRequestAudio('/api/speech/briefing', {
+    body: { text, lang },
+    locale,
+    signal: requestController.signal,
+  }).then((blob) => {
+    if (stopped) return;
+    objectUrl = globalThis.window.URL.createObjectURL(blob);
+    audio = new AudioConstructor(objectUrl);
+    audio.onended = finish;
+    audio.onerror = () => fail(new Error('Google voice audio could not be played.'));
+    if (!paused) play();
+  }).catch(fail);
+
+  const stop = () => {
+    if (stopped || finished) return;
+    stopped = true;
+    requestController.abort();
+    releaseAudio();
+  };
+
+  return {
+    pause: () => {
+      if (stopped || finished) return;
+      paused = true;
+      audio?.pause();
+    },
+    resume: () => {
+      if (stopped || finished) return;
+      paused = false;
+      if (audio) play();
+    },
     stop,
     close: stop,
   };
@@ -286,3 +375,4 @@ export function buildDetailedRoutineBriefing({
   }
   return { ...base, text: parts.join(' ') };
 }
+import { apiRequestAudio } from './apiClient.js';

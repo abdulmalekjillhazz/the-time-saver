@@ -24,6 +24,14 @@ describe('app guards (no database needed)', () => {
     expect(res.body.error.code).toBe('CSRF_FAILED');
   });
 
+  it('Google voice synthesis requires CSRF before any provider request', async () => {
+    const res = await request(app)
+      .post('/api/speech/briefing')
+      .send({ text: 'শুভ সকাল!', lang: 'bn' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CSRF_FAILED');
+  });
+
   it('the batch word-meaning endpoint requires a CSRF token', async () => {
     const res = await request(app)
       .post('/api/word-meanings')

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
-import { buildDetailedRoutineBriefing, speakWithVoice } from '../lib/voiceBriefing.js';
+import { buildDetailedRoutineBriefing, speakWithGoogleTts } from '../lib/voiceBriefing.js';
 import { formatNaturalTime } from '../lib/prayerAnchors.js';
 
 export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }) {
@@ -20,8 +20,6 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
   );
 
   const activeText = baseBriefing.text;
-  const speechLang = isBn ? 'bn-BD' : 'en-US';
-
   const copy = {
     title: isBn ? '🎧 আপনার ব্যক্তিগত ভয়েস ব্রিফিং' : '🎧 Your Personal Voice Briefing',
     play: isBn ? '▶ ব্রিফিং শুনুন' : '▶ Play Briefing',
@@ -29,17 +27,17 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
     resume: isBn ? '▶ আবার চালান' : '▶ Resume',
     stop: isBn ? '⏹ বন্ধ করুন' : '⏹ Stop Audio',
     close: isBn ? 'বন্ধ করুন' : 'Close',
-    localNotice: isBn
-      ? 'এই ব্রিফিংয়ে আপনার নাম ও প্রতিটি রুটিনের নাম ধরে ডাকা হবে—বিনামূল্যের ভয়েসে শোনা যাবে।'
-      : 'This briefing calls out your name and each of your routines one by one.',
+    providerNotice: isBn
+      ? 'ফ্রি Google Translate voice ব্যবহার হবে। নাম ও রুটিনের লেখা Google-এ যায়; এই সেবা সীমিত বা পরিবর্তিত হতে পারে।'
+      : 'Uses free Google Translate speech. Your name and routine text is sent to Google; this service may be limited or change.',
     hint: isBn
       ? `${baseBriefing.greeting}, ${baseBriefing.name}! আপনার আজকের ব্যক্তিগত রুটিন ব্রিফিং`
       : `${baseBriefing.greeting}, ${baseBriefing.name}! Listen to your personalized routine briefing`,
     sparkle: isBn ? '📋 আজকের রুটিন ব্রিফিং (প্রতিটি রুটিনসহ)' : '📋 Today’s Routine-by-Routine Briefing',
     routineListTitle: isBn ? '📋 আপনার আজকের রুটিনসমূহ (ট্যাপ করে শুনুন):' : '📋 Your Routines Today (Tap to hear):',
     speechUnavailable: isBn
-      ? '❌ এই browser-এ ভয়েস চালানো যায়নি। নিচের লেখাটি পড়তে পারবেন।'
-      : '❌ A voice is not available in this browser. You can still read the briefing.',
+      ? '❌ Google voice চালানো যায়নি। নেটওয়ার্ক যাচাই করে আবার চেষ্টা করুন।'
+      : '❌ Google voice could not play. Check the network and try again.',
   };
 
   const startSpeech = (textToSpeak = activeText) => {
@@ -48,16 +46,17 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
     setSpeaking(true);
     setPaused(false);
     try {
-      controllerRef.current = speakWithVoice(textToSpeak, {
-        lang: speechLang,
+      controllerRef.current = speakWithGoogleTts(textToSpeak, {
+        lang: isBn ? 'bn' : 'en',
+        locale: lang,
         onEnd: () => {
           setSpeaking(false);
           setPaused(false);
         },
-        onError: () => {
+        onError: (speechRequestError) => {
           setSpeaking(false);
           setPaused(false);
-          setSpeechError(copy.speechUnavailable);
+          setSpeechError(speechRequestError.message || copy.speechUnavailable);
         },
       });
     } catch {
@@ -117,7 +116,7 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
             </div>
             <div>
               <p className="text-sm font-extrabold text-gold-soft">{copy.hint}</p>
-              <p className="mt-0.5 text-xs opacity-80">{copy.localNotice}</p>
+              <p className="mt-0.5 text-xs opacity-80">{copy.providerNotice}</p>
             </div>
           </div>
 
