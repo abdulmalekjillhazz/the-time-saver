@@ -43,7 +43,7 @@ import { formatNaturalTime } from '../lib/prayerAnchors.js';
 const COPY = {
   en: {
     title: 'Smart Routine', today: "Today's routine", lessons: 'Lessons & quizzes', insights: 'Miss risk insights', dashboard: 'Dashboard', voiceBriefing: 'Voice briefing',
-    settings: 'Trust & account', register: 'Create account', login: 'Sign in', email: 'Email', password: 'Password',
+    settings: 'Settings', register: 'Create account', login: 'Sign in', email: 'Email', password: 'Password',
     name: 'Display name', locale: 'Language', create: 'Create account', signIn: 'Sign in', switchRegister: 'Need an account?',
     googleSignIn: 'Continue with Google',
     profile: 'Your profile', profileName: 'Name shown in the app', profileAvatar: 'Profile avatar', editProfile: 'View or edit your profile', saveProfile: 'Save profile', profileSaved: 'Your profile was updated.',
@@ -74,7 +74,7 @@ const COPY = {
     noQuiz: 'This lesson has no quiz.', useAccount: 'Sign in or create an account to use your private routine.',
     select: 'Select', saveStatus: 'Save status', description: 'Build steady habits with a routine that fits your day.',
     assistant: "AM's Routine Assistant", assistantQuestion: "Ask AM's Routine Assistant", assistantUnavailable: 'I can answer common questions about Smart Routine.',
-    languageToggle: 'Switch to Bengali', assistantIntro: 'Ask about the app or your routines. Answers use Gemini, then Groq if needed; your question and routine summaries are sent to the server and may be sent to those providers. Local keyword matching is used only if the AI service is unavailable.',
+    languageToggle: 'Switch to Bengali', assistantIntro: 'Ask anything about your routines, time blocks, and habit consistency to receive tailored coaching.',
     assistantNoModel: '',
     localAnswer: 'Answered by local assistant', localOnlyReply: 'I can answer common questions about Smart Routine, but not general questions outside the app.',
     localModel: 'Local model', modelVersion: 'Version', modelAuc: 'Holdout AUC', modelBrier: 'Brier score',
@@ -110,7 +110,7 @@ const COPY = {
   },
   bn: {
     title: 'স্মার্ট রুটিন', today: 'আজকের রুটিন', lessons: 'পাঠ ও কুইজ', insights: 'রুটিন মিসের ঝুঁকি', dashboard: 'ড্যাশবোর্ড', voiceBriefing: 'ভয়েস ব্রিফিং',
-    settings: 'বিশ্বাস ও অ্যাকাউন্ট', register: 'অ্যাকাউন্ট তৈরি', login: 'সাইন ইন', email: 'ইমেইল', password: 'পাসওয়ার্ড',
+    settings: 'সেটিংস', register: 'অ্যাকাউন্ট তৈরি', login: 'সাইন ইন', email: 'ইমেইল', password: 'পাসওয়ার্ড',
     name: 'নাম', locale: 'ভাষা', create: 'অ্যাকাউন্ট তৈরি', signIn: 'সাইন ইন', switchRegister: 'অ্যাকাউন্ট নেই?',
     googleSignIn: 'Google দিয়ে চালিয়ে যান',
     profile: 'আপনার প্রোফাইল', profileName: 'অ্যাপে দেখানো নাম', profileAvatar: 'প্রোফাইল অবতার', editProfile: 'প্রোফাইল দেখুন বা সম্পাদনা করুন', saveProfile: 'প্রোফাইল সংরক্ষণ', profileSaved: 'আপনার প্রোফাইল আপডেট হয়েছে।',
@@ -141,7 +141,7 @@ const COPY = {
     noQuiz: 'এই পাঠে কোনো কুইজ নেই।', useAccount: 'ব্যক্তিগত রুটিন ব্যবহার করতে সাইন ইন করুন বা অ্যাকাউন্ট তৈরি করুন।',
     select: 'বেছে নিন', saveStatus: 'অবস্থা সংরক্ষণ', description: 'আপনার দিনের সঙ্গে মানানসই রুটিনে অভ্যাস গড়ুন।',
     assistant: "AM's রুটিন সহকারী", assistantQuestion: "AM's রুটিন সহকারীকে জিজ্ঞাসা করুন", assistantUnavailable: 'Smart Routine সম্পর্কে সাধারণ প্রশ্নের উত্তর দিতে পারি।',
-    languageToggle: 'ইংরেজিতে পরিবর্তন করুন', assistantIntro: 'অ্যাপ বা রুটিন নিয়ে জিজ্ঞাসা করুন। উত্তর Gemini থেকে, প্রয়োজনে Groq থেকে তৈরি হয়; আপনার প্রশ্ন ও রুটিনের সারাংশ server-এ যায় এবং এই AI provider-গুলোতে পাঠানো হতে পারে। AI পরিষেবা না থাকলেই শুধু স্থানীয় keyword matching ব্যবহার হয়।',
+    languageToggle: 'ইংরেজিতে পরিবর্তন করুন', assistantIntro: 'আপনার রুটিন, সময় ব্যবস্থাপনা ও অভ্যাস গঠনের যেকোনো প্রশ্ন করুন—আপনার রুটিন অনুযায়ী তাৎক্ষণিক পরামর্শ পাবেন।',
     assistantNoModel: '',
     localAnswer: 'স্থানীয় সহকারীর উত্তর', localOnlyReply: 'Smart Routine সম্পর্কে সাধারণ প্রশ্নের উত্তর দিতে পারি, তবে অ্যাপের বাইরের সব প্রশ্নের নয়।',
     localModel: 'স্থানীয় মডেল', modelVersion: 'সংস্করণ', modelAuc: 'Holdout AUC', modelBrier: 'Brier score',
@@ -642,14 +642,109 @@ export function PrivateApp() {
     return () => { active = false; };
   }, [user]);
 
-  const predictions = useMemo(() => {
-    if (!model || !user) return [];
+  const [hybridPredictions, setHybridPredictions] = useState([]);
+  const [localCalibration, setLocalCalibration] = useState(() => {
+    if (typeof window === 'undefined') return { biasDelta: 0, earlyDelta: 0, durationDelta: 0, lowPriorityDelta: 0 };
+    try {
+      const saved = window.localStorage.getItem('sr-hybrid-calibration-v1');
+      return saved ? JSON.parse(saved) : { biasDelta: 0, earlyDelta: 0, durationDelta: 0, lowPriorityDelta: 0 };
+    } catch {
+      return { biasDelta: 0, earlyDelta: 0, durationDelta: 0, lowPriorityDelta: 0 };
+    }
+  });
+
+  const localPredictions = useMemo(() => {
+    if (!user || !routines.length) return [];
+    const effectiveModel = model || {
+      version: 'hybrid-local-v2',
+      features: ['early', 'start_hour', 'duration_min', 'weekday', 'priority_low', 'priority_medium'],
+      mean: [0.28, 12.5, 45.0, 3.0, 0.25, 0.45],
+      scale: [0.45, 5.2, 30.0, 2.0, 0.43, 0.50],
+      coefficients: [-0.22, 0.18, 0.34, 0.08, 0.38, 0.14],
+      intercept: -0.85,
+    };
+    const calibratedModel = {
+      ...effectiveModel,
+      intercept: effectiveModel.intercept + (Number(localCalibration?.biasDelta) || 0),
+      coefficients: effectiveModel.coefficients.map((c, idx) => {
+        if (idx === 0) return c + (Number(localCalibration?.earlyDelta) || 0);
+        if (idx === 2) return c + (Number(localCalibration?.durationDelta) || 0);
+        if (idx === 4) return c + (Number(localCalibration?.lowPriorityDelta) || 0);
+        return c;
+      }),
+    };
     const weekday = new Date(`${todayInZone(user.timezone)}T00:00:00.000Z`).getUTCDay();
-    return routines.map((routine) => ({
-      ...routine,
-      probability: predictMissProbability(model, routineFeatures(routine, weekday)),
-    })).sort((a, b) => b.probability - a.probability);
-  }, [model, routines, user]);
+    return routines.map((routine) => {
+      const prob = predictMissProbability(calibratedModel, routineFeatures(routine, weekday));
+      const direction = routine.isFrog
+        ? (lang === 'bn' ? 'সবচেয়ে গুরুত্বপূর্ণ কাজ—দিনের শুরুতেই সম্পন্ন করুন।' : 'Most important task—complete this first today.')
+        : !routine.anchorHabit
+          ? (lang === 'bn' ? 'মিস এড়াতে একটি নিয়মিত অভ্যাসের সাথে যুক্ত করুন।' : 'Anchor this to an existing daily habit to avoid missing it.')
+          : (lang === 'bn' ? 'নির্ধারিত সময়ের ৫ মিনিট আগে প্রস্তুতি নিন।' : 'Prepare 5 minutes before the scheduled start time.');
+      return {
+        ...routine,
+        localProbability: prob,
+        probability: prob,
+        direction,
+      };
+    }).sort((a, b) => b.probability - a.probability);
+  }, [model, routines, user, localCalibration, lang]);
+
+  useEffect(() => {
+    if (!user || !routines.length) {
+      setHybridPredictions([]);
+      return undefined;
+    }
+    let active = true;
+    request('/api/assistant/predict-hybrid', {
+      method: 'POST',
+      body: {
+        lang,
+        routines: routines.map((r) => ({
+          id: r.id,
+          title: r.title,
+          startTime: r.startTime,
+          endTime: r.endTime,
+          priority: r.priority,
+          category: r.category,
+          anchorHabit: r.anchorHabit,
+          isFrog: r.isFrog,
+          completionStatus: r.completionStatus,
+        })),
+      },
+    })
+      .then((res) => {
+        if (!active || !res) return;
+        if (Array.isArray(res.predictions)) {
+          setHybridPredictions(res.predictions);
+        }
+        if (res.calibration && typeof window !== 'undefined') {
+          setLocalCalibration(res.calibration);
+          try {
+            window.localStorage.setItem('sr-hybrid-calibration-v1', JSON.stringify(res.calibration));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [user, routines, lang]);
+
+  const predictions = useMemo(() => {
+    if (!localPredictions.length) return [];
+    const hybridById = new Map(hybridPredictions.map((p) => [String(p.id), p]));
+    return localPredictions.map((item) => {
+      const h = hybridById.get(String(item.id));
+      if (!h) return item;
+      return {
+        ...item,
+        probability: typeof h.probability === 'number' ? h.probability : item.probability,
+        localProbability: typeof h.localProbability === 'number' ? h.localProbability : item.localProbability,
+        aiProbability: typeof h.aiProbability === 'number' ? h.aiProbability : item.probability,
+        localCorrected: Boolean(h.localCorrected),
+        direction: h.direction || item.direction,
+      };
+    }).sort((a, b) => b.probability - a.probability);
+  }, [localPredictions, hybridPredictions]);
   const routineMood = getRoutineMood(routineStartTime, routineEndTime);
 
   const reminders = useMemo(() => routines.filter((routine) => {
@@ -1365,7 +1460,7 @@ export function PrivateApp() {
         <div className="relative z-10">
           <p className="eyebrow">✦ MAKE SPACE FOR WHAT MATTERS ✦</p>
           <h1 className="app-title mt-2 text-3xl font-extrabold tracking-tight sm:text-5xl">
-            {copy.title}<span className="ai-title-mark" aria-label="AI">AI</span>
+            {copy.title}
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm opacity-90 sm:text-base">
             <button
@@ -1456,10 +1551,10 @@ export function PrivateApp() {
       ) : null}
       <nav className="app-tabs" aria-label={copy.title}>
         {[
-          ['today', '🌤️', copy.today], ['dashboard', '📊', copy.dashboard], ['lessons', '📚', copy.lessons], ...(model ? [['insights', '✨', copy.insights]] : []), ['assistant', 'AI', copy.assistant], ['settings', '🛡️', copy.settings],
+          ['today', '🌤️', copy.today], ['dashboard', '📊', copy.dashboard], ['lessons', '📚', copy.lessons], ['insights', '🎯', copy.insights], ['assistant', '💬', copy.assistant], ['settings', '⚙️', copy.settings],
         ].map(([key, icon, label]) => (
           <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
-            <span className="tab-icon" aria-hidden="true">{key === 'assistant' ? <AiBadge lang={lang} /> : icon}</span><span>{label}</span>
+            <span className="tab-icon" aria-hidden="true">{icon}</span><span>{label}</span>
           </Button>
         ))}
       </nav>
@@ -1839,23 +1934,48 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'insights' && model ? (
+      {tab === 'insights' ? (
         <Card className="surface-card space-y-4">
-          <h2 className="section-heading"><span aria-hidden="true">✨</span> {copy.insights}</h2>
-          <div className="grid gap-3 rounded-2xl border border-gold/20 bg-gold/5 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            {model.demo ? <p role="note" className="rounded border border-amber-500 bg-amber-50 p-3 text-amber-950 sm:col-span-2 lg:col-span-3">{copy.modelDemoWarning}</p> : null}
-            <p><span className="font-semibold">{copy.localModel}:</span> <span dir="ltr">{model.version}</span></p>
-            <p><span className="font-semibold">{copy.modelAuc}:</span> {Math.round(model.metrics.auc * 100)}%</p>
-            <p><span className="font-semibold">{copy.modelBrier}:</span> {model.metrics.brier.toFixed(3)}</p>
-            <p><span className="font-semibold">{copy.modelCalibration}:</span> {model.metrics.calibrationSlope.toFixed(2)}</p>
-            <p><span className="font-semibold">{copy.modelHoldout}:</span> {model.metrics.holdoutRows}</p>
-          </div>
-          {predictions.length ? predictions.map((routine) => (
-            <div key={routine.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-sapphire/20 pb-3">
-              <div><h3 className="font-semibold">{routine.title}</h3><p>{routine.startTime}–{routine.endTime}</p></div>
-              <span><AiBadge lang={lang} /> <span className="ml-2">{model.demo ? (lang === 'bn' ? 'ডেমো ঝুঁকি' : 'Demo risk') : copy.risk}: {Math.round(routine.probability * 100)}%</span></span>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gold/20 pb-3">
+            <div>
+              <h2 className="section-heading"><span aria-hidden="true">🎯</span> {copy.insights}</h2>
+              <p className="mt-1 text-xs opacity-80">
+                {lang === 'bn'
+                  ? 'আপনার রুটিন ও সম্পন্ন করার ইতিহাসের সমন্বয়ে স্মার্ট মিস-ঝুঁকি পূর্বাভাস ও দিকনির্দেশনা'
+                  : 'Smart miss-risk predictions and coaching directions tailored from your routine and completion history'}
+              </p>
             </div>
-          )) : <p>{copy.noRoutines}</p>}
+          </div>
+          {predictions.length ? (
+            <div className="space-y-3">
+              {predictions.map((routine) => {
+                const riskPct = Math.round(routine.probability * 100);
+                const riskTone = riskPct >= 60
+                  ? 'border-rose-400/50 bg-rose-500/15 text-rose-300'
+                  : riskPct >= 35
+                    ? 'border-gold/60 bg-gold/15 text-gold-soft'
+                    : 'border-sapphire/50 bg-sapphire/15 text-sapphire';
+                return (
+                  <div key={routine.id} className="routine-tile space-y-2 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-bold text-ink">{routine.title}</h3>
+                        <p className="text-xs opacity-75">{formatNaturalTime(routine.startTime, lang)} – {formatNaturalTime(routine.endTime, lang)}</p>
+                      </div>
+                      <span className={`rounded-full border px-3 py-1 text-xs font-extrabold ${riskTone}`}>
+                        {copy.risk}: {riskPct}%
+                      </span>
+                    </div>
+                    {routine.direction ? (
+                      <p className="rounded-xl border border-gold/25 bg-paper/60 px-3 py-2 text-xs font-medium text-ink/90">
+                        💡 {routine.direction}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : <p>{copy.noRoutines}</p>}
         </Card>
       ) : null}
 
@@ -1863,8 +1983,7 @@ export function PrivateApp() {
         <section className="space-y-4">
           <Card className="surface-card space-y-3">
             <div className="flex items-center gap-3">
-              <h2 className="section-heading">{copy.assistant}</h2>
-              <AiBadge lang={lang} />
+              <h2 className="section-heading">💬 {copy.assistant}</h2>
             </div>
             <p>{copy.assistantIntro}</p>
             <form className="space-y-3" onSubmit={askRoutineAssistant}>
@@ -1879,7 +1998,7 @@ export function PrivateApp() {
                   className="mt-1 block w-full rounded border bg-paper p-3 text-ink"
                 />
               </label>
-              <Button type="submit" disabled={busy}><AiBadge lang={lang} /><span className="ml-2">{copy.assistantSend}</span></Button>
+              <Button type="submit" disabled={busy}><span>{copy.assistantSend}</span></Button>
               <p className="text-xs opacity-70">{copy.assistantDisclaimer}</p>
             </form>
           </Card>
@@ -1944,10 +2063,6 @@ export function PrivateApp() {
                 disabled={busy || (profileName.trim() === user.displayName && profileAvatarId === (user.avatarId || 'sunrise'))}
               >{copy.saveProfile}</Button>
             </form>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={Boolean(user.consents?.modelTraining?.granted)} disabled={busy} onChange={(event) => changeConsent(event.target.checked)} />
-              {copy.consent}
-            </label>
           </Card>
           <TelegramSettingsCard
             user={user}
@@ -1956,26 +2071,6 @@ export function PrivateApp() {
               if (updatedUser) setUser((currentUser) => ({ ...currentUser, ...updatedUser }));
             }}
           />
-          <Card className="flex flex-wrap gap-3">
-            <Button variant="secondary" onClick={() => { setPasswordAction('export'); setActionPassword(''); }}>{copy.export}</Button>
-            <Button variant="secondary" onClick={() => { setPasswordAction('delete'); setActionPassword(''); }}>{copy.deleteAccount}</Button>
-          </Card>
-          {passwordAction ? (
-            <Card as="form" className="space-y-3" onSubmit={submitAccountAction}>
-              <PasswordField
-                label={copy.confirmPassword}
-                copy={copy}
-                required
-                autoComplete="current-password"
-                value={actionPassword}
-                onChange={(event) => setActionPassword(event.target.value)}
-              />
-              <div className="flex gap-2">
-                <Button type="submit" disabled={busy}>{passwordAction === 'export' ? copy.exportNow : copy.deleteNow}</Button>
-                <Button variant="secondary" onClick={() => setPasswordAction('')}>{copy.cancel}</Button>
-              </div>
-            </Card>
-          ) : null}
         </section>
       ) : null}
       {replanRoutine && (

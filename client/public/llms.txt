@@ -1,0 +1,21 @@
+# Smart Routine — Intelligent Daily Routine Planner & Bilingual Habit Coach
+
+> Smart Routine (https://made-your-dream-bigger.vercel.app) is a free, offline-first daily routine planner, habit tracker, and bilingual (Bangla & English) story-based learning platform designed for students and professionals in Bangladesh and worldwide.
+
+## Core Capabilities
+- **Daily Routine & Time-Block Planner**: Schedule daily tasks, prioritize "Eat That Frog" most-important tasks, and anchor habits to daily routines or 5 daily prayer times.
+- **Hybrid AI Miss-Risk Prediction & Coaching**: Combines on-device statistical habit modeling with cloud AI coaching to predict routine miss risk and provide actionable micro-directions.
+- **5-Minute Adaptive Re-Plan (Streak Saver)**: Converts 30–60 minute routines into 5-minute micro-actions on busy days so streaks never break.
+- **Daily Bilingual Habit Stories & Quizzes**: Publishes a fresh Bangla & English conversational family story every midnight (Asia/Dhaka) with interactive tap-for-word-meaning popovers, audio narration, and comprehension quizzes.
+- **365-Day Habit Heatmap & Gamification**: GitHub-style annual completion grid, XP levels, milestone badges, and Friends Habit Circles.
+
+## Primary Public URLs
+- Bangla Home: https://made-your-dream-bigger.vercel.app/bn
+- English Home: https://made-your-dream-bigger.vercel.app/en
+- Bangla Habit Lessons & Stories: https://made-your-dream-bigger.vercel.app/bn/lessons
+- English Habit Lessons & Stories: https://made-your-dream-bigger.vercel.app/en/lessons
+- About Smart Routine (Bangla): https://made-your-dream-bigger.vercel.app/bn/about
+- About Smart Routine (English): https://made-your-dream-bigger.vercel.app/en/about
+- Help & FAQ (Bangla): https://made-your-dream-bigger.vercel.app/bn/help
+- Help & FAQ (English): https://made-your-dream-bigger.vercel.app/en/help
+- Sitemap: https://made-your-dream-bigger.vercel.app/sitemap.xml

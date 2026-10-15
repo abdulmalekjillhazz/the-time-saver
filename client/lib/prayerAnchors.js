@@ -6,7 +6,7 @@ export const DEFAULT_PRAYER_ANCHORS = [
   { key: 'Isha', name: { bn: 'এশা', en: 'Isha' }, defaultTime: '19:30', anchorHabit: { bn: 'এশার নামাজের পর', en: 'After Isha prayer' } },
 ];
 
-function addMinutesToTime(timeStr, minutesToAdd) {
+export function addMinutesToTime(timeStr, minutesToAdd) {
   const [h, m] = timeStr.split(':').map(Number);
   const totalMins = (h * 60 + m + minutesToAdd + 1440) % 1440;
   return `${String(Math.floor(totalMins / 60)).padStart(2, '0')}:${String(totalMins % 60).padStart(2, '0')}`;

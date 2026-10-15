@@ -6,6 +6,9 @@ import { MobileMenu } from './MobileMenu.jsx';
 export function Header({ lang, dict }) {
   const otherLang = lang === 'bn' ? 'en' : 'bn';
   const otherLangLabel = lang === 'bn' ? 'English' : 'বাংলা';
+  const logoAlt = lang === 'bn'
+    ? 'Smart Routine — দৈনিক রুটিন প্ল্যানার ও অভ্যাস কোচ লোগো'
+    : 'Smart Routine — Daily Routine Planner & Habit Coach Logo';
 
   return (
     <header className="public-site-header">
@@ -13,7 +16,7 @@ export function Header({ lang, dict }) {
         <Link href={`/${lang}`} aria-label={dict.brand} className="inline-flex min-h-[44px] items-center gap-3 py-1 text-xl font-extrabold tracking-tight text-gold">
           <Image
             src={BRAND_LOGO_URL}
-            alt=""
+            alt={logoAlt}
             width={48}
             height={48}
             priority
@@ -23,13 +26,12 @@ export function Header({ lang, dict }) {
         </Link>
 
         <div className="flex items-center gap-3 md:order-last">
-          {/* Global Language Switcher Button */}
           <Link
             href={`/${otherLang}`}
             className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-bold text-gold transition-colors hover:bg-gold/20"
             title={`Switch to ${otherLangLabel}`}
           >
-            <span>🌐</span>
+            <span aria-hidden="true">🌐</span>
             <span>{otherLangLabel}</span>
           </Link>
 
@@ -42,6 +44,7 @@ export function Header({ lang, dict }) {
         </div>
 
         <MobileMenu label={dict.nav.menu} closeLabel={dict.nav.close}>
+          <Link href={`/${lang}`} className="min-h-[44px] py-2 font-medium">{dict.nav.home}</Link>
           <Link href={`/${lang}/lessons`} className="min-h-[44px] py-2 font-medium">{dict.nav.lessons}</Link>
           <Link href={`/${lang}/about`} className="min-h-[44px] py-2 font-medium">{dict.nav.about}</Link>
           <Link href={`/${lang}/help`} className="min-h-[44px] py-2 font-medium">{dict.nav.help}</Link>
@@ -60,6 +63,8 @@ export function Footer({ lang, dict }) {
       <div className="public-site-footer-inner">
         <span className="public-site-footer-brand">{dict.footer.note}</span>
         <nav aria-label={dict.footer.label} className="public-site-footer-links">
+          <Link href={`/${lang}/lessons`}>{dict.nav.lessons}</Link>
+          <Link href={`/${lang}/about`}>{dict.nav.about}</Link>
           <Link href={`/${lang}/privacy`}>{dict.footer.privacy}</Link>
           <Link href={`/${lang}/terms`}>{dict.footer.terms}</Link>
           <Link href={`/${lang}/help`}>{dict.footer.help}</Link>

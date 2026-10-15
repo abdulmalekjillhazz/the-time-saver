@@ -119,7 +119,7 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
   const isBn = lang === 'bn';
   const [selected, setSelected] = useState(null);
 
-  const handleWordClick = async (word) => {
+  const handleWordClick = async (word, keyId) => {
     const clean = normalizeWord(word);
     if (!clean) return;
 
@@ -132,12 +132,13 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
         ? rawMeaning
         : rawMeaning?.[lang] || rawMeaning?.bn || rawMeaning?.en || '';
       if (localDef && typeof navigator !== 'undefined' && navigator.onLine) {
-        setSelected({ term: clean, meaning: localDef, loading: false });
+        setSelected({ keyId, term: clean, meaning: localDef, loading: false });
       }
     }
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setSelected({
+        keyId,
         term: clean,
         meaning: isBn ? '⚠️ অফলাইন: ইন্টারনেট সংযোগ প্রয়োজন।' : '⚠️ Offline: Internet connection required.',
         isOffline: true,
@@ -145,69 +146,72 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
       return;
     }
 
-    setSelected((prev) => prev?.term === clean && prev?.meaning ? prev : {
+    setSelected((prev) => (prev?.keyId === keyId && prev?.meaning ? prev : {
+      keyId,
       term: clean,
       meaning: '...',
       loading: true,
-    });
+    }));
     const result = await fetchOnlineWordMeaning(clean, lang);
-    if (result) setSelected(result);
+    if (result) setSelected({ ...result, keyId });
   };
 
   return (
-    <div className="w-full space-y-3">
-      {selected ? (
-        <div
-          role="status"
-          className="sticky top-2 z-30 flex items-center justify-between rounded-xl border-2 border-gold bg-paper p-3 text-sm shadow-lg"
-        >
-          <div className="min-w-0 flex-1 pr-2">
-            <span className="mr-2 inline-block rounded bg-gold px-2 py-0.5 text-xs font-extrabold text-on-gold">
-              {selected.term}
+    <div className="w-full space-y-2.5">
+      {lines.map((line, index) => (
+        <div key={index} className="rounded-xl border border-gold/20 bg-paper/70 px-3.5 py-3 text-base leading-relaxed">
+          {line.speaker ? (
+            <span className="mr-2 inline-block rounded-full border border-gold/40 bg-gold/15 px-2.5 py-0.5 text-xs font-bold text-gold-soft">
+              {line.speaker}
             </span>
-            <span className="font-semibold text-ink">{selected.meaning}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSelected(null)}
-            className="shrink-0 rounded-lg border border-gold/50 px-2.5 py-1 text-xs font-bold text-gold-soft"
-          >
-            ✕
-          </button>
-        </div>
-      ) : null}
+          ) : null}
+          {String(line.text || '').split(/(\s+)/).map((part, partIndex) => {
+            if (!/\S/.test(part)) return <span key={partIndex}>{part}</span>;
+            const clean = normalizeWord(part);
+            if (!clean) return <span key={partIndex}>{part}</span>;
+            const keyId = `${index}-${partIndex}`;
+            const isSelected = selected && selected.keyId === keyId;
 
-      <div className="w-full space-y-2.5">
-        {lines.map((line, index) => (
-          <div key={index} className="rounded-xl border border-gold/20 bg-paper/70 px-3.5 py-3 text-base leading-relaxed">
-            {line.speaker ? (
-              <span className="mr-2 inline-block rounded-full border border-gold/40 bg-gold/15 px-2.5 py-0.5 text-xs font-bold text-gold-soft">
-                {line.speaker}
-              </span>
-            ) : null}
-            {String(line.text || '').split(/(\s+)/).map((part, partIndex) => {
-              if (!/\S/.test(part)) return <span key={partIndex}>{part}</span>;
-              const clean = normalizeWord(part);
-              const isSelected = selected && normalizeWord(selected.term) === clean;
-
-              if (!clean) return <span key={partIndex}>{part}</span>;
-
-              return (
+            return (
+              <span key={partIndex} className="relative inline-block">
+                {isSelected ? (
+                  <span
+                    role="status"
+                    className="absolute bottom-full left-1/2 z-50 mb-2 min-w-[170px] max-w-[260px] -translate-x-1/2 rounded-xl border-2 border-gold bg-paper px-3 py-2 text-xs font-semibold text-ink shadow-2xl"
+                  >
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="min-w-0 flex-1">
+                        <strong className="block text-gold-soft">{selected.term}</strong>
+                        <span className="mt-0.5 block leading-snug text-ink">{selected.meaning}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelected(null);
+                        }}
+                        className="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold text-gold-soft hover:bg-gold/20"
+                        aria-label="Close"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  </span>
+                ) : null}
                 <button
-                  key={partIndex}
                   type="button"
-                  onClick={() => handleWordClick(part)}
-                  className={`rounded px-1 py-0.5 transition cursor-pointer hover:bg-gold/30 ${
-                    isSelected ? 'bg-gold text-on-gold font-extrabold ring-2 ring-gold' : ''
+                  onClick={() => handleWordClick(part, keyId)}
+                  className={`cursor-pointer rounded px-1 py-0.5 transition hover:bg-gold/30 ${
+                    isSelected ? 'bg-gold font-extrabold text-on-gold ring-2 ring-gold' : ''
                   }`}
                 >
                   {part}
                 </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+              </span>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

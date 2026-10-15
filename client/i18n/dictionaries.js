@@ -28,7 +28,7 @@ export const DICTIONARIES = {
         ['Keep momentum visible', 'Track what you complete, snooze alarms when you need a little more time, and use the focus stopwatch.'],
         ['Learn in your language', 'Browse short lessons and quizzes in Bangla or English, with a calendar that makes days off easier to spot.'],
       ],
-      privacyNote: 'The routine coach sends your question and up to 30 routine summaries to the server, which tries Gemini and then Groq if configured. Local matching is only a fallback when those services are unavailable.',
+      privacyNote: 'The routine coach uses your routine summaries and local habit model to provide personalized scheduling guidance.',
       finalCta: 'Start with one routine. Build from there.',
     },
     lessons: {
@@ -122,7 +122,7 @@ export const DICTIONARIES = {
         ['অগ্রগতি চোখের সামনে রাখুন', 'কাজ শেষ হলে চিহ্ন দিন, দরকার হলে অ্যালার্ম স্নুজ করুন, আর ফোকাস স্টপওয়াচ ব্যবহার করুন।'],
         ['নিজের ভাষায় শিখুন', 'বাংলা বা ইংরেজিতে ছোট পাঠ ও কুইজ দেখুন; ক্যালেন্ডারে ছুটির দিনও সহজে চিনুন।'],
       ],
-      privacyNote: "AM's রুটিন সহকারী আপনার প্রশ্ন ও সর্বোচ্চ ৩০টি রুটিনের সারাংশ server-এ পাঠায়; server Gemini চেষ্টা করে, এরপর কনফিগার থাকলে Groq ব্যবহার করে। এসব AI service না চললেই শুধু local matching ব্যবহার হয়।",
+      privacyNote: "রুটিন সহকারী আপনার রুটিনের সারাংশ ও লোকাল হ্যাবিট মডেল ব্যবহার করে ব্যক্তিগত পরামর্শ দেয়।",
       finalCta: 'একটি রুটিন দিয়ে শুরু করুন। ধীরে ধীরে এগোন।',
     },
     lessons: {

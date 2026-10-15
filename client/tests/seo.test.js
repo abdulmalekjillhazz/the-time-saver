@@ -40,20 +40,21 @@ describe('titles and descriptions', () => {
 });
 
 describe('metadata and indexing rules', () => {
-  it('Bangla pages are noindex until reviewed (default)', () => {
-    expect(indexable('bn')).toBe(false);
+  it('both Bangla and English pages are indexable by default', () => {
+    expect(indexable('bn')).toBe(true);
+    expect(indexable('en')).toBe(true);
     const m = pageMetadata({ lang: 'bn', path: '', title: 't', description: 'd' });
-    expect(m.robots.index).toBe(false);
+    expect(m.robots.index).toBe(true);
     expect(m.alternates.canonical).toMatch(/\/bn$/);
   });
 
-  it('English pages are indexable, with hreflang only for currently indexable languages', () => {
+  it('English and Bangla pages emit complete hreflang alternates', () => {
     const m = pageMetadata({ lang: 'en', path: '/lessons', title: 't', description: 'd' });
     expect(m.metadataBase.href).toBe(`${SITE_URL}/`);
     expect(m.robots.index).toBe(true);
     expect(m.alternates.languages.en).toMatch(/\/en\/lessons$/);
-    expect(m.alternates.languages['bn-BD']).toBeUndefined();
-    expect(m.alternates.languages['x-default']).toMatch(/\/en\/lessons$/);
+    expect(m.alternates.languages['bn-BD']).toMatch(/\/bn\/lessons$/);
+    expect(m.alternates.languages['x-default']).toMatch(/\/bn\/lessons$/);
     expect(m.openGraph.images[0]).toMatchObject({ width: 1200, height: 630 });
     expect(m.twitter.card).toBe('summary_large_image');
   });
@@ -65,14 +66,15 @@ describe('metadata and indexing rules', () => {
 
   it('private screens are never indexed or followed', () => {
     const metadata = privateMetadata('x');
-    expect(metadata.robots).toEqual({ index: false, follow: false });
+    expect(metadata.robots).toMatchObject({ index: false, follow: false });
     expect(metadata.metadataBase.href).toBe(`${SITE_URL}/`);
   });
 
-  it('language alternates never point crawlers at a noindex language copy', () => {
+  it('language alternates include both bn-BD and en', () => {
     expect(languageAlternates('')).toEqual({
+      'bn-BD': absUrl('bn'),
       en: absUrl('en'),
-      'x-default': absUrl('en'),
+      'x-default': absUrl('bn'),
     });
   });
 });

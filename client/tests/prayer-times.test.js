@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { PrayerTimesCard } from '../components/PrayerTimesCard.jsx';
 import { useAppStore } from '../lib/appStore.js';
 import { getPrayerApiDate, getPrayerDateKey, getPrayerOccurrences, nextPrayerInfo } from '../lib/prayerTimes.js';
+import { addMinutesToTime } from '../lib/prayerAnchors.js';
 
 const prayerTestStore = vi.hoisted(() => {
   let state = {
@@ -31,6 +32,11 @@ const timings = {
 };
 
 describe('Bangladesh prayer-time conversion', () => {
+  it('adds minutes to a routine time and wraps at midnight', () => {
+    expect(addMinutesToTime('07:00', 30)).toBe('07:30');
+    expect(addMinutesToTime('23:30', 60)).toBe('00:30');
+  });
+
   it('converts Dhaka wall time to UTC without adding an hour', () => {
     const now = new Date('2026-10-12T22:10:00.000Z');
     const next = nextPrayerInfo(timings, now);

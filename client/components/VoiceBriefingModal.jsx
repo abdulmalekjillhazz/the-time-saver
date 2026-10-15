@@ -1,19 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
 import { buildDetailedRoutineBriefing, speakWithVoice } from '../lib/voiceBriefing.js';
-import { apiRequest } from '../lib/apiClient.js';
 import { formatNaturalTime } from '../lib/prayerAnchors.js';
 
 export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }) {
   const [speaking, setSpeaking] = useState(false);
   const [paused, setPaused] = useState(false);
   const [speechError, setSpeechError] = useState('');
-  const [aiBriefText, setAiBriefText] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState(null);
   const controllerRef = useRef(null);
   const isBn = lang === 'bn';
   const userName = user?.displayName || (isBn ? 'বন্ধু' : 'friend');
@@ -23,7 +19,7 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
     [userName, user?.timezone, routines, lang]
   );
 
-  const activeText = aiBriefText || baseBriefing.text;
+  const activeText = baseBriefing.text;
   const speechLang = isBn ? 'bn-BD' : 'en-US';
 
   const copy = {
@@ -33,60 +29,18 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
     resume: isBn ? '▶ আবার চালান' : '▶ Resume',
     stop: isBn ? '⏹ বন্ধ করুন' : '⏹ Stop Audio',
     close: isBn ? 'বন্ধ করুন' : 'Close',
-    generateAi: isBn ? '✨ Gemini AI দিয়ে রুটিন ধরে ব্রিফ তৈরি করুন' : '✨ Personalize with Gemini AI',
-    generatingAi: isBn ? '🔄 Gemini আপনার রুটিনগুলো সাজাচ্ছে...' : '🔄 Gemini is crafting your routine briefing...',
-    aiSuccess: isBn ? '✅ সফল হয়েছে! Gemini আপনার সব রুটিনের নাম ধরে নতুন ব্রিফ তৈরি করেছে।' : '✅ Success! Gemini created a custom briefing with all your routine names.',
-    aiFailed: isBn ? '⚠️ অফলাইন বা সার্ভার ব্যস্ত—আপনার সব রুটিনের নামসহ লোকাল ব্রিফিং দেখানো হচ্ছে।' : '⚠️ Using local routine-by-routine briefing.',
     localNotice: isBn
       ? 'এই ব্রিফিংয়ে আপনার নাম ও প্রতিটি রুটিনের নাম ধরে ডাকা হবে—বিনামূল্যের ভয়েসে শোনা যাবে।'
       : 'This briefing calls out your name and each of your routines one by one.',
     hint: isBn
       ? `${baseBriefing.greeting}, ${baseBriefing.name}! আপনার আজকের ব্যক্তিগত রুটিন ব্রিফিং`
       : `${baseBriefing.greeting}, ${baseBriefing.name}! Listen to your personalized routine briefing`,
-    sparkle: isBn ? '✨ আজকের রুটিন ব্রিফিং (প্রতিটি রুটিনসহ)' : '✨ Today’s Routine-by-Routine Briefing',
+    sparkle: isBn ? '📋 আজকের রুটিন ব্রিফিং (প্রতিটি রুটিনসহ)' : '📋 Today’s Routine-by-Routine Briefing',
     routineListTitle: isBn ? '📋 আপনার আজকের রুটিনসমূহ (ট্যাপ করে শুনুন):' : '📋 Your Routines Today (Tap to hear):',
     speechUnavailable: isBn
       ? '❌ এই browser-এ ভয়েস চালানো যায়নি। নিচের লেখাটি পড়তে পারবেন।'
       : '❌ A voice is not available in this browser. You can still read the briefing.',
   };
-
-  const fetchGeminiBriefing = useCallback(async () => {
-    if (!user) return;
-    setAiLoading(true);
-    setStatusMsg(null);
-    try {
-      const payloadRoutines = routines.map((r) => ({
-        title: r.title,
-        startTime: r.startTime,
-        endTime: r.endTime,
-        completionStatus: r.completionStatus,
-        isFrog: Boolean(r.isFrog),
-        anchorHabit: r.anchorHabit || '',
-      }));
-      const res = await apiRequest('/api/assistant/briefing', {
-        method: 'POST',
-        body: {
-          userName,
-          lang,
-          routines: payloadRoutines,
-        },
-      });
-      if (res?.briefingText) {
-        setAiBriefText(res.briefingText);
-        setStatusMsg({ type: 'success', text: copy.aiSuccess });
-      }
-    } catch {
-      setStatusMsg({ type: 'info', text: copy.aiFailed });
-    } finally {
-      setAiLoading(false);
-    }
-  }, [user, routines, userName, lang, copy.aiSuccess, copy.aiFailed]);
-
-  useEffect(() => {
-    if (user && routines.length > 0) {
-      void fetchGeminiBriefing();
-    }
-  }, []);
 
   const startSpeech = (textToSpeak = activeText) => {
     controllerRef.current?.close();
@@ -167,39 +121,16 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
             </div>
           </div>
 
-          {statusMsg ? (
-            <div
-              role="status"
-              className={`rounded-xl border px-3.5 py-2.5 text-xs font-bold ${
-                statusMsg.type === 'success'
-                  ? 'border-sapphire bg-sapphire/15 text-sapphire'
-                  : 'border-gold/50 bg-gold/15 text-gold-soft'
-              }`}
-            >
-              {statusMsg.text}
-            </div>
-          ) : null}
-
           <div className="routine-tile p-4 text-left">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <p className="text-xs font-bold text-sapphire">{copy.sparkle}</p>
-              <button
-                type="button"
-                disabled={aiLoading}
-                onClick={fetchGeminiBriefing}
-                className="secondary-button min-h-[36px] px-3 py-1 text-xs font-bold disabled:opacity-50"
-              >
-                {aiLoading ? copy.generatingAi : copy.generateAi}
-              </button>
-            </div>
-            <p lang={isBn ? 'bn' : 'en'} className="text-sm leading-relaxed text-ink font-medium">
+            <p className="mb-2 text-xs font-bold text-sapphire">{copy.sparkle}</p>
+            <p lang={isBn ? 'bn' : 'en'} className="text-sm font-medium leading-relaxed text-ink">
               {activeText}
             </p>
           </div>
 
           {routines.length > 0 ? (
             <div className="rounded-xl border border-gold/25 bg-paper/70 p-3.5">
-              <p className="text-xs font-extrabold uppercase tracking-wider text-gold-soft mb-2">
+              <p className="mb-2 text-xs font-extrabold uppercase tracking-wider text-gold-soft">
                 {copy.routineListTitle}
               </p>
               <ul className="space-y-1.5 text-xs sm:text-sm">

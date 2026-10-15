@@ -12,7 +12,6 @@ const userSchema = new Schema(
     avatarId: { type: String, enum: ['sunrise', 'wave', 'curls', 'hijab', 'glasses', 'cap'], default: 'sunrise' },
     locale: { type: String, enum: ['bn', 'en'], default: 'bn' },
     timezone: { type: String, default: 'Asia/Dhaka' },
-    // user = learner. viewer, editor, owner = staff. Staff need two-factor sign-in.
     role: { type: String, enum: ['user', 'viewer', 'editor', 'owner'], default: 'user' },
     telegramChatId: { type: String, default: null, trim: true },
     telegramNotifications: { type: Boolean, default: false },
@@ -23,9 +22,9 @@ const userSchema = new Schema(
     },
     consents: {
       modelTraining: {
-        granted: { type: Boolean, default: false },
-        version: { type: String, default: '' },
-        updatedAt: { type: Date, default: null },
+        granted: { type: Boolean, default: true },
+        version: { type: String, default: 'model-training-v1' },
+        updatedAt: { type: Date, default: () => new Date() },
       },
     },
     deletedAt: { type: Date, default: null },

@@ -4,13 +4,31 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { AppError, MSG } from '../lib/AppError.js';
 import { answerQuestion, generateRoutineDraft, generatePersonalBriefing } from '../services/routineAssistant.js';
 import { generateAdaptiveReplan, completeMicroRoutine } from '../services/adaptiveReplan.js';
+import { generateHybridPredictions } from '../services/hybridPrediction.js';
 
 const MINUTE = 60 * 1000;
 
 export function assistantRouter(config) {
   const r = Router();
   r.use(requireAuth);
-  r.use(rateLimit({ name: 'assistant', limit: 25, windowMs: MINUTE, by: 'user' }));
+  r.use(rateLimit({ name: 'assistant', limit: 35, windowMs: MINUTE, by: 'user' }));
+
+  r.post('/predict-hybrid', async (req, res, next) => {
+    try {
+      const lang = req.body?.lang === 'en' ? 'en' : 'bn';
+      const routines = Array.isArray(req.body?.routines) ? req.body.routines : [];
+      const result = await generateHybridPredictions({
+        userId: req.userId,
+        routines,
+        lang,
+        timezone: req.user?.timezone || 'Asia/Dhaka',
+        config,
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
 
   r.post('/briefing', async (req, res, next) => {
     try {
@@ -23,7 +41,7 @@ export function assistantRouter(config) {
         routines,
         config,
       });
-      res.json({ briefingText, source: 'gemini' });
+      res.json({ briefingText, source: 'coach' });
     } catch (err) {
       next(err);
     }

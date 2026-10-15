@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { apiRequest } from '../lib/apiClient.js';
-import { AiBadge } from './ui/AiBadge.jsx';
 import { Button } from './ui/Button.jsx';
 import { Card } from './ui/Card.jsx';
 
@@ -47,7 +46,6 @@ export function GoalToRoutine({ lang = 'en', onRoutinesAdded }) {
     setBusy(true);
     try {
       for (const draft of drafts) {
-        // eslint-disable-next-line no-await-in-loop
         await apiRequest('/api/routines', { method: 'POST', body: draft });
       }
       setAdded(true);
@@ -63,7 +61,7 @@ export function GoalToRoutine({ lang = 'en', onRoutinesAdded }) {
   return (
     <Card className="surface-card space-y-3">
       <header className="flex items-center gap-2">
-        <AiBadge lang={lang} />
+        <span aria-hidden="true">🎯</span>
         <h2 className="section-heading">{copy.title}</h2>
       </header>
       <p className="text-sm opacity-80">{copy.hint}</p>

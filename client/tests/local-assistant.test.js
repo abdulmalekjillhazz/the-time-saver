@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { answerWithLocalModel } from '../lib/localAssistant.js';
 
-const model = { version: 'real-v1' };
+const model = { version: 'hybrid-local-v2' };
 const predictions = [
-  { title: 'Study', probability: 0.81 },
+  { title: 'Study', probability: 0.81, direction: 'Start with 5 minutes.' },
   { title: 'Walk', probability: 0.42 },
 ];
 
@@ -43,12 +43,10 @@ describe('local-first assistant', () => {
     expect(answerWithLocalModel('এই অ্যাপে কী করা যায়?', [], null, 'bn')).toContain('রুটিন সাজানো');
   });
 
-  it('explains the remote-provider flow and local fallback accurately', () => {
-    const answer = answerWithLocalModel('Do you send my routines to Gemini?', [], null, 'en');
-    expect(answer).toContain('normally sends your question and routine summaries to the server');
-    expect(answer).toContain('tries Gemini and then Groq');
-    expect(answer).toContain('Local keyword matching is only a fallback');
-    expect(answer).toContain('not currently active');
+  it('explains the hybrid model flow without exposing internal provider names', () => {
+    const answer = answerWithLocalModel('How is my data used for predictions?', [], null, 'en');
+    expect(answer).toContain('on-device habit model');
+    expect(answer).not.toContain('Gemini');
   });
 
   it('states assistant limitations and leaves unrelated questions unanswered', () => {

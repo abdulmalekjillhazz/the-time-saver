@@ -11,7 +11,7 @@ function characterIcon(role) {
   return '🎙️';
 }
 
-export function spokenTextParts(text, fraction, completed, onWordClick, selectedTerm = '') {
+export function spokenTextParts(text, fraction, completed, onWordClick, selectedWordState = null, lineIndex = 0) {
   const parts = String(text || '').split(/(\s+)/);
   const wordCount = parts.filter((part) => /\S/.test(part)).length;
   const revealedWords = completed
@@ -26,7 +26,16 @@ export function spokenTextParts(text, fraction, completed, onWordClick, selected
     wordIndex += 1;
     const highlighted = wordIndex <= revealedWords;
     const clean = normalizeWord(part);
-    const isSelected = Boolean(selectedTerm && clean && selectedTerm === clean);
+    const keyId = `${lineIndex}-${index}`;
+    const selectedTerm = typeof selectedWordState === 'string'
+      ? selectedWordState
+      : selectedWordState?.term || '';
+    const isSelected = Boolean(
+      clean && (
+        (selectedWordState?.keyId && selectedWordState.keyId === keyId) ||
+        (!selectedWordState?.keyId && selectedTerm && selectedTerm === clean)
+      )
+    );
 
     const baseClass = highlighted ? 'rounded bg-gold/40 px-0.5 text-ink' : undefined;
     if (!onWordClick) {
@@ -40,22 +49,48 @@ export function spokenTextParts(text, fraction, completed, onWordClick, selected
       'span',
       {
         key: index,
-        role: 'button',
-        tabIndex: 0,
-        onClick: () => onWordClick(part),
-        onKeyDown: (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onWordClick(part);
-          }
-        },
-        className: [
-          baseClass || 'rounded px-1 py-0.5',
-          'cursor-pointer transition hover:bg-gold/30',
-          isSelected ? 'bg-gold text-on-gold font-extrabold ring-2 ring-gold' : '',
-        ].filter(Boolean).join(' '),
+        className: 'relative inline-block',
       },
-      part
+      isSelected && selectedWordState?.meaning
+        ? React.createElement(
+            'span',
+            {
+              role: 'status',
+              className:
+                'absolute bottom-full left-1/2 z-50 mb-2 min-w-[170px] max-w-[260px] -translate-x-1/2 rounded-xl border-2 border-gold bg-paper px-3 py-2 text-xs font-semibold text-ink shadow-2xl',
+            },
+            React.createElement(
+              'span',
+              { className: 'flex items-start justify-between gap-2' },
+              React.createElement(
+                'span',
+                { className: 'min-w-0 flex-1' },
+                React.createElement('strong', { className: 'block text-gold-soft' }, selectedWordState.term),
+                React.createElement('span', { className: 'mt-0.5 block leading-snug text-ink' }, selectedWordState.meaning),
+              ),
+            ),
+          )
+        : null,
+      React.createElement(
+        'span',
+        {
+          role: 'button',
+          tabIndex: 0,
+          onClick: () => onWordClick(part, keyId),
+          onKeyDown: (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onWordClick(part, keyId);
+            }
+          },
+          className: [
+            baseClass || 'rounded px-1 py-0.5',
+            'cursor-pointer transition hover:bg-gold/30',
+            isSelected ? 'bg-gold text-on-gold font-extrabold ring-2 ring-gold' : '',
+          ].filter(Boolean).join(' '),
+        },
+        part,
+      ),
     );
   });
 }
@@ -95,7 +130,7 @@ export function AudioDramaPlayer({
     friendlyError: isBn ? 'অডিও এখন চালানো যাচ্ছে না। ইন্টারনেট দেখে আবার চেষ্টা করুন।' : 'Audio cannot play right now. Check your connection and try again.',
   };
 
-  const handleWordLookup = async (rawWord) => {
+  const handleWordLookup = async (rawWord, keyId) => {
     const clean = normalizeWord(rawWord);
     if (!clean) return;
 
@@ -108,12 +143,13 @@ export function AudioDramaPlayer({
         ? rawMeaning
         : rawMeaning?.[lang] || rawMeaning?.bn || rawMeaning?.en || '';
       if (localDef && typeof navigator !== 'undefined' && navigator.onLine) {
-        setSelectedWord({ term: clean, meaning: localDef, loading: false });
+        setSelectedWord({ keyId, term: clean, meaning: localDef, loading: false });
       }
     }
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setSelectedWord({
+        keyId,
         term: clean,
         meaning: isBn ? '⚠️ অফলাইন: ইন্টারনেট সংযোগ প্রয়োজন।' : '⚠️ Offline: Internet connection required.',
         isOffline: true,
@@ -121,13 +157,14 @@ export function AudioDramaPlayer({
       return;
     }
 
-    setSelectedWord((prev) => prev?.term === clean && prev?.meaning ? prev : {
+    setSelectedWord((prev) => (prev?.keyId === keyId && prev?.meaning ? prev : {
+      keyId,
       term: clean,
       meaning: '...',
       loading: true,
-    });
+    }));
     const res = await fetchOnlineWordMeaning(clean, lang);
-    if (res) setSelectedWord(res);
+    if (res) setSelectedWord({ ...res, keyId });
   };
 
   const startPlayback = (startAt = 0) => {
@@ -264,21 +301,13 @@ export function AudioDramaPlayer({
           </div>
 
           {selectedWord ? (
-            <div className="flex flex-1 items-center justify-between gap-2 rounded-xl border-2 border-gold bg-gold/15 px-3 py-2 text-sm">
-              <div className="min-w-0 flex-1">
-                <span className="mr-2 inline-block rounded bg-gold px-2 py-0.5 text-xs font-extrabold text-on-gold">
-                  {selectedWord.term}
-                </span>
-                <span className="font-semibold text-ink">{selectedWord.meaning}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedWord(null)}
-                className="shrink-0 rounded px-2 py-0.5 text-xs font-bold text-gold-soft"
-              >
-                ✕
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedWord(null)}
+              className="rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-soft"
+            >
+              ✕ {isBn ? 'অর্থ লুকান' : 'Hide meaning'}
+            </button>
           ) : null}
         </div>
 
@@ -320,7 +349,7 @@ export function AudioDramaPlayer({
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-gold-soft">{line.character}</p>
                   <p className="mt-1 text-base leading-relaxed">
-                    {spokenTextParts(line.text, fraction, isCompletedLine, handleWordLookup, selectedWord?.term)}
+                    {spokenTextParts(line.text, fraction, isCompletedLine, handleWordLookup, selectedWord, lineIndex)}
                   </p>
                 </div>
               </div>
