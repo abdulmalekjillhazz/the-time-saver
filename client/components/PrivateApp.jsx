@@ -1817,10 +1817,6 @@ export function PrivateApp() {
         ))}
       </nav>
 
-      <div className={tab === 'today' ? 'block' : 'hidden'}>
-        <PrayerTimesCard lang={lang} />
-      </div>
-
       {tab === 'dashboard' ? (
         <section className="space-y-4">
           <GamificationBar lang={lang} />
@@ -1842,8 +1838,6 @@ export function PrivateApp() {
               el?.scrollIntoView({ behavior: 'smooth' });
             }}
           />
-
-          {/* PrayerTimesCard is mounted above tabs so Azan stays active */}
 
           {reminders.length ? (
             <Card className="border-gold bg-gold-soft" role="status">
@@ -2283,8 +2277,7 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'settings' ? (
-        <section className="space-y-4">
+      <section className={tab === 'settings' ? 'space-y-4' : 'hidden'} aria-label={copy.settings}>
           <Card className="surface-card space-y-3 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -2292,11 +2285,13 @@ export function PrivateApp() {
                     <span>🕌</span> {lang === 'bn' ? 'নামাজের ওয়াক্ত প্রদর্শন' : 'Show Prayer Times'}
                   </h3>
                   <p className="text-sm text-ink/75 mt-0.5">
-                  {lang === 'bn' ? 'হোমপেজে নামাজের সময়সূচী দেখান বা গোপন রাখুন' : 'Display or hide daily prayer times schedule'}
+                  {lang === 'bn' ? 'নামাজের সময়সূচী ও আজান সেটিংস দেখান বা লুকান' : 'Show or hide prayer times and Azan controls'}
                 </p>
               </div>
               <button
                 type="button"
+                aria-label={lang === 'bn' ? 'নামাজের সময় ও আজান চালু বা বন্ধ করুন' : 'Toggle prayer times and Azan'}
+                aria-pressed={showPrayerTimes}
                 onClick={() => setShowPrayerTimes(!showPrayerTimes)}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${showPrayerTimes ? 'bg-sapphire-deep' : 'bg-gray-300'}`}
               >
@@ -2304,6 +2299,7 @@ export function PrivateApp() {
               </button>
             </div>
           </Card>
+          <PrayerTimesCard lang={lang} />
           <Card className="space-y-3">
             <h2 className="text-2xl font-semibold">{copy.settings}</h2>
             <form className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end" onSubmit={saveProfile}>
@@ -2342,8 +2338,7 @@ export function PrivateApp() {
               if (updatedUser) setUser((currentUser) => ({ ...currentUser, ...updatedUser }));
             }}
           />
-        </section>
-      ) : null}
+      </section>
       {replanRoutine && (
         <AdaptiveReplanModal
           routine={replanRoutine}
