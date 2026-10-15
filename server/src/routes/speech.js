@@ -17,6 +17,10 @@ const MINUTE = 60 * 1000;
 const audioDramaRequest = z.object({
   content: z.string().trim().min(1).max(5000),
 }).strict();
+const freeAudioDramaRequest = z.object({
+  content: z.string().trim().min(1).max(8000),
+  lang: z.enum(['bn', 'en']),
+}).strict();
 const briefingRequest = z.object({
   text: z.string().trim().min(1).max(1500),
   lang: z.enum(['bn', 'en']),
@@ -103,6 +107,33 @@ export function speechRouter({ config = {} } = {}) {
           status: error.status,
           upstreamCode: error.upstreamCode,
         }, 'Google TTS briefing synthesis failed');
+        return next(googleTtsError(error));
+      }
+    }
+  );
+
+  router.post(
+    '/audio-drama/free',
+    rateLimit({ name: 'free-audio-drama', limit: 10, windowMs: 15 * MINUTE }),
+    validate({ body: freeAudioDramaRequest }),
+    async (req, res, next) => {
+      try {
+        const audio = await generateGoogleTtsAudio({
+          text: req.body.content,
+          lang: req.body.lang,
+        });
+        res.set({
+          'Cache-Control': 'private, no-store',
+          'Content-Length': String(audio.length),
+          'Content-Type': 'audio/mpeg',
+        });
+        return res.send(audio);
+      } catch (error) {
+        logger.warn({
+          errName: error.name,
+          status: error.status,
+          upstreamCode: error.upstreamCode,
+        }, 'Free Google TTS story synthesis failed');
         return next(googleTtsError(error));
       }
     }

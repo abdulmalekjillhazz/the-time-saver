@@ -8,6 +8,35 @@ const originalWindow = globalThis.window;
 const originalFetch = globalThis.fetch;
 const originalAudio = globalThis.Audio;
 
+class FakeAudioContext {
+  static instances = [];
+
+  constructor() {
+    this.currentTime = 0;
+    this.destination = {};
+    this.state = 'running';
+    this.sources = [];
+    this.resume = vi.fn(async () => {});
+    this.decodeAudioData = vi.fn(async () => ({ duration: 12 }));
+    this.close = vi.fn(async () => { this.state = 'closed'; });
+    FakeAudioContext.instances.push(this);
+  }
+
+  createGain() {
+    return { gain: { value: 1 }, connect: vi.fn() };
+  }
+
+  createBufferSource() {
+    const source = {
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+    };
+    this.sources.push(source);
+    return source;
+  }
+}
+
 afterEach(() => {
   if (originalWindow === undefined) delete globalThis.window;
   else globalThis.window = originalWindow;
@@ -83,19 +112,55 @@ describe('offline audio drama', () => {
     expect(narrationSpeakerForRole('storyteller')).toBe('storyteller');
   });
 
-  it('requires the ElevenLabs Cloudinary-saved audio and does not fall back to browser speech', async () => {
-    globalThis.fetch = vi.fn(async (url) => {
-      if (url === '/api/auth/csrf') return { ok: true, json: async () => ({ csrfToken: 'test-token' }) };
-      if (url === '/api/speech/audio-drama') {
-        return {
-          ok: false,
-          json: async () => ({ error: { message: { en: 'ElevenLabs and Cloudinary are not configured.' } } }),
-        };
-      }
-      throw new Error(`Unexpected request: ${url}`);
+  it('uses free Google audio for stories, unlocks playback immediately, and supports pause and resume', async () => {
+    FakeAudioContext.instances = [];
+    globalThis.window = { AudioContext: FakeAudioContext };
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+
+    const onEnd = vi.fn();
+    const onNotice = vi.fn();
+    const lines = parseStoryScript('[Storyteller]: The story begins.\n[Father]: Dad lost a shoe.');
+    const player = playDrama(lines, vi.fn(), onEnd, { lang: 'bn', onNotice });
+
+    player.play();
+    const [context] = FakeAudioContext.instances;
+    expect(context.resume).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(context.sources).toHaveLength(1));
+
+    const [requestUrl, requestOptions] = globalThis.fetch.mock.calls[1];
+    expect(requestUrl).toBe('/api/speech/audio-drama/free');
+    expect(requestOptions.headers['X-CSRF-Token']).toBe('test-token');
+    expect(JSON.parse(requestOptions.body)).toEqual({
+      content: lines.map(({ text }) => text).join(' '),
+      lang: 'en',
     });
-    const browserSpeak = vi.fn();
-    globalThis.window = { speechSynthesis: { speak: browserSpeak } };
+    expect(context.sources[0].start).toHaveBeenCalledWith(0, 0);
+    expect(onNotice).toHaveBeenCalledWith('বিনামূল্যের Google voice-এ গল্পটি পড়া হচ্ছে।');
+
+    context.currentTime = 3;
+    player.pause();
+    expect(context.sources[0].stop).toHaveBeenCalledOnce();
+    player.resume();
+    await vi.waitFor(() => expect(context.sources).toHaveLength(2));
+    expect(context.sources[1].start).toHaveBeenCalledWith(0, 3);
+
+    context.sources[1].onended();
+    expect(onEnd).toHaveBeenCalledOnce();
+    expect(context.close).toHaveBeenCalledOnce();
+    player.close();
+  });
+
+  it('reports free voice provider failures without breaking story text rendering', async () => {
+    FakeAudioContext.instances = [];
+    globalThis.window = { AudioContext: FakeAudioContext };
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: { message: { en: 'Google voice is temporarily unavailable.', bn: 'Google voice সাময়িকভাবে চালানো যাচ্ছে না।' } } }),
+      });
     const onError = vi.fn();
     const player = playDrama(
       parseStoryScript('[Storyteller]: শুরু।'),
@@ -106,73 +171,8 @@ describe('offline audio drama', () => {
 
     player.play();
     await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/speech/audio-drama', expect.any(Object));
-    expect(globalThis.fetch.mock.calls.some(([url]) => /google-tts|audio-drama\/free|elevenlabs-tts/.test(url))).toBe(false);
-    expect(browserSpeak).not.toHaveBeenCalled();
-    player.close();
-  });
-
-  it('uses one saved Cloudinary audio file and reuses its URL for later playback', async () => {
-    globalThis.fetch = vi.fn(async (url) => {
-      if (url === '/api/auth/csrf') {
-        return { ok: true, json: async () => ({ csrfToken: 'test-token' }) };
-      }
-      if (url === '/api/speech/audio-drama') {
-        return {
-          ok: true,
-          json: async () => ({
-            audioUrl: 'https://media.example/full-story.mp3',
-            cached: false,
-          }),
-        };
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    });
-
-    globalThis.window = {};
-    const audioInstances = [];
-    globalThis.Audio = class {
-      constructor(src) {
-        this.src = src;
-        audioInstances.push(this);
-      }
-
-      play() {
-        return Promise.resolve();
-      }
-
-      pause() {}
-
-      removeAttribute() {}
-
-      load() {}
-    };
-
-    const progress = vi.fn();
-    const onNotice = vi.fn();
-    const lines = parseStoryScript('[Storyteller]: The story begins.\n[Father]: Dad lost a shoe.');
-    const player = playDrama(
-      lines,
-      progress,
-      vi.fn(),
-      { lang: 'en', onNotice },
-    );
-
-    player.play();
-    await vi.waitFor(() => expect(audioInstances).toHaveLength(1));
-    expect(audioInstances[0].src).toBe('https://media.example/full-story.mp3');
-    expect(progress.mock.calls.some(([event]) => event.source === 'cloudinary')).toBe(true);
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/speech/audio-drama', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ content: '[Storyteller]: The story begins.\n[Father]: Dad lost a shoe.' }),
-    }));
-    audioInstances[0].onended();
-    player.play();
-    await vi.waitFor(() => expect(audioInstances).toHaveLength(2));
-    expect(audioInstances[1].src).toBe('https://media.example/full-story.mp3');
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-    expect(globalThis.fetch.mock.calls.some(([url]) => /google-tts|audio-drama\/free|elevenlabs-tts/.test(url))).toBe(false);
-    expect(onNotice).toHaveBeenCalledWith('ElevenLabs audio has been saved to Cloudinary.');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/speech/audio-drama/free', expect.any(Object));
+    expect(onError.mock.calls[0][0]).toBe('Google voice সাময়িকভাবে চালানো যাচ্ছে না।');
     player.close();
   });
 });

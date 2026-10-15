@@ -1,3 +1,5 @@
+import { apiRequestAudio } from './apiClient.js';
+
 const CHARACTERS = {
   narrator: { character: 'Narrator', pan: 0, pitch: 1, rate: 1 },
   storyteller: { character: 'Storyteller', pan: 0, pitch: 1, rate: 1 },
@@ -126,52 +128,7 @@ export function narrationSpeakerForRole(role) {
   })[role] || 'storyteller';
 }
 
-const savedStoryAudioCache = new Map();
-
-async function createSavedAudioDrama(lines, signal, lang) {
-  const content = lines.map((line) => `[${line.character}]: ${line.text}`).join('\n');
-  const cached = savedStoryAudioCache.get(content);
-  if (cached) return cached;
-
-  const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin', signal });
-  const csrfBody = await csrfResponse.json().catch(() => ({}));
-  if (!csrfResponse.ok || typeof csrfBody.csrfToken !== 'string') {
-    throw new Error(lang === 'bn' ? 'নিরাপত্তা যাচাই করা যায়নি। আবার চেষ্টা করুন।' : 'Could not establish a security token.');
-  }
-
-  const response = await fetch('/api/speech/audio-drama', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': csrfBody.csrfToken,
-    },
-    body: JSON.stringify({ content }),
-    signal,
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    const message = body?.error?.message;
-    throw new Error(typeof message === 'object'
-      ? message[lang] || message.en || message.bn
-      : lang === 'bn'
-        ? 'অডিও Cloudinary-তে তৈরি ও সংরক্ষণ করা যায়নি।'
-        : 'The audio could not be generated and saved to Cloudinary.');
-  }
-
-  const result = await response.json();
-  if (typeof result.audioUrl !== 'string' || !result.audioUrl.startsWith('https://')) {
-    throw new Error(lang === 'bn' ? 'সংরক্ষিত অডিওর তথ্য সঠিক নয়।' : 'The saved audio response was invalid.');
-  }
-  savedStoryAudioCache.set(content, result);
-  return result;
-}
-
-function createCloudinaryAudio(url) {
-  const audio = new globalThis.Audio(url);
-  audio.preload = 'auto';
-  return audio;
-}
+const freeStoryAudioCache = new Map();
 
 export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   lang = 'bn',
@@ -182,11 +139,21 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   let index = 0;
   let isPlaying = false;
   let isPaused = false;
-  let currentAudio = null;
+  let audioContext = null;
+  let gainNode = null;
+  let audioBuffer = null;
+  let currentSource = null;
   let requestAbortController = null;
-  let savedAudioDramaPromise = null;
+  let audioRequestPromise = null;
+  let progressTimer = null;
   let runId = 0;
   let currentVolume = Math.max(0, Math.min(1, volume));
+  let playbackOffset = 0;
+  let playbackStartedAt = 0;
+  let desiredStartIndex = 0;
+  const content = lines.map(({ text }) => text).join(' ');
+  const audioLang = /[\u0980-\u09ff]/u.test(content) ? 'bn' : 'en';
+  const cacheKey = `${audioLang}:${content}`;
 
   const emitProgress = (fraction = 0) => {
     const line = lines[index];
@@ -196,87 +163,127 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       fraction,
       percent: ((index + fraction) / lines.length) * 100,
       line,
-      source: currentAudio ? 'cloudinary' : null,
+      source: currentSource ? 'google-free' : null,
       spatialAvailable: false,
     });
   };
 
-  const cleanupAudio = () => {
+  const clearProgressTimer = () => {
+    if (progressTimer !== null) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
+  };
+
+  const closeAudioContext = () => {
+    clearProgressTimer();
+    if (audioContext && audioContext.state !== 'closed') void audioContext.close();
+    audioContext = null;
+    gainNode = null;
+  };
+
+  const stopSource = () => {
+    if (!currentSource) return;
+    const oldSource = currentSource;
+    currentSource = null;
+    oldSource.onended = null;
+    oldSource.stop();
+  };
+
+  const cleanupAudio = (closeContext = true) => {
     requestAbortController?.abort();
     requestAbortController = null;
-    const cacheKey = lines.map((line) => `[${line.character}]: ${line.text}`).join('\n');
-    if (!savedStoryAudioCache.has(cacheKey)) savedAudioDramaPromise = null;
-    if (currentAudio) {
-      currentAudio.onended = null;
-      currentAudio.onerror = null;
-      currentAudio.ontimeupdate = null;
-      currentAudio.pause();
-      currentAudio.removeAttribute('src');
-      currentAudio.load();
-    }
-    currentAudio = null;
+    stopSource();
+    if (closeContext) closeAudioContext();
   };
 
   const fail = (message) => {
     isPlaying = false;
     isPaused = false;
     cleanupAudio();
-    onError(lang === 'bn' && !/[\u0980-\u09FF]/.test(message)
-      ? message === 'Audio could not resume.'
-        ? 'অডিও আবার চালানো যায়নি।'
-        : 'Cloudinary-তে সংরক্ষিত অডিও চালানো যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
-      : message);
+    onError(message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play the story audio.'));
   };
 
-  const playSavedStory = async (id, startAt = 0) => {
+  const updatePosition = (id) => {
+    if (id !== runId || !currentSource || !audioBuffer) return;
+    const elapsed = audioContext.currentTime - playbackStartedAt;
+    const position = Math.min(lines.length, ((playbackOffset + elapsed) / audioBuffer.duration) * lines.length);
+    index = Math.min(Math.floor(position), lines.length - 1);
+    emitProgress(Math.min(1, position - index));
+  };
+
+  const finishPlayback = (id) => {
+    if (id !== runId) return;
+    isPlaying = false;
+    isPaused = false;
+    playbackOffset = 0;
+    if (currentSource) {
+      currentSource.onended = null;
+      currentSource = null;
+    }
+    clearProgressTimer();
+    closeAudioContext();
+    index = lines.length - 1;
+    onProgress({ index: lines.length, fraction: 0, percent: 100, line: null, source: null, spatialAvailable: false });
+    onEnd();
+  };
+
+  const startAudio = async (id, offset = playbackOffset) => {
+    if (id !== runId || !isPlaying || isPaused || !audioBuffer || !audioContext || currentSource) return;
+    try {
+      await audioContext.resume();
+      if (id !== runId || !isPlaying || isPaused || !audioBuffer || !audioContext || currentSource) return;
+      const safeOffset = Math.max(0, Math.min(offset, audioBuffer.duration - 0.01));
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+      source.onended = () => {
+        if (currentSource !== source || id !== runId) return;
+        finishPlayback(id);
+      };
+      currentSource = source;
+      playbackOffset = safeOffset;
+      playbackStartedAt = audioContext.currentTime;
+      const startIndex = Math.min(lines.length - 1, Math.floor((safeOffset / audioBuffer.duration) * lines.length));
+      index = Math.max(0, startIndex);
+      source.start(0, safeOffset);
+      emitProgress((safeOffset / audioBuffer.duration) * lines.length - index);
+      clearProgressTimer();
+      progressTimer = setInterval(() => updatePosition(id), 100);
+    } catch (error) {
+      if (id === runId) fail(error.message);
+    }
+  };
+
+  const loadAndPlayStory = async (id) => {
     if (id !== runId || !isPlaying || !lines.length) return;
     const abortController = new AbortController();
     requestAbortController = abortController;
     try {
-      savedAudioDramaPromise ??= createSavedAudioDrama(lines, abortController.signal, lang);
-      const drama = await savedAudioDramaPromise;
-      if (id !== runId || !isPlaying) return;
-      onNotice(drama.cached
-        ? (lang === 'bn'
-          ? 'Cloudinary-তে রাখা ElevenLabs অডিও চালানো হচ্ছে—নতুন voice তৈরি হচ্ছে না।'
-          : 'Playing the Cloudinary-saved ElevenLabs audio; no new voice is being generated.')
-        : (lang === 'bn'
-          ? 'ElevenLabs-এর অডিও Cloudinary-তে সংরক্ষণ করা হয়েছে।'
-          : 'ElevenLabs audio has been saved to Cloudinary.'));
-      currentAudio = createCloudinaryAudio(drama.audioUrl);
-      currentAudio.volume = currentVolume;
-      currentAudio.ontimeupdate = () => {
-        if (!currentAudio || !Number.isFinite(currentAudio.duration) || currentAudio.duration <= 0) return;
-        const position = (currentAudio.currentTime / currentAudio.duration) * lines.length;
-        index = Math.min(Math.floor(position), lines.length - 1);
-        emitProgress(Math.min(1, position - index));
-      };
-      currentAudio.onended = () => {
-        if (id !== runId) return;
-        isPlaying = false;
-        isPaused = false;
-        index = lines.length - 1;
-        cleanupAudio();
-        onProgress({ index: lines.length, fraction: 0, percent: 100, line: null, source: null, spatialAvailable: false });
-        onEnd();
-      };
-      currentAudio.onerror = () => {
-        if (id === runId) fail(lang === 'bn'
-          ? 'Cloudinary থেকে সংরক্ষিত ElevenLabs অডিও চালানো যায়নি।'
-          : 'The Cloudinary-saved ElevenLabs audio could not be played.');
-      };
-      currentAudio.onloadedmetadata = () => {
-        if (startAt > 0 && Number.isFinite(currentAudio.duration)) {
-          currentAudio.currentTime = currentAudio.duration * Math.min(startAt, lines.length - 1) / lines.length;
-        }
-      };
-      await currentAudio.play();
-      emitProgress(0);
+      audioRequestPromise ??= freeStoryAudioCache.has(cacheKey)
+        ? Promise.resolve(freeStoryAudioCache.get(cacheKey))
+        : apiRequestAudio('/api/speech/audio-drama/free', {
+          body: { content, lang: audioLang },
+          locale: lang,
+          signal: abortController.signal,
+        }).then((audioData) => {
+          freeStoryAudioCache.set(cacheKey, audioData);
+          return audioData;
+        });
+      const audioData = await audioRequestPromise;
+      if (id !== runId || !isPlaying || !audioContext) return;
+      audioBuffer = await audioContext.decodeAudioData(audioData.slice(0));
+      if (id !== runId || !isPlaying || !audioContext) return;
+      gainNode = audioContext.createGain();
+      gainNode.gain.value = currentVolume;
+      gainNode.connect(audioContext.destination);
+      playbackOffset = (audioBuffer.duration * Math.min(desiredStartIndex, lines.length - 1)) / lines.length;
+      onNotice(lang === 'bn'
+        ? 'বিনামূল্যের Google voice-এ গল্পটি পড়া হচ্ছে।'
+        : 'Reading the story with free Google voice.');
+      if (!isPaused) await startAudio(id, playbackOffset);
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
-      if (savedAudioDramaPromise && !savedStoryAudioCache.has(lines.map((line) => `[${line.character}]: ${line.text}`).join('\n'))) {
-        savedAudioDramaPromise = null;
-      }
       fail(error.message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play audio.'));
     } finally {
       if (requestAbortController === abortController) requestAbortController = null;
@@ -292,20 +299,45 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       cleanupAudio();
       runId += 1;
       index = Math.max(0, Math.min(lines.length - 1, Math.floor(startAt)));
+      desiredStartIndex = index;
       isPlaying = true;
       isPaused = false;
-      void playSavedStory(runId, index);
+      playbackOffset = 0;
+      audioRequestPromise = null;
+      const AudioContextConstructor = globalThis.window?.AudioContext
+        || globalThis.window?.webkitAudioContext;
+      if (typeof AudioContextConstructor !== 'function') {
+        fail(lang === 'bn' ? 'এই ব্রাউজারে অডিও চালানো যাচ্ছে না।' : 'This browser cannot play audio.');
+        return;
+      }
+      try {
+        audioContext = new AudioContextConstructor();
+        void audioContext.resume().catch((error) => {
+          if (isPlaying) fail(error.message);
+        });
+      } catch (error) {
+        fail(error.message);
+        return;
+      }
+      void loadAndPlayStory(runId, index);
     },
     pause() {
       if (!isPlaying || isPaused) return;
       isPaused = true;
-      if (currentAudio) currentAudio.pause();
+      if (currentSource && audioContext && audioBuffer) {
+        playbackOffset = Math.min(
+          audioBuffer.duration,
+          playbackOffset + audioContext.currentTime - playbackStartedAt,
+        );
+        stopSource();
+        clearProgressTimer();
+      }
     },
     resume() {
       if (!isPlaying || !isPaused) return;
       isPaused = false;
-      if (currentAudio) void currentAudio.play().catch(() => fail('Audio could not resume.'));
-      else void playSavedStory(runId, index);
+      if (audioBuffer) void startAudio(runId, playbackOffset);
+      else if (audioContext) void audioContext.resume().catch((error) => fail(error.message));
     },
     stop() {
       runId += 1;
@@ -316,17 +348,23 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     seek(position) {
       const target = Math.max(0, Math.min(lines.length - 1, Math.floor(position)));
       index = target;
-      if (currentAudio && Number.isFinite(currentAudio.duration)) {
-        currentAudio.currentTime = currentAudio.duration * target / lines.length;
-        emitProgress(0);
+      desiredStartIndex = target;
+      if (audioBuffer) {
+        playbackOffset = audioBuffer.duration * target / lines.length;
+        if (currentSource) {
+          stopSource();
+          clearProgressTimer();
+          void startAudio(runId, playbackOffset);
+        } else {
+          emitProgress(0);
+        }
       } else {
         const shouldPlay = isPlaying && !isPaused;
         if (shouldPlay) {
-          runId += 1;
-          cleanupAudio();
-          isPlaying = true;
-          isPaused = false;
-          void playSavedStory(runId, target);
+          playbackOffset = audioBuffer
+            ? audioBuffer.duration * target / lines.length
+            : playbackOffset;
+          emitProgress(0);
         } else {
           emitProgress(0);
         }
@@ -334,7 +372,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     },
     setVolume(value) {
       currentVolume = Math.max(0, Math.min(1, value));
-      if (currentAudio) currentAudio.volume = currentVolume;
+      if (gainNode) gainNode.gain.value = currentVolume;
     },
     setSpatial() {
       return false;
