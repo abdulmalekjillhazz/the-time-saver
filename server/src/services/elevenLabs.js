@@ -19,6 +19,8 @@ const DEFAULT_VOICE_SETTINGS = {
   use_speaker_boost: true,
 };
 
+export const NARRATION_AUDIO_VERSION = 'multi-voice-dialogue-v1';
+
 function normalizeNarrationSpeakerName(value) {
   return String(value ?? '')
     .trim()
@@ -31,7 +33,7 @@ function normalizeNarrationSpeakerName(value) {
 
 export function getNarrationVoiceConfigVersion(config) {
   return [
-    'multi-voice-dialogue-v1',
+    NARRATION_AUDIO_VERSION,
     config.ELEVENLABS_MODEL || 'eleven_multilingual_v2',
     config.ELEVENLABS_FATHER_VOICE_ID || '',
     config.ELEVENLABS_MOTHER_VOICE_ID || '',

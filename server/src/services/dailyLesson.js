@@ -15,6 +15,7 @@ import {
   generateAndUploadLessonAudio,
   getNarrationVoiceConfigVersion,
   hasCompleteNarrationVoiceConfig,
+  NARRATION_AUDIO_VERSION,
 } from './elevenLabs.js';
 
 const NARRATION_PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
@@ -249,11 +250,13 @@ export function formatQuizForLearner(quiz) {
   };
 }
 
-function formatDailyLessonForLearner(lesson) {
+export function formatDailyLessonForLearner(lesson) {
   const dailyLesson = lesson.toObject ? lesson.toObject() : lesson;
+  const audioIsCurrent = dailyLesson.audio?.voiceConfigVersion
+    ?.startsWith(`${NARRATION_AUDIO_VERSION}:`);
   return {
     ...dailyLesson,
-    audio: dailyLesson.audio ? {
+    audio: audioIsCurrent ? {
       status: dailyLesson.audio.status,
       url: dailyLesson.audio.url,
       durationSeconds: dailyLesson.audio.durationSeconds,

@@ -4,6 +4,7 @@ import {
   getSeasonBangladesh,
   getStoryTypeForDate,
   getThemeForDate,
+  formatDailyLessonForLearner,
   parseAndValidateDailyLessonPayload,
   formatQuizForLearner,
 } from '../../src/services/dailyLesson.js';
@@ -15,6 +16,17 @@ import { dailyLessonPayloadSchema, routineCreateSchema } from '@smart-routine/sh
 afterEach(() => vi.restoreAllMocks());
 
 describe('Daily Lesson: pure utilities and validation', () => {
+  it('does not serve stale single-voice saved audio to learners', () => {
+    const lesson = {
+      audio: {
+        status: 'ready',
+        url: 'https://media.example/old-single-voice.mp3',
+        voiceConfigVersion: 'eleven_v3:old-voice-ids',
+      },
+    };
+    expect(formatDailyLessonForLearner(lesson).audio).toBeNull();
+  });
+
   it('reuses saved narration without claiming a new generation', async () => {
     const saved = {
       _id: 'lesson-id',
