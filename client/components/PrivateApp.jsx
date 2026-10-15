@@ -1749,13 +1749,6 @@ export function PrivateApp() {
           </Button>
           <Button
             variant="secondary"
-            className="app-hero-action language-toggle-button"
-            aria-label={copy.languageToggle}
-            title={copy.languageToggle}
-            onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
-          ><span className="language-toggle-globe" aria-hidden="true">🌐</span><LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} /><span className="app-hero-action-label">{lang === 'bn' ? 'English' : 'বাংলা'}</span></Button>
-          <Button
-            variant="secondary"
             className="app-hero-action icon-button"
             aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
             title={theme === 'dark' ? copy.themeLight : copy.themeDark}
@@ -1768,7 +1761,13 @@ export function PrivateApp() {
             title={copy.logout}
             onClick={signOut}
             disabled={busy}
-          ><span aria-hidden="true">🚪</span><span className="app-hero-action-label">{copy.logout}</span></Button>
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="logout-icon h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10" />
+              <path d="M14 16l4-4-4-4M18 12H9" />
+            </svg>
+            <span className="app-hero-action-label">{copy.logout}</span>
+          </Button>
         </div>
       </header>
       <SyncStatus userId={user.id} lang={lang} />
@@ -2298,6 +2297,27 @@ export function PrivateApp() {
                 <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${showPrayerTimes ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
+          </Card>
+          <Card className="surface-card flex flex-wrap items-center justify-between gap-3 p-5">
+            <div>
+              <h3 className="flex items-center gap-2 font-bold text-ink">
+                <span aria-hidden="true">🌐</span>
+                {lang === 'bn' ? 'অ্যাপের ভাষা' : 'App language'}
+              </h3>
+              <p className="mt-0.5 text-sm text-ink/75">
+                {lang === 'bn' ? 'অ্যাপের প্রদর্শিত ভাষা পরিবর্তন করুন' : 'Change the language used in the app'}
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              className="language-toggle-button"
+              aria-label={copy.languageToggle}
+              title={copy.languageToggle}
+              onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
+            >
+              <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
+              <span className="ml-2">{lang === 'bn' ? 'English' : 'বাংলা'}</span>
+            </Button>
           </Card>
           <PrayerTimesCard lang={lang} />
           <Card className="space-y-3">
