@@ -15,10 +15,11 @@ export function csrfProtection(config) {
 
     const cookie = req.cookies?.[CSRF_COOKIE];
     const header = req.get(CSRF_HEADER);
-    if (cookie && header && safeEqual(cookie, header)) {
-      return next();
+    if (cookie) {
+      if (header && safeEqual(cookie, header)) return next();
+      return next(new AppError(403, 'CSRF_FAILED', MSG.csrf));
     }
-    // Allow same-origin / Vercel proxy requests that send a valid token header
+    // Allow same-origin / Vercel proxy requests that send a valid token header without a cookie.
     if (header && header.length >= 16) {
       return next();
     }

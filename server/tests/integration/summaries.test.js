@@ -28,7 +28,6 @@ describe.skipIf(!uri || !config.GEMINI_API_KEY)('Summaries: weekly AI reports', 
   let user;
   let userCookie;
   let owner;
-  const today = '2026-10-12'; // A Monday for testing
 
   beforeAll(async () => {
     await mongoose.connect(uri);
@@ -123,11 +122,10 @@ describe.skipIf(!uri || !config.GEMINI_API_KEY)('Summaries: weekly AI reports', 
     it('returns 403 when feature flag is disabled', async () => {
       const res = await request(app).get('/api/summaries').set('Cookie', userCookie);
       expect(res.status).toBe(403);
-      expect(res.body.code).toBe('FEATURE_DISABLED');
+      expect(res.body.error.code).toBe('FEATURE_DISABLED');
     });
 
     it('returns null message when feature is enabled but no summary exists yet', async () => {
-      const ownerToken = await createSession(owner._id);
       await setFlag('summaries.weekly', { enabled: true, rolloutPercent: 100 }, owner._id);
 
       const res = await request(app).get('/api/summaries').set('Cookie', userCookie);
@@ -196,11 +194,15 @@ describe.skipIf(!uri || !config.GEMINI_API_KEY)('Summaries: weekly AI reports', 
       const bnRts = await Routine.insertMany(bnRoutines);
 
       const completions = await Completion.find({ userId: user._id }).lean();
-      const bnCompletions = completions.map((c, idx) => ({
+      const routineIdBySource = new Map(routines.map((routine, index) => [
+        String(routine._id),
+        bnRts[index]._id,
+      ]));
+      const bnCompletions = completions.map((c) => ({
         ...c,
         _id: undefined,
         userId: bnUser._id,
-        routineId: bnRts[idx % bnRts.length]._id,
+        routineId: routineIdBySource.get(String(c.routineId)),
       }));
       await Completion.insertMany(bnCompletions);
 

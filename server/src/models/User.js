@@ -22,7 +22,7 @@ const userSchema = new Schema(
     },
     consents: {
       modelTraining: {
-        granted: { type: Boolean, default: true },
+        granted: { type: Boolean, default: false },
         version: { type: String, default: 'model-training-v1' },
         updatedAt: { type: Date, default: () => new Date() },
       },

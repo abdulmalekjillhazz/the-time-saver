@@ -37,10 +37,12 @@ describe('feature flags', () => {
     }
   });
 
-  it('every default flag starts on for everyone', () => {
-    for (const f of Object.values(FLAG_DEFAULTS)) {
+  it('every generally available default flag starts on for everyone', () => {
+    for (const [key, f] of Object.entries(FLAG_DEFAULTS)) {
+      if (key === 'summaries.weekly') continue;
       expect(f.enabled).toBe(true);
       expect(f.rolloutPercent).toBe(100);
     }
+    expect(FLAG_DEFAULTS['summaries.weekly']).toMatchObject({ enabled: false, rolloutPercent: 0 });
   });
 });

@@ -26,7 +26,7 @@ export function toCsv(rows) {
 export async function buildTrainingRows(secret) {
   const activeUsers = await User.find({
     deletedAt: null,
-    'consents.modelTraining.granted': { $ne: false },
+    'consents.modelTraining.granted': true,
   })
     .select('_id')
     .lean();

@@ -25,6 +25,7 @@ import { flagsRouter } from './routes/flags.js';
 import { calendarRouter } from './routes/calendar.js';
 import { summariesRouter } from './routes/summaries.js';
 import { gamificationRouter } from './routes/gamification.js';
+import { badgesRouter } from './routes/badges.js';
 import { circlesRouter } from './routes/circles.js';
 import { telegramRouter } from './routes/telegram.js';
 import { configureCloudinary } from './services/cloudinary.js';
@@ -66,7 +67,7 @@ export function createApp({ config }) {
   const serverWordCache = new Map();
   app.get('/api/word-meaning', async (req, res) => {
     const raw = String(req.query.word || '').trim().toLowerCase();
-    const clean = raw.replace(/['’]s$/i, '').replace(/^[^a-z0-9\u0980-\u09FF]+ert{}[^a-z0-9\u0980-\u09FF]+$/gi, '');
+    const clean = raw.replace(/['\u2019]s$/i, '').replace(/^[^a-z0-9\u0980-\u09FF]+|[^a-z0-9\u0980-\u09FF]+$/gi, '');
     if (!clean || clean.length < 1) {
       return res.status(400).json({ ok: false, meaning: '' });
     }
@@ -145,6 +146,7 @@ export function createApp({ config }) {
   app.use('/api/calendar', calendarRouter());
   app.use('/api/summaries', summariesRouter(config));
   app.use('/api/gamification', gamificationRouter());
+  app.use('/api/badges', badgesRouter());
   app.use('/api/circles', circlesRouter());
   app.use('/api/telegram', telegramRouter(config));
   app.use('/api/speech', speechRouter({ config }));

@@ -1,11 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { pseudonymize, weekdayOf, toCsv } from '../../src/services/mlExport.js';
 import { verifyArtifactHash } from '../../src/services/mlRegistry.js';
+import { User } from '../../src/models/User.js';
 import crypto from 'node:crypto';
 
 const SECRET = 'a'.repeat(40);
 
 describe('training export helpers', () => {
+  it('defaults new users to no model-training consent', () => {
+    const user = new User({ email: 'new@example.com', displayName: 'New User' });
+    expect(user.consents.modelTraining.granted).toBe(false);
+  });
+
   it('pseudonyms are stable for one secret and differ across secrets', () => {
     expect(pseudonymize(SECRET, 'user-1')).toBe(pseudonymize(SECRET, 'user-1'));
     expect(pseudonymize(SECRET, 'user-1')).not.toBe(pseudonymize('b'.repeat(40), 'user-1'));

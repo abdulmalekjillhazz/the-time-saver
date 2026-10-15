@@ -3,16 +3,16 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
-import { StoryReader } from './StoryReader.jsx';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
 
-export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
+export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = false }) {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [submission, setSubmission] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [loginRequired, setLoginRequired] = useState(false);
+  const [expanded, setExpanded] = useState(!collapsible);
 
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [shared, setShared] = useState(false);
@@ -24,6 +24,9 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
   const isBn = lang === 'bn';
   const copy = {
     todayLesson: isBn ? 'আজকের গল্প (Story)' : "Today's Story",
+    openLesson: isBn ? 'গল্প ও কুইজ খুলুন' : 'Open story and quiz',
+    closeLesson: isBn ? 'পাঠ বন্ধ করুন' : 'Close lesson',
+    lessonType: isBn ? 'ইংরেজি গল্প · কুইজ' : 'English story · quiz',
     takeaway: isBn ? 'মূল শিক্ষা' : 'Key Takeaway',
     vocab: isBn ? 'গুরুত্বপূর্ণ শব্দভাণ্ডার' : 'Vocabulary',
     quizTitle: isBn ? 'আজকের কুইজ (Quiz)' : 'Daily Quiz',
@@ -155,18 +158,37 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
     } catch {}
   };
 
-  const storyLines = dailyLesson.content
-    ? dailyLesson.content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-    : [];
-  const dialogueLines = storyLines.map((line) => {
-    const match = line.match(/^\[([^\]]+)\]\s*:\s*(.*)$/);
-    return match ? { speaker: match[1], text: match[2] } : { speaker: null, text: line };
-  });
+  if (collapsible && !expanded) {
+    return (
+      <Card id="daily-lesson-full-content" className="surface-card overflow-hidden border border-gold/30 p-0">
+        <div className="flex flex-col gap-4 bg-gradient-to-r from-sapphire/10 via-paper to-gold/10 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="min-w-0">
+            <p className="text-xs font-extrabold uppercase tracking-wider text-sapphire">
+              📖 {copy.lessonType} · {dailyLesson.date}
+            </p>
+            <h2 className="mt-1 text-xl font-extrabold text-ink sm:text-2xl">{dailyLesson.title}</h2>
+            {dailyLesson.description ? (
+              <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink/75">{dailyLesson.description}</p>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            onClick={() => setExpanded(true)}
+            aria-expanded="false"
+            aria-controls="daily-lesson-full-content"
+            className="shrink-0"
+          >
+            {copy.openLesson}
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   const questionCount = quiz?.questions?.length || 3;
 
   return (
-    <Card className="surface-card space-y-6 p-4 sm:p-6">
+    <Card id={collapsible ? 'daily-lesson-full-content' : undefined} className="surface-card space-y-6 p-4 sm:p-6">
       <div className="rounded-2xl border-2 border-gold/45 bg-paper p-4 sm:p-5">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-gold/30 bg-gold/10 p-3.5">
@@ -264,6 +286,12 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn' }) {
           <p className="text-center text-sm font-medium text-sapphire">{copy.thankFeedback}</p>
         )}
       </div>
+
+      {collapsible ? (
+        <Button type="button" variant="secondary" onClick={() => setExpanded(false)} aria-expanded="true" aria-controls="daily-lesson-full-content">
+          {copy.closeLesson}
+        </Button>
+      ) : null}
 
       {quiz && quiz.questions && quiz.questions.length > 0 && (
         <section id="daily-lesson-quiz-box" className="scroll-mt-6 border-t border-gold/25 pt-6">

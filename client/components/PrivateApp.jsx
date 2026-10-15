@@ -1969,19 +1969,19 @@ export function PrivateApp() {
 
       {tab === 'lessons' ? (
         <section className="space-y-4">
-          {dailyLesson ? <DailyLessonCard dailyLesson={dailyLesson} quiz={dailyQuiz} lang={lang} /> : null}
+          {dailyLesson ? <DailyLessonCard dailyLesson={dailyLesson} quiz={dailyQuiz} lang={lang} collapsible /> : null}
           {lessons.length ? (
             <div className="space-y-4">
               <Card className="surface-card space-y-3 p-4 sm:p-6">
                 <h2 className="text-xl font-extrabold text-gold-soft">{copy.lessons}</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {lessons.map((item) => (
-                    <div key={item.slug} className="rounded-xl border border-gold/35 bg-paper p-3.5 flex flex-col justify-between gap-3">
+                    <div key={item.slug} className="flex flex-col justify-between gap-3 rounded-2xl border border-sapphire/25 bg-gradient-to-br from-paper via-paper to-sapphire/5 p-4 shadow-sm transition hover:border-gold/50 hover:shadow-md">
                       <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-sapphire">
-                          📖 {lang === 'bn' ? 'গল্প ও কুইজ' : 'Story & Quiz'}
+                        <p className="text-xs font-extrabold uppercase tracking-wider text-sapphire">
+                          📖 {lang === 'bn' ? 'ইংরেজি গল্প · কুইজ' : 'English story · quiz'}
                         </p>
-                        <h3 className="mt-1 text-base font-bold text-ink">{localized(item.title, lang)}</h3>
+                        <h3 className="mt-1 text-lg font-extrabold leading-snug text-ink">{localized(item.title, 'en')}</h3>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <Button
@@ -2005,14 +2005,14 @@ export function PrivateApp() {
                   ))}
                 </div>
               </Card>
-              <Card id="published-lesson-story" className="surface-card scroll-mt-6 space-y-4 p-4 sm:p-6">
+              <Card id="published-lesson-story" className="surface-card scroll-mt-6 space-y-5 rounded-2xl border border-gold/30 p-4 shadow-md sm:p-6">
                 {!lesson ? <p>{copy.chooseLesson}</p> : (
                   <>
-                    <div className="rounded-xl border-2 border-gold/40 bg-paper p-4">
-                      <p className="text-xs font-bold uppercase tracking-wider text-gold-soft">
+                    <div className="rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 via-paper to-sapphire/10 p-4 sm:p-5">
+                      <p className="text-xs font-extrabold uppercase tracking-wider text-gold-soft">
                         📖 {lang === 'bn' ? 'নির্বাচিত গল্প ও কুইজ' : 'Selected Story & Quiz'}
                       </p>
-                      <h2 className="mt-1 text-xl font-extrabold text-ink sm:text-2xl">{localized(lesson.title, 'en')}</h2>
+                      <h2 className="mt-1 text-2xl font-extrabold leading-tight text-ink sm:text-3xl">{localized(lesson.title, 'en')}</h2>
                     </div>
                     <AudioDramaPlayer
                       title={localized(lesson.title, 'en')}
@@ -2024,17 +2024,20 @@ export function PrivateApp() {
                       <div id="published-lesson-quiz" className="scroll-mt-6 space-y-4">
                         <h3 className="text-xl font-semibold">{copy.quiz}</h3>
                         {lesson.quiz.map((question, index) => (
-                          <fieldset key={`${lesson.id}-${index}`} className="space-y-2">
-                            <legend>{localized(question.question, 'en')}</legend>
-                            {question.options.map((option, optionIndex) => (
-                              <label key={optionIndex} className="block">
-                                <input type="radio" name={`question-${index}`} checked={answers[index] === optionIndex} onChange={() => setAnswers((previous) => {
+                          <fieldset key={`${lesson.id}-${index}`} className="space-y-3 rounded-2xl border border-sapphire/20 bg-paper/70 p-4 sm:p-5">
+                            <legend className="text-base font-bold leading-relaxed text-ink sm:text-lg">{localized(question.question, 'en')}</legend>
+                            <div className="mt-3 grid gap-2">
+                              {question.options.map((option, optionIndex) => (
+                              <label key={optionIndex} className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed transition ${answers[index] === optionIndex ? 'border-sapphire bg-sapphire/15 ring-1 ring-sapphire/40' : 'border-sapphire/15 bg-paper hover:border-gold/50 hover:bg-gold/5'}`}>
+                                <input type="radio" className="mt-1 accent-sapphire" name={`question-${index}`} checked={answers[index] === optionIndex} onChange={() => setAnswers((previous) => {
                                   const next = [...previous];
                                   next[index] = optionIndex;
                                   return next;
-                                })} />{' '}{localized(option, 'en')}
+                                })} />
+                                <span>{localized(option, 'en')}</span>
                               </label>
                             ))}
+                            </div>
                           </fieldset>
                         ))}
                         <Button disabled={busy || !lesson.quiz.every((_, index) => Number.isInteger(answers[index]))} onClick={submitQuiz}>{copy.submit}</Button>

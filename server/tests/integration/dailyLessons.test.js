@@ -11,6 +11,7 @@ import { Quiz } from '../../src/models/Quiz.js';
 import { DailyQuizScore } from '../../src/models/DailyQuizScore.js';
 import { generateDailyLesson } from '../../src/services/dailyLesson.js';
 import { User } from '../../src/models/User.js';
+import { todayInZone } from '@smart-routine/shared';
 
 const uri = process.env.MONGODB_URI_TEST;
 const config = {
@@ -28,9 +29,7 @@ describe.skipIf(!uri || !config.GEMINI_API_KEY)('Daily Lessons & Quizzes: AI Gen
   let userCookie;
   let csrfToken;
   let owner;
-  let ownerCookie;
-  let ownerCsrf;
-  const testDate = '2026-10-12';
+  const testDate = todayInZone('Asia/Dhaka');
 
   beforeAll(async () => {
     await mongoose.connect(uri);
@@ -46,9 +45,6 @@ describe.skipIf(!uri || !config.GEMINI_API_KEY)('Daily Lessons & Quizzes: AI Gen
     userCookie = `sr_session=${userSession.token}; sr_csrf=${userSession.csrf}`;
     csrfToken = userSession.csrf;
 
-    const ownerSession = await createSession(owner._id);
-    ownerCookie = `sr_session=${ownerSession.token}; sr_csrf=${ownerSession.csrf}`;
-    ownerCsrf = ownerSession.csrf;
   });
 
   afterAll(async () => {
@@ -66,7 +62,7 @@ describe.skipIf(!uri || !config.GEMINI_API_KEY)('Daily Lessons & Quizzes: AI Gen
       .set('Cookie', userCookie);
 
     expect(res.status).toBe(403);
-    expect(res.body.code).toBe('FEATURE_DISABLED');
+    expect(res.body.error.code).toBe('FEATURE_DISABLED');
   });
 
   it('generates a daily lesson and quiz successfully', async () => {
@@ -126,7 +122,7 @@ describe.skipIf(!uri || !config.GEMINI_API_KEY)('Daily Lessons & Quizzes: AI Gen
       .post('/api/lessons/today/attempts')
       .set('Cookie', userCookie)
       .set('X-CSRF-Token', csrfToken)
-      .send({ date: testDate, answers: correctIndices });
+      .send({ answers: correctIndices });
 
     expect(res.status).toBe(201);
     expect(res.body.score).toBe(savedQuiz.questions.length);

@@ -127,7 +127,7 @@ These settings are sent once per generated story. They are configuration choices
 
 #### Daily lesson in the signed-in app
 
-The private app's Lessons & quizzes tab loads two distinct APIs: `GET /api/lessons` contains individually published lessons, while `GET /api/lessons/today?locale=en` supplies the English daily story and quiz for every interface language. Daily content appears in the lesson tab even when the published collection is empty; published lessons remain available alongside it when present. `PrivateApp.loadLessons()` handles failures from each request independently, so an unavailable daily story does not hide the published collection (and vice versa).
+The private app's Lessons & quizzes tab loads two distinct APIs: `GET /api/lessons` contains individually published lessons, while `GET /api/lessons/today?locale=en` supplies the English daily story and quiz for every interface language. The daily lesson starts collapsed; open it to see the complete story, audio, and quiz. Public lesson pages remain expanded. Daily content appears in the lesson tab even when the published collection is empty; published lessons remain available alongside it when present. `PrivateApp.loadLessons()` handles failures from each request independently, so an unavailable daily story does not hide the published collection (and vice versa).
 
 #### One playback, from script to cached audio
 
@@ -148,7 +148,7 @@ Users can save a display name and choose from six built-in avatars in **Trust & 
 
 The daily voice briefing is English-only and spoken by the browser's built-in speech service. It prefers an installed local English voice and uses no ElevenLabs, Gemini, or Groq credits. Story narration is separate: it uses ElevenLabs and Cloudinary caching. The signed-in AI routine coach is API-first: it sends the question and up to 30 routine summaries to the server, which tries Gemini and then Groq if configured; local keyword matching runs only if the provider request fails.
 
-An owner can replace a published daily story and quiz with a Gemini-generated version or explicitly generate its full narration in **Admin → Daily stories**. Every dialogue turn is synthesized and combined into one audio file; the completed story is saved to Cloudinary and played from the saved URL on the public lesson page. Repeated narration requests reuse the lesson's saved audio or an existing matching Cloudinary asset rather than calling ElevenLabs again. Editing or replacing the story clears and removes its superseded narration. Narration requires both complete Cloudinary and ElevenLabs configuration; missing configuration is reported to the admin instead of silently falling back.
+An owner can replace a published daily story and quiz with a Gemini-generated version or explicitly generate its full narration in **Admin → Daily stories**. The complete story is synthesized in one ElevenLabs request; the resulting audio is saved to Cloudinary and played from the saved URL on the public lesson page. Repeated narration requests reuse the lesson's saved audio or an existing matching Cloudinary asset rather than calling ElevenLabs again. Editing or replacing the story clears and removes its superseded narration. Narration requires both complete Cloudinary and ElevenLabs configuration; missing configuration is reported to the admin instead of silently falling back.
 
 #### Audio-drama implementation map
 
@@ -168,7 +168,7 @@ An owner can replace a published daily story and quiz with a Gemini-generated ve
 | `client/components/RoutineDashboard.jsx` | `RoutineDashboard()` | Loads the completion summary/streak and refreshes after sync, focus, and page visibility changes. |
 | `client/components/AudioDramaPlayer.jsx` | `characterIcon()`, `spokenTextParts()`, `AudioDramaPlayer()` | Character icons, scrollable dialogue bubbles, progress-based word highlighting, and bilingual notices. |
 | `client/components/PrivateApp.jsx` | `loadLessons()`, alarm handlers, Lessons & quizzes tab | Fetches the English daily story/quiz, navigates to a selected story or quiz, and syncs local alarms with the Capacitor Android plugin. |
-| `client/components/DailyLessonCard.jsx` | `DailyLessonCard()` | Renders the daily story, quiz, feedback, and audio player in a paper/sapphire/gold palette consistent with the rest of the app. |
+| `client/components/DailyLessonCard.jsx` | `DailyLessonCard()` | Keeps signed-in daily stories collapsed until opened; public lesson pages remain expanded. The opened view includes the story, quiz, feedback, and audio player. |
 | `client/components/LandingQuizGrid.jsx` | `LandingQuizGrid()` | Renders two interactive, bilingual public practice quizzes and submits answers for server-side checking. |
 | `client/app/(public)/[lang]/page.jsx` | `HomePage()` | Loads and shows the two public landing-page practice quizzes. |
 | `client/components/AdminPanel.jsx` | `loadLandingQuizzes()`, `saveLandingQuiz()`, Landing quizzes tab | Lets verified editors/owners edit and publish either fixed quiz slot in Bangla and English. |
@@ -196,7 +196,7 @@ An owner can replace a published daily story and quiz with a Gemini-generated ve
 | `server/src/services/prayerTimes.js` | `buildAladhanTimingsUrl()`, `fetchPrayerTimings()` | Requests Aladhan timings for supplied coordinates, validates the provider timezone and normalizes returned prayer clocks. |
 | `client/public/azan.mp3` | Wikimedia Commons CC BY-SA 4.0 recording (Andrewler) | Prayer notification azan with in-app credit; `adhan.ogg` remains as fallback. |
 | `client/tests/prayer-times.test.js`, `server/tests/unit/prayer-times.test.js` | timezone/date conversion and coordinate API tests | Covers location-based calculations and provider validation without live API calls. |
-| `server/tests/unit/elevenLabs.test.js` | Provider/Cloudinary error, English narration, and Bengali free-audio cache tests | Uses mocked provider/storage responses; no live API/credit use. |
+| `server/tests/unit/elevenLabs.test.js` | Provider/Cloudinary error, English narration, and saved-audio cache tests | Uses mocked provider/storage responses; no live API/credit use. |
 | `server/tests/unit/cloudinary-sign.test.js` | `signParams()` and upload-form signature test | Verifies the exact signed fields match the multipart upload request, including the folder. |
 | `server/tests/unit/env-empty.test.js` | Default model configuration test | Verifies the empty/default environment selects `eleven_v3`. |
 | `client/tests/audio-drama.test.js` | Transcript, role mapping, Cloudinary playback, and fallback tests | Verifies sequential direct Cloudinary playback without live TTS. |
@@ -212,8 +212,8 @@ Show a user-visible error only when it helps resolve the user's current action (
 - Required server-only configuration: `ELEVENLABS_API_KEY`, `ELEVENLABS_MODEL`, the four `ELEVENLABS_*_VOICE_ID` values, and all three `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` values. `cloudinaryAudioReady` means the three Cloudinary variables are present; only Cloudinary's Admin API can verify that the values are valid together. A rejected lookup/upload is reported as `CLOUDINARY_UNAVAILABLE` with the failing HTTP status logged, without logging provider response bodies. Restart the API after changing `server/.env`; do not put provider keys in client code or chat.
 - Focused regression tests: run `npm.cmd test -- tests/unit/elevenLabs.test.js` from `server/`, and `npm.cmd test -- tests/audio-drama.test.js` from `client/`. Both mock ElevenLabs and Cloudinary and consume no live credits.
 
-ElevenLabs usage is billable and each dialogue turn makes a provider request. Confirm current pricing and API access on your account before generating narration; do not assume the free tier is unrestricted or permanent.
-- Local ML demo: with MongoDB running at `localhost`, run `npm run ml:local-demo -w server`. It installs explicitly synthetic demo weights only in a local development database; displayed percentages are illustrative and are never validated personal-risk estimates.
+ElevenLabs usage is billable: one uncached story makes one synthesis request, then users reuse its saved Cloudinary audio. Confirm current pricing and API access on your account before generating narration; do not assume the free tier is unrestricted or permanent.
+- Local ML demo: with MongoDB running at `localhost`, run `npm run ml:local-demo -w server`. It installs explicitly synthetic demo weights only in a local development database; displayed percentages are illustrative and are never validated personal-risk estimates. New users default to no model-training consent; exports include active users with `consents.modelTraining.granted: true`. Existing saved consent values are preserved and are not migrated by this code change.
 
 ## Where things are documented
 
