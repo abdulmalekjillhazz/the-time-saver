@@ -1712,11 +1712,8 @@ export function PrivateApp() {
   return (
     <main className="app-shell app-shell-main mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7">
       <header className="app-hero relative flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl px-5 py-6 sm:px-8 sm:py-8">
-        <div className="relative z-10">
+        <div className="relative z-10 w-full">
           <div className="app-hero-heading-row">
-            <h1 className="app-title mt-2 text-3xl font-extrabold tracking-tight sm:text-5xl">
-              {copy.title}
-            </h1>
             <div className="app-header-controls">
               <Button
                 variant="secondary"
@@ -1730,20 +1727,18 @@ export function PrivateApp() {
               </Button>
               <Button
                 variant="secondary"
-                className="app-header-settings"
-                aria-label={copy.settings}
-                title={copy.settings}
-                aria-current={tab === 'settings' ? 'page' : undefined}
-                onClick={() => setTab('settings')}
+                className="app-header-voice"
+                aria-label={copy.voiceBriefing}
+                title={copy.voiceBriefing}
+                onClick={() => setVoiceModalOpen(true)}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="settings-gear-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z" />
-                  <path d="m19.4 15 .1.1a1.7 1.7 0 1 1-2.4 2.4l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.3a1.7 1.7 0 1 1-3.4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a1.7 1.7 0 1 1-2.4-2.4l.1-.1a1.7 1.7 0 0 0-1.2-2.9h-.3a1.7 1.7 0 1 1 0-3.4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a1.7 1.7 0 1 1 2.4-2.4l.1.1a1.7 1.7 0 0 0 2.9-1.2v-.3a1.7 1.7 0 1 1 3.4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a1.7 1.7 0 1 1 2.4 2.4l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.3a1.7 1.7 0 1 1 0 3.4h-.2a1.7 1.7 0 0 0-1.2 2.9Z" />
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="voice-mic-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="3" width="6" height="12" rx="3" />
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8" />
                 </svg>
               </Button>
             </div>
           </div>
-          <p className="hero-description mt-3 text-sm opacity-90 sm:text-base">{copy.description}</p>
         </div>
       </header>
       <SyncStatus userId={user.id} lang={lang} />
