@@ -40,7 +40,6 @@ import { SyncStatus } from './SyncStatus.jsx';
 const TelegramSettingsCard = dynamic(() => import('./TelegramSettingsCard.jsx').then((m) => m.TelegramSettingsCard), { ssr: false });
 const HabitCirclesCard = dynamic(() => import('./HabitCirclesCard.jsx').then((m) => m.HabitCirclesCard), { ssr: false });
 const PrayerTimesCard = dynamic(() => import('./PrayerTimesCard.jsx').then((m) => m.PrayerTimesCard), { ssr: false });
-const GamificationBar = dynamic(() => import('./GamificationBar.jsx').then((m) => m.GamificationBar), { ssr: false });
 const VoiceBriefingModal = dynamic(() => import('./VoiceBriefingModal.jsx').then((m) => m.VoiceBriefingModal), { ssr: false });
 const EveningReflectionModal = dynamic(() => import('./EveningReflectionModal.jsx').then((m) => m.EveningReflectionModal), { ssr: false });
 const HeatmapGrid = dynamic(() => import('./HeatmapGrid.jsx').then((m) => m.HeatmapGrid), { ssr: false });
@@ -1718,19 +1717,31 @@ export function PrivateApp() {
             <h1 className="app-title mt-2 text-3xl font-extrabold tracking-tight sm:text-5xl">
               {copy.title}
             </h1>
-            <Button
-              variant="secondary"
-              className="app-header-settings"
-              aria-label={copy.settings}
-              title={copy.settings}
-              aria-current={tab === 'settings' ? 'page' : undefined}
-              onClick={() => setTab('settings')}
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="settings-gear-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z" />
-                <path d="m19.4 15 .1.1a1.7 1.7 0 1 1-2.4 2.4l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.3a1.7 1.7 0 1 1-3.4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a1.7 1.7 0 1 1-2.4-2.4l.1-.1a1.7 1.7 0 0 0-1.2-2.9h-.3a1.7 1.7 0 1 1 0-3.4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a1.7 1.7 0 1 1 2.4-2.4l.1.1a1.7 1.7 0 0 0 2.9-1.2v-.3a1.7 1.7 0 1 1 3.4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a1.7 1.7 0 1 1 2.4 2.4l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.3a1.7 1.7 0 1 1 0 3.4h-.2a1.7 1.7 0 0 0-1.2 2.9Z" />
-              </svg>
-            </Button>
+            <div className="app-header-controls">
+              <Button
+                variant="secondary"
+                className="app-header-language"
+                aria-label={copy.languageToggle}
+                title={copy.languageToggle}
+                onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
+              >
+                <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
+                <span>{lang === 'bn' ? 'EN' : 'বাংলা'}</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="app-header-settings"
+                aria-label={copy.settings}
+                title={copy.settings}
+                aria-current={tab === 'settings' ? 'page' : undefined}
+                onClick={() => setTab('settings')}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="settings-gear-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z" />
+                  <path d="m19.4 15 .1.1a1.7 1.7 0 1 1-2.4 2.4l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.3a1.7 1.7 0 1 1-3.4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a1.7 1.7 0 1 1-2.4-2.4l.1-.1a1.7 1.7 0 0 0-1.2-2.9h-.3a1.7 1.7 0 1 1 0-3.4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a1.7 1.7 0 1 1 2.4-2.4l.1.1a1.7 1.7 0 0 0 2.9-1.2v-.3a1.7 1.7 0 1 1 3.4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a1.7 1.7 0 1 1 2.4 2.4l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.3a1.7 1.7 0 1 1 0 3.4h-.2a1.7 1.7 0 0 0-1.2 2.9Z" />
+                </svg>
+              </Button>
+            </div>
           </div>
           <p className="hero-description mt-3 text-sm opacity-90 sm:text-base">{copy.description}</p>
         </div>
@@ -1779,7 +1790,6 @@ export function PrivateApp() {
 
       {tab === 'dashboard' ? (
         <section className="space-y-4">
-          <GamificationBar lang={lang} />
           <RoutineDashboard lang={lang} userId={user.id} />
           <BadgesShowcase lang={lang} />
           <HeatmapGrid lang={lang} />
@@ -1791,8 +1801,8 @@ export function PrivateApp() {
         <section className="space-y-4">
           <TodayProgressCard
             lang={lang}
+            userId={user.id}
             routines={routines}
-            onOpenVoiceBriefing={() => setVoiceModalOpen(true)}
             onScrollToAddRoutine={() => setTab('plan')}
             onScrollToAlarms={() => setTab('focus')}
           />
@@ -2251,27 +2261,6 @@ export function PrivateApp() {
                 <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${showPrayerTimes ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
-          </Card>
-          <Card className="surface-card flex flex-wrap items-center justify-between gap-3 p-5">
-            <div>
-              <h3 className="flex items-center gap-2 font-bold text-ink">
-                <span aria-hidden="true">🌐</span>
-                {lang === 'bn' ? 'অ্যাপের ভাষা' : 'App language'}
-              </h3>
-              <p className="mt-0.5 text-sm text-ink/75">
-                {lang === 'bn' ? 'অ্যাপের প্রদর্শিত ভাষা পরিবর্তন করুন' : 'Change the language used in the app'}
-              </p>
-            </div>
-            <Button
-              variant="secondary"
-              className="language-toggle-button"
-              aria-label={copy.languageToggle}
-              title={copy.languageToggle}
-              onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
-            >
-              <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
-              <span className="ml-2">{lang === 'bn' ? 'English' : 'বাংলা'}</span>
-            </Button>
           </Card>
           <Card className="surface-card space-y-3 p-5">
             <h2 className="text-lg font-semibold">{lang === 'bn' ? 'দ্রুত সেটিংস' : 'Quick settings'}</h2>

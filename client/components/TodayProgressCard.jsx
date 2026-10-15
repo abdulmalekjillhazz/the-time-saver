@@ -4,16 +4,19 @@ import { useState, useEffect } from 'react';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
 import { toBanglaNumber } from '../lib/prayerAnchors.js';
+import { recordDailyVisit } from '../lib/dailyVisit.js';
 
 export function TodayProgressCard({
   lang = 'bn',
+  userId,
   routines = [],
-  onOpenVoiceBriefing,
   onScrollToAddRoutine,
   onScrollToAlarms,
 }) {
   const isBn = lang === 'bn';
   const [isOnline, setIsOnline] = useState(true);
+  const [dailyVisit, setDailyVisit] = useState(null);
+  const [dailyVisitError, setDailyVisitError] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -27,6 +30,17 @@ export function TodayProgressCard({
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  useEffect(() => {
+    if (!userId || typeof window === 'undefined') return;
+    try {
+      setDailyVisit(recordDailyVisit(window.localStorage, userId));
+      setDailyVisitError('');
+    } catch (error) {
+      console.error('Could not record daily app visit', error);
+      setDailyVisitError(isBn ? 'আজকের উপস্থিতি সংরক্ষণ করা যায়নি।' : 'Today’s check-in could not be saved.');
+    }
+  }, [isBn, userId]);
 
   const total = routines.length;
   const completed = routines.filter((r) => r.completionStatus === 'done').length;
@@ -88,19 +102,7 @@ export function TodayProgressCard({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {onOpenVoiceBriefing && (
-            <Button
-              variant="secondary"
-              className="flex min-h-[42px] w-full items-center justify-center px-3 text-xs font-bold sm:text-sm"
-              onClick={onOpenVoiceBriefing}
-              title={isBn ? 'সকালের অডিও ব্রিফিং শুনুন' : 'Listen to audio briefing'}
-            >
-              <span aria-hidden="true" className="mr-1.5">🎙️</span>
-              <span>{isBn ? 'অডিও ব্রিফিং' : 'Voice Briefing'}</span>
-            </Button>
-          )}
-
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             variant="secondary"
             className="flex min-h-[42px] w-full items-center justify-center px-3 text-xs font-bold sm:text-sm"
@@ -122,6 +124,22 @@ export function TodayProgressCard({
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-sapphire/20 bg-paper/60 px-3 py-2 text-sm">
+        <span aria-hidden="true">{dailyVisitError ? '⚠️' : dailyVisit ? '✅' : '📅'}</span>
+        <span className="font-semibold">
+          {dailyVisitError
+            ? dailyVisitError
+            : dailyVisit
+              ? isBn
+                ? `আজ উপস্থিত · টানা ${toBanglaNumber(dailyVisit.streak)} দিন`
+                : `Checked in today · ${dailyVisit.streak}-day streak`
+              : isBn ? 'আজকের উপস্থিতি যাচাই হচ্ছে…' : 'Checking today’s visit…'}
+        </span>
+        <span className="text-xs opacity-70">
+          {isBn ? 'এই ডিভাইসে অ্যাপ খোলার দিন গোনা হয়' : 'App visits are counted on this device'}
+        </span>
       </div>
 
       {total > 0 && (
