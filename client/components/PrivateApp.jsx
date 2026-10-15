@@ -98,7 +98,7 @@ const COPY = {
     localModel: 'Local model', modelVersion: 'Version', modelAuc: 'Holdout AUC', modelBrier: 'Brier score',
     modelCalibration: 'Calibration slope', modelHoldout: 'Holdout examples', modelUnavailable: 'No validated local model is active. Risk predictions need a validated local model.', modelDemoWarning: 'Local synthetic demo only. These risk percentages are illustrative, not validated, and must not be used as personal predictions.',
     assistantSend: 'Ask assistant', assistantDisclaimer: '⚠️ AM’s Routine Assistant can make mistakes. Double-check important advice.',
-    themeDark: 'Switch to dark mode', themeLight: 'Switch to light mode', alarmTitle: 'Alarms & focus timer',
+    themeDark: 'Switch to dark mode', themeLight: 'Switch to light mode', alarmTitle: 'Alarms',
     alarmTime: 'Alarm time', alarmName: 'Alarm name', addAlarm: 'Set alarm', noAlarms: 'No alarms set yet.',
     enableBrowserNotifications: 'Enable browser notifications', browserNotificationsOn: 'Browser notifications are enabled.',
     browserNotificationsOff: 'Browser notifications are off. Tap Enable and allow them in your browser prompt.',
@@ -166,7 +166,7 @@ const COPY = {
     localModel: 'স্থানীয় মডেল', modelVersion: 'সংস্করণ', modelAuc: 'Holdout AUC', modelBrier: 'Brier score',
     modelCalibration: 'Calibration slope', modelHoldout: 'Holdout উদাহরণ', modelUnavailable: 'যাচাইকৃত স্থানীয় মডেল চালু নেই। ঝুঁকির অনুমানের জন্য যাচাইকৃত স্থানীয় মডেল প্রয়োজন।', modelDemoWarning: 'শুধু স্থানীয় কৃত্রিম ডেমো। ঝুঁকির শতাংশ যাচাইকৃত নয়; ব্যক্তিগত পূর্বাভাস হিসেবে ব্যবহার করবেন না।',
     assistantSend: 'সহকারীকে জিজ্ঞাসা করুন', assistantDisclaimer: '⚠️ AM’s রুটিন সহকারী ভুল করতে পারে। গুরুত্বপূর্ণ পরামর্শ যাচাই করে নিন।',
-    themeDark: 'ডার্ক মোড চালু করুন', themeLight: 'লাইট মোড চালু করুন', alarmTitle: 'অ্যালার্ম ও ফোকাস টাইমার',
+    themeDark: 'ডার্ক মোড চালু করুন', themeLight: 'লাইট মোড চালু করুন', alarmTitle: 'অ্যালার্ম',
     alarmTime: 'অ্যালার্মের সময়', alarmName: 'অ্যালার্মের নাম', addAlarm: 'অ্যালার্ম সেট করুন', noAlarms: 'এখনো কোনো অ্যালার্ম সেট করা নেই।',
     enableBrowserNotifications: 'ব্রাউজার নোটিফিকেশন চালু করুন', browserNotificationsOn: 'ব্রাউজার নোটিফিকেশন চালু আছে।',
     browserNotificationsOff: 'ব্রাউজার নোটিফিকেশন বন্ধ। চালু করুন চাপুন এবং ব্রাউজারের অনুমতি দিন।',
@@ -1760,10 +1760,14 @@ export function PrivateApp() {
       <nav className="app-tabs" aria-label={copy.title}>
         {[
           ['today', '🌤️', copy.today, lang === 'bn' ? 'আজ' : 'Today'],
+          ['add-routine', '➕', copy.addRoutine, lang === 'bn' ? 'যোগ' : 'Add'],
+          ['calendar', '📅', lang === 'bn' ? 'ক্যালেন্ডার' : 'Calendar', lang === 'bn' ? 'ক্যালেন্ডার' : 'Calendar'],
+          ['stopwatch', '⏱️', copy.stopwatch, lang === 'bn' ? 'টাইমার' : 'Timer'],
+          ['alarms', '🔔', copy.alarmTitle, lang === 'bn' ? 'অ্যালার্ম' : 'Alarm'],
           ['dashboard', '📊', copy.dashboard, lang === 'bn' ? 'হোম' : 'Home'],
           ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
-          ['insights', '🎯', copy.insights, lang === 'bn' ? 'ঝুঁকি' : 'Insights'],
-          ['assistant', '💬', copy.assistant, lang === 'bn' ? 'সহায়ক' : 'Assistant'],
+          ['insights', '🎯', copy.insights, lang === 'bn' ? 'ঝুঁকি' : 'Risk'],
+          ['assistant', '💬', copy.assistant, lang === 'bn' ? 'সহায়ক' : 'Help'],
           ['settings', '⚙️', copy.settings, lang === 'bn' ? 'সেটিংস' : 'Settings'],
         ].map(([key, icon, label, shortLabel]) => (
           <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
@@ -1792,10 +1796,8 @@ export function PrivateApp() {
             lang={lang}
             routines={routines}
             onOpenVoiceBriefing={() => setVoiceModalOpen(true)}
-            onScrollToAddRoutine={() => {
-              const el = document.getElementById('add-routine-card');
-              el?.scrollIntoView({ behavior: 'smooth' });
-            }}
+            onScrollToAddRoutine={() => setTab('add-routine')}
+            onScrollToAlarms={() => setTab('alarms')}
           />
 
           {reminders.length ? (
@@ -1889,21 +1891,23 @@ export function PrivateApp() {
             )}
           </Card>
 
+        </section>
+      ) : null}
+
+      {tab === 'add-routine' ? (
+        <section className="space-y-4">
           <AddRoutineBuilderCard
             lang={lang}
             copy={copy}
             busy={busy}
             onSubmitRoutine={addRoutine}
           />
+        </section>
+      ) : null}
 
-          <details className="surface-card group rounded-2xl p-4 transition">
-            <summary className="cursor-pointer font-bold text-ink flex items-center justify-between list-none">
-              <span className="flex items-center gap-2">
-                <span aria-hidden="true">📅</span>
-                <span>{lang === 'bn' ? 'বাংলাদেশ ছুটির দিন ও মাসিক ক্যালেন্ডার' : 'Holiday & Monthly Calendar'}</span>
-              </span>
-              <span className="text-xs font-semibold text-sapphire group-open:rotate-180 transition-transform">▼</span>
-            </summary>
+      {tab === 'calendar' ? (
+        <section className="space-y-4">
+          <Card className="surface-card p-4">
             <div className="mt-4 space-y-4 pt-3 border-t border-sapphire/15">
               <header className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1970,24 +1974,24 @@ export function PrivateApp() {
               </Button>
             </div>
             </div>
-          </details>
+          </Card>
+        </section>
+      ) : null}
 
-          <details className="surface-card group rounded-2xl p-4 transition">
-            <summary className="cursor-pointer font-bold text-ink flex items-center justify-between list-none">
-              <span className="flex items-center gap-2">
-                <span aria-hidden="true">💡</span>
-                <span>{lang === 'bn' ? 'নতুন রুটিনের ধারণা ও টেমপ্লেট সংগ্রহ' : 'Routine Ideas & Starter Templates'}</span>
-              </span>
-              <span className="text-xs font-semibold text-sapphire group-open:rotate-180 transition-transform">▼</span>
-            </summary>
+      {tab === 'add-routine' ? (
+        <section className="space-y-4">
+          <Card className="surface-card p-4">
+            <h2 className="section-heading"><span aria-hidden="true">💡</span> {lang === 'bn' ? 'রুটিনের ধারণা ও টেমপ্লেট' : 'Routine Ideas & Templates'}</h2>
             <div className="mt-4 space-y-4 pt-3 border-t border-sapphire/15">
               <GoalToRoutine lang={lang} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
               <TemplatePicker lang={lang} onRoutineAdded={() => loadRoutines(user).catch(reportError)} />
             </div>
-          </details>
+          </Card>
+        </section>
+      ) : null}
 
-          <div id="alarm-section-card" className="scroll-mt-6">
-              <section className="grid gap-4 lg:grid-cols-2">
+      {tab === 'stopwatch' ? (
+        <section className="space-y-4">
             <Card className="surface-card space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="section-heading"><span aria-hidden="true">⏱️</span> {copy.stopwatch}</h2>
@@ -2003,6 +2007,11 @@ export function PrivateApp() {
                 <Button variant="secondary" onClick={() => resetStopwatch()}><span aria-hidden="true">↻</span><span className="ml-2">{copy.resetTimer}</span></Button>
               </div>
             </Card>
+        </section>
+      ) : null}
+
+      {tab === 'alarms' ? (
+        <section className="space-y-4">
             <Card className="surface-card space-y-4">
               <h2 className="section-heading"><span aria-hidden="true">🔔</span> {copy.alarmTitle}</h2>
               <form className="grid gap-3 sm:grid-cols-2" onSubmit={scheduleAlarm}>
@@ -2058,8 +2067,6 @@ export function PrivateApp() {
                 )) : <li className="text-sm opacity-70">{copy.noAlarms}</li>}
               </ul>
             </Card>
-          </section>
-          </div>
         </section>
       ) : null}
 
