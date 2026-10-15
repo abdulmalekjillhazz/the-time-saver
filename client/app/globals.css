@@ -736,7 +736,7 @@ select:disabled {
   }
 
   .app-hero > div:first-child {
-    width: auto;
+    width: 100%;
     min-width: 0;
   }
 
@@ -746,7 +746,9 @@ select:disabled {
 
   .app-hero-heading-row {
     display: flex;
+    width: 100%;
     align-items: center;
+    justify-content: space-between;
     gap: 0.7rem;
   }
 
