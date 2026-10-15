@@ -1714,60 +1714,25 @@ export function PrivateApp() {
     <main className="app-shell app-shell-main mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7">
       <header className="app-hero relative flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl px-5 py-6 sm:px-8 sm:py-8">
         <div className="relative z-10">
-          <h1 className="app-title mt-2 text-3xl font-extrabold tracking-tight sm:text-5xl">
-            {copy.title}
-          </h1>
-          <p className="hero-description mt-3 text-sm opacity-90 sm:text-base">{copy.description}</p>
-          <p className="app-hero-clock mt-4 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-4 py-1.5 font-mono text-sm">
-            <span aria-hidden="true">🕰️</span>{new Date(clockNow).toLocaleTimeString(lang === 'bn' ? 'bn-BD' : 'en', { hour: '2-digit', minute: '2-digit' })}
-          </p>
-        </div>
-        <div className="app-hero-actions relative z-10 flex items-center gap-2">
-          {pwaInstallPrompt ? (
+          <div className="app-hero-heading-row">
+            <h1 className="app-title mt-2 text-3xl font-extrabold tracking-tight sm:text-5xl">
+              {copy.title}
+            </h1>
             <Button
-              variant="primary"
-                className="app-hero-action"
-                aria-label={lang === 'bn' ? 'অ্যাপ ইনস্টল করুন' : 'Install app'}
-                title={lang === 'bn' ? 'অ্যাপ ইনস্টল করুন' : 'Install app'}
-                onClick={async () => {
-                  pwaInstallPrompt.prompt();
-                  await pwaInstallPrompt.userChoice.catch(() => {});
-                  setPwaInstallPrompt(null);
-                }}
+              variant="secondary"
+              className="app-header-settings"
+              aria-label={copy.settings}
+              title={copy.settings}
+              aria-current={tab === 'settings' ? 'page' : undefined}
+              onClick={() => setTab('settings')}
             >
-                <span aria-hidden="true">📲</span><span className="app-hero-action-label">{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install App'}</span>
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="settings-gear-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z" />
+                <path d="m19.4 15 .1.1a1.7 1.7 0 1 1-2.4 2.4l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.3a1.7 1.7 0 1 1-3.4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a1.7 1.7 0 1 1-2.4-2.4l.1-.1a1.7 1.7 0 0 0-1.2-2.9h-.3a1.7 1.7 0 1 1 0-3.4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a1.7 1.7 0 1 1 2.4-2.4l.1.1a1.7 1.7 0 0 0 2.9-1.2v-.3a1.7 1.7 0 1 1 3.4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a1.7 1.7 0 1 1 2.4 2.4l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.3a1.7 1.7 0 1 1 0 3.4h-.2a1.7 1.7 0 0 0-1.2 2.9Z" />
+              </svg>
             </Button>
-          ) : null}
-          <Button
-            variant="secondary"
-            className="app-hero-action"
-            aria-label={copy.voiceBriefing}
-            title={copy.voiceBriefing}
-            onClick={() => setVoiceModalOpen(true)}
-          >
-            <span aria-hidden="true">🎧</span><span className="app-hero-action-label">{copy.voiceBriefing}</span>
-          </Button>
-          <Button
-            variant="secondary"
-            className="app-hero-action icon-button"
-            aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
-            title={theme === 'dark' ? copy.themeLight : copy.themeDark}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >{theme === 'dark' ? '☀️' : '🌙'}</Button>
-          <Button
-            variant="secondary"
-            className="app-hero-action account-logout"
-            aria-label={copy.logout}
-            title={copy.logout}
-            onClick={signOut}
-            disabled={busy}
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="logout-icon h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10" />
-              <path d="M14 16l4-4-4-4M18 12H9" />
-            </svg>
-            <span className="app-hero-action-label">{copy.logout}</span>
-          </Button>
+          </div>
+          <p className="hero-description mt-3 text-sm opacity-90 sm:text-base">{copy.description}</p>
         </div>
       </header>
       <SyncStatus userId={user.id} lang={lang} />
@@ -1803,12 +1768,7 @@ export function PrivateApp() {
         ].map(([key, icon, label, shortLabel]) => (
           <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
             <span className={`tab-icon tab-icon-${key}`} aria-hidden="true">
-              {key === 'settings' ? (
-                <>
-                  <span className="tab-settings-gear">{icon}</span>
-                  <ProfileAvatar avatarId={user.avatarId || 'sunrise'} size="sm" className="tab-settings-avatar" />
-                </>
-              ) : icon}
+              {icon}
             </span>
             <span className="tab-label-desktop">{label}</span>
             <span className="tab-label-mobile" aria-hidden="true">{shortLabel}</span>
@@ -2318,6 +2278,55 @@ export function PrivateApp() {
               <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
               <span className="ml-2">{lang === 'bn' ? 'English' : 'বাংলা'}</span>
             </Button>
+          </Card>
+          <Card className="surface-card space-y-3 p-5">
+            <h2 className="text-lg font-semibold">{lang === 'bn' ? 'দ্রুত সেটিংস' : 'Quick settings'}</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {pwaInstallPrompt ? (
+                <Button
+                  variant="secondary"
+                  className="settings-action-button"
+                  aria-label={lang === 'bn' ? 'অ্যাপ ইনস্টল করুন' : 'Install app'}
+                  onClick={async () => {
+                    pwaInstallPrompt.prompt();
+                    await pwaInstallPrompt.userChoice.catch(() => {});
+                    setPwaInstallPrompt(null);
+                  }}
+                >
+                  <span aria-hidden="true">📲</span><span>{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install app'}</span>
+                </Button>
+              ) : null}
+              <Button
+                variant="secondary"
+                className="settings-action-button"
+                aria-label={copy.voiceBriefing}
+                onClick={() => setVoiceModalOpen(true)}
+              >
+                <span aria-hidden="true">🎧</span><span>{copy.voiceBriefing}</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="settings-action-button"
+                aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+                <span>{theme === 'dark' ? copy.themeLight : copy.themeDark}</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="settings-action-button"
+                aria-label={copy.logout}
+                onClick={signOut}
+                disabled={busy}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10" />
+                  <path d="M14 16l4-4-4-4M18 12H9" />
+                </svg>
+                <span>{copy.logout}</span>
+              </Button>
+            </div>
           </Card>
           <PrayerTimesCard lang={lang} />
           <Card className="space-y-3">
