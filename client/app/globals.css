@@ -1208,7 +1208,7 @@ select:disabled {
   }
 
   .app-shell-main {
-    padding-bottom: calc(8.5rem + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;
   }
 
   .app-tabs {
@@ -1220,7 +1220,7 @@ select:disabled {
     display: grid;
     width: 100%;
     margin-bottom: 0 !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 0.2rem;
     border: 1px solid rgb(var(--c-sapphire) / 0.26);
     border-bottom: 0;
@@ -1313,6 +1313,19 @@ select:disabled {
 @media (max-width: 360px) {
   .app-tabs .tab-button {
     font-size: 0.55rem;
+  }
+
+  .tab-label-mobile {
+    display: none;
+  }
+
+  .app-tabs .tab-button {
+    min-height: 2.75rem;
+  }
+
+  .tab-icon {
+    width: 1.8rem;
+    height: 1.8rem;
   }
 
   .tab-icon {

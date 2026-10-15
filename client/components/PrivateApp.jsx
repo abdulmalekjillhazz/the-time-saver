@@ -1760,13 +1760,10 @@ export function PrivateApp() {
       <nav className="app-tabs" aria-label={copy.title}>
         {[
           ['today', '🌤️', copy.today, lang === 'bn' ? 'আজ' : 'Today'],
-          ['add-routine', '➕', copy.addRoutine, lang === 'bn' ? 'যোগ' : 'Add'],
-          ['calendar', '📅', lang === 'bn' ? 'ক্যালেন্ডার' : 'Calendar', lang === 'bn' ? 'ক্যালেন্ডার' : 'Calendar'],
-          ['stopwatch', '⏱️', copy.stopwatch, lang === 'bn' ? 'টাইমার' : 'Timer'],
-          ['alarms', '🔔', copy.alarmTitle, lang === 'bn' ? 'অ্যালার্ম' : 'Alarm'],
-          ['dashboard', '📊', copy.dashboard, lang === 'bn' ? 'হোম' : 'Home'],
+          ['plan', '🗓️', lang === 'bn' ? 'পরিকল্পনা' : 'Plan', lang === 'bn' ? 'পরিকল্পনা' : 'Plan'],
+          ['focus', '⏱️', lang === 'bn' ? 'ফোকাস' : 'Focus', lang === 'bn' ? 'ফোকাস' : 'Focus'],
+          ['dashboard', '📊', lang === 'bn' ? 'পরিসংখ্যান ও ঝুঁকি' : 'Progress & insights', lang === 'bn' ? 'প্রগতি' : 'Stats'],
           ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
-          ['insights', '🎯', copy.insights, lang === 'bn' ? 'ঝুঁকি' : 'Risk'],
           ['assistant', '💬', copy.assistant, lang === 'bn' ? 'সহায়ক' : 'Help'],
           ['settings', '⚙️', copy.settings, lang === 'bn' ? 'সেটিংস' : 'Settings'],
         ].map(([key, icon, label, shortLabel]) => (
@@ -1796,8 +1793,8 @@ export function PrivateApp() {
             lang={lang}
             routines={routines}
             onOpenVoiceBriefing={() => setVoiceModalOpen(true)}
-            onScrollToAddRoutine={() => setTab('add-routine')}
-            onScrollToAlarms={() => setTab('alarms')}
+            onScrollToAddRoutine={() => setTab('plan')}
+            onScrollToAlarms={() => setTab('focus')}
           />
 
           {reminders.length ? (
@@ -1894,24 +1891,22 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'add-routine' ? (
+      {tab === 'plan' ? (
         <section className="space-y-4">
-          <AddRoutineBuilderCard
-            lang={lang}
-            copy={copy}
-            busy={busy}
-            onSubmitRoutine={addRoutine}
-          />
-        </section>
-      ) : null}
-
-      {tab === 'calendar' ? (
-        <section className="space-y-4">
+          <div className="space-y-2">
+            <p className="eyebrow">{lang === 'bn' ? 'ধাপ ১ · রুটিন তৈরি' : 'STEP 1 · CREATE A ROUTINE'}</p>
+            <AddRoutineBuilderCard
+              lang={lang}
+              copy={copy}
+              busy={busy}
+              onSubmitRoutine={addRoutine}
+            />
+          </div>
           <Card className="surface-card p-4">
-            <div className="mt-4 space-y-4 pt-3 border-t border-sapphire/15">
+            <h2 className="section-heading"><span aria-hidden="true">📅</span> {lang === 'bn' ? 'ধাপ ২ · মাসিক ক্যালেন্ডার' : 'STEP 2 · MONTHLY CALENDAR'}</h2>
+            <div className="mt-4 space-y-4 border-t border-sapphire/15 pt-3">
               <header className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="section-heading"><span aria-hidden="true">📅</span> {lang === 'bn' ? copy.holidayCalendar : copy.calendar}</h2>
                 <p className="font-semibold">{englishMonth}</p>
                 {banglaMonthRange ? <p className="text-sm opacity-75">{banglaMonthRange.first} – {banglaMonthRange.last}</p> : null}
               </div>
@@ -1975,13 +1970,8 @@ export function PrivateApp() {
             </div>
             </div>
           </Card>
-        </section>
-      ) : null}
-
-      {tab === 'add-routine' ? (
-        <section className="space-y-4">
           <Card className="surface-card p-4">
-            <h2 className="section-heading"><span aria-hidden="true">💡</span> {lang === 'bn' ? 'রুটিনের ধারণা ও টেমপ্লেট' : 'Routine Ideas & Templates'}</h2>
+            <h2 className="section-heading"><span aria-hidden="true">💡</span> {lang === 'bn' ? 'ধাপ ৩ · ধারণা ও টেমপ্লেট' : 'STEP 3 · IDEAS & TEMPLATES'}</h2>
             <div className="mt-4 space-y-4 pt-3 border-t border-sapphire/15">
               <GoalToRoutine lang={lang} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
               <TemplatePicker lang={lang} onRoutineAdded={() => loadRoutines(user).catch(reportError)} />
@@ -1990,7 +1980,7 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'stopwatch' ? (
+      {tab === 'focus' ? (
         <section className="space-y-4">
             <Card className="surface-card space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2007,11 +1997,7 @@ export function PrivateApp() {
                 <Button variant="secondary" onClick={() => resetStopwatch()}><span aria-hidden="true">↻</span><span className="ml-2">{copy.resetTimer}</span></Button>
               </div>
             </Card>
-        </section>
-      ) : null}
-
-      {tab === 'alarms' ? (
-        <section className="space-y-4">
+          <section className="space-y-4">
             <Card className="surface-card space-y-4">
               <h2 className="section-heading"><span aria-hidden="true">🔔</span> {copy.alarmTitle}</h2>
               <form className="grid gap-3 sm:grid-cols-2" onSubmit={scheduleAlarm}>
@@ -2067,6 +2053,7 @@ export function PrivateApp() {
                 )) : <li className="text-sm opacity-70">{copy.noAlarms}</li>}
               </ul>
             </Card>
+          </section>
         </section>
       ) : null}
 
@@ -2165,7 +2152,7 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'insights' ? (
+      {tab === 'dashboard' ? (
         <Card className="surface-card space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gold/20 pb-3">
             <div>
