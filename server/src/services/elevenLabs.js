@@ -152,16 +152,11 @@ export async function generateElevenLabsAudio({ text, speaker, config, signal })
   });
 
   if (!response.ok) {
-    let code = '';
-    try {
-      const body = await response.json();
-      const providerCode = body?.detail?.code || body?.detail?.status || body?.detail?.type || '';
-      code = typeof providerCode === 'string'
-        ? providerCode.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 64)
-        : '';
-    } catch {
-      code = '';
-    }
+    const body = await response.json().catch(() => null);
+    const providerCode = body?.detail?.code || body?.detail?.status || body?.detail?.type || '';
+    const code = typeof providerCode === 'string'
+      ? providerCode.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 64)
+      : '';
     throw new ElevenLabsApiError(response.status, code);
   }
 
@@ -175,16 +170,14 @@ export async function generateNarrationAudio({ lesson, config, signal }) {
     throw new Error('The lesson content does not contain any narration segments.');
   }
 
-  const generated = [];
-  const chunks = [];
-  for (const segment of segments) {
-    const audio = await generateElevenLabsAudio({ text: segment.text, speaker: segment.speaker, config, signal });
-    const buffer = Buffer.from(await audio);
-    chunks.push(buffer);
-    generated.push({ speaker: segment.speaker, text: segment.text, audio: buffer });
-  }
-
-  return { segments: generated, count: generated.length, audioBuffer: Buffer.concat(chunks) };
+  const text = segments.map(({ text: line }) => line).join(' ');
+  const audio = await generateElevenLabsAudio({ text, speaker: 'storyteller', config, signal });
+  const audioBuffer = Buffer.from(await audio);
+  return {
+    segments: [{ speaker: 'storyteller', text, audio: audioBuffer }],
+    count: 1,
+    audioBuffer,
+  };
 }
 
 export async function generateAndUploadLessonAudio({ lesson, config, signal }) {
@@ -257,38 +250,16 @@ async function createAudioDramaAsset({ content, config, signal }) {
   if (!segments.length) throw new Error('The audio drama does not contain any narration segments.');
 
   const existingFull = await cloudinary().client.resourceInfo(fullPublicId, 'video');
-  const existingSegments = await Promise.all(segments.map((_, index) => (
-    cloudinary().client.resourceInfo(`${folder}/${publicId}-segment-${index + 1}`, 'video')
-  )));
-  if (existingFull?.secure_url && existingSegments.every((segment) => segment?.secure_url)) {
+  if (existingFull?.secure_url) {
     return {
       url: existingFull.secure_url,
-      segments: segments.map((segment, index) => ({
-        speaker: segment.speaker,
-        text: segment.text,
-        url: existingSegments[index].secure_url,
-      })),
       cached: true,
     };
   }
 
   const generated = await generateNarrationAudio({ lesson: { content }, config, signal });
-  if (!generated.audioBuffer.length || generated.segments.length !== segments.length) {
-    throw new Error('ElevenLabs returned incomplete audio drama segments.');
-  }
-
-  const uploadedSegments = [];
-  for (const [index, segment] of generated.segments.entries()) {
-    const result = await uploadBufferToCloudinary({
-      config,
-      buffer: segment.audio,
-      publicId: `${publicId}-segment-${index + 1}`,
-      folder,
-      resourceType: 'video',
-      format: 'mp3',
-    });
-    if (!result?.secure_url) throw new Error('Cloudinary did not return a secure audio drama segment URL.');
-    uploadedSegments.push({ speaker: segment.speaker, text: segment.text, url: result.secure_url });
+  if (!generated.audioBuffer.length || generated.count !== 1) {
+    throw new Error('ElevenLabs returned an incomplete story narration.');
   }
 
   const uploadedFull = await uploadBufferToCloudinary({
@@ -301,7 +272,7 @@ async function createAudioDramaAsset({ content, config, signal }) {
   });
   if (!uploadedFull?.secure_url) throw new Error('Cloudinary did not return a secure full audio drama URL.');
 
-  return { url: uploadedFull.secure_url, segments: uploadedSegments, cached: false };
+  return { url: uploadedFull.secure_url, cached: false };
 }
 
 export async function generateAndUploadAudioDrama({ content, config, signal }) {

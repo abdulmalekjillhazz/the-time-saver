@@ -12,7 +12,6 @@ import { evaluateAndAwardBadges } from './gamification.js';
 import { hasCompleteStoryScript } from './geminiLessons.js';
 import { createCuratedDailyLesson } from './dailyLessonFallback.js';
 import { generateAndUploadLessonAudio, getNarrationVoiceConfigVersion } from './elevenLabs.js';
-import { cloudinary } from './cloudinary.js';
 
 const NARRATION_PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -23,15 +22,13 @@ You are the lesson & quiz generator for Smart Routine, a daily planner & habit c
 Users are from Bangladesh and other South Asian countries.
 Users range from students to working professionals.
 Lessons teach habit formation, time management, mental health, and productivity.
-Lessons are read in Bengali or English; quizzes reinforce learning.
+All stories, vocabulary, and quizzes are English-only so learners can practise simple English.
 
 ## Your Role & The 80/20 Magnetic Storytelling Formula
-Generate ONE complete lesson + ONE quiz pair per day.
-The lesson is a 280-350 word humanized story told as realistic dialogue between three fictional family characters ([Rahim - Father], [Asha - Mother], [Rafi - Child]), framed by [Storyteller].
+Generate ONE complete English lesson + ONE English quiz pair per day.
+The lesson is a funny, 220-300 word humanized story told as realistic dialogue between three fictional family characters ([Rahim - Father], [Asha - Mother], [Rafi - Child]), framed by [Storyteller].
 1. **Magnetic First-Line Hook (Crucial):** The very first line must hook the reader immediately with suspense, curiosity, a relatable emotional conflict, a sudden problem, or a humorous surprise so the reader cannot stop reading until the end.
-2. **The 80/20 Language Rule (80% Basic Conversational + 20% Smart Advanced English):**
-   - **80% Simple & Short Everyday Conversation:** 80% of the dialogue must use short, natural, crystal-clear sentences (5 to 10 words per sentence) that even a basic beginner can understand and use in daily conversation immediately.
-   - **20% Smart Advanced English:** Naturally weave 20% richer, high-value vocabulary, idioms, or expressive phrases into the dialogue so learners upgrade their English in context. Always include these 20% advanced words in the vocabulary array with clear meanings.
+2. **Simple English:** Use short, natural sentences that a beginner can understand. Include gentle, situation-based humour and 5-8 useful English vocabulary words with simple English definitions.
 3. **Human Warmth & Realism:** Show real human emotions, gentle family banter, relatable South Asian daily struggles, and end with one practical 5-minute habit action. Never sound robotic or lecture-like.
 Quizzes are exactly 3 HARD multiple-choice questions testing inference, application, and character trade-offs.
 
@@ -58,13 +55,13 @@ Quizzes are exactly 3 HARD multiple-choice questions testing inference, applicat
   "slug": "kebab-case-title",
   "title": "Human-readable title (5-10 words)",
   "description": "1-2 sentence hook (under 100 chars)",
-  "content": "A 280-350 word humanized dialogue script with one tagged speaker per line (12-16 dialogue lines)",
+  "content": "A 220-300 word funny English dialogue script with one tagged speaker per line (12-16 dialogue lines)",
   "category": "sleep|focus|health|social|growth",
-  "locale": "en|bn",
+  "locale": "en",
   "storyType": "personal|science|myth|tool",
   "keyTakeaway": "One sentence: what should the reader do?",
   "vocabulary": [
-    { "term": "word", "definition": "short definition in the same language" }
+    { "term": "English word", "definition": "short English definition" }
   ]
 }
 
@@ -76,9 +73,9 @@ Quizzes are exactly 3 HARD multiple-choice questions testing inference, applicat
     - [Storyteller]: (storyteller voice; not a fourth family character)
 2. Every non-empty content line must start with exactly one speaker tag. The story must be 12-16 dialogue lines: start with a short storyteller introduction, alternate the three family characters through the story with real back-and-forth (reactions, questions, gentle disagreement), add a short storyteller transition or observation around the middle, and end with a storyteller closing line after the family's agreed action.
 3. Give the family a believable everyday problem connected to the selected theme. Let them react like real humans — show feelings, ask questions, disagree gently, laugh a little, and work out one small practical step together. The outcome must stay reasonable and achievable.
-4. Make the characters sound distinct and natural. Keep English dialogue simple and conversational. For Bengali, use clear, respectful Bengali while retaining the English speaker tags.
+4. Make the characters sound distinct and natural. Use simple English throughout; do not write Bengali story or quiz text.
 5. End with one small action they agree to try within five minutes.
-6. Always include 5-8 vocabulary entries: pick the hardest or most useful words from the story, each with a short definition in the same language, so readers can tap any word and learn its meaning.
+6. Always include 5-8 useful English vocabulary entries from the story, each with a short English definition.
 6. **Tone**:
    - Friendly, conversational, and encouraging without toxic positivity.
    - South Asian friendly: respect for family, elders, and practical constraints.
@@ -131,17 +128,12 @@ Create exactly 3 HARD questions, and base every answer only on the generated sto
    - 1-2 sentences, plain language.
 
 ## Language-Specific Rules
-### English Lessons
+### English Lessons only
 - Use Oxford spelling (colour, realise).
 - Inclusive language (they/them for singular they; avoid gendered assumptions).
 - Examples from UK, South Asia, North America (not US-only).
 
-### Bengali Lessons
-- Use formal address (আপনি), not casual.
-- Prioritize clarity over poetic language.
-- Use common Bengali words; avoid overly Arabic/Persian terms unless necessary.
-- Examples from Bangladeshi daily life (classroom, office, home, bazaar).
-- Translate technical terms clearly.
+Do not produce Bengali text in any field.
 
 ## Daily Output Format
 Return ONLY a JSON object (no markdown fences, no preamble):
@@ -214,6 +206,7 @@ export function parseAndValidateDailyLessonPayload(rawText) {
   if (
     payload.quiz.questions.length !== 3
     || !hasCompleteStoryScript(payload.lesson.content)
+    || /[\u0980-\u09ff]/.test(JSON.stringify(payload))
   ) {
     throw new AppError(502, 'UPSTREAM_UNAVAILABLE', {
       en: 'AI lesson must be a three-character story with a three-question quiz.',
@@ -260,9 +253,9 @@ function formatDailyLessonForLearner(lesson) {
   };
 }
 
-export async function generateDailyLesson({ date, locale = 'bn', config, force = false, context = '', strictAI = false }) {
+export async function generateDailyLesson({ date, config, force = false, context = '', strictAI = false }) {
   const dateStr = date || todayInZone('Asia/Dhaka');
-  const targetLocale = locale === 'en' ? 'en' : 'bn';
+  const targetLocale = 'en';
   let shouldUpsert = force;
   const existingForDate = await DailyLesson.findOne({ date: dateStr, locale: targetLocale });
 
@@ -291,8 +284,8 @@ Current day of week: ${dayOfWeek}
 Current season in Bangladesh: ${season}
 Selected theme: ${theme}
 Selected story type: ${storyType}
-Locale: ${targetLocale} (${targetLocale === 'bn' ? 'Bengali (বাংলা)' : 'English'})
-Style direction: HOOK the reader in line 1 with an irresistible curiosity/emotional situation so they stay glued till the end. Follow the 80/20 English rule strictly: 80% short, simple everyday conversational sentences for basic learners + 20% smart advanced English words/phrases explained in vocabulary. Make all three quiz questions challenging through inference, application, or character-choice analysis.
+Locale: English only, regardless of the user's app language.
+Style direction: Write a funny, engaging story in simple everyday English. Use a curious or funny hook in line 1. Keep sentences short and beginner-friendly. Include 5-8 useful English vocabulary entries with simple English definitions. Make all three quiz questions challenging through inference, application, or character-choice analysis. Do not include Bengali text anywhere.
 Recent lesson slugs to avoid (last 90 days): ${recentSlugs.slice(0, 30).join(', ') || '(none)'}
 
 ${context.trim() ? `Admin-provided story direction (follow where compatible with the safety and format rules): ${context.trim()}` : 'No extra context was provided.'}
@@ -517,9 +510,9 @@ export async function generateAdminDailyLessonAudio(id, config) {
   }
 }
 
-export async function getTodayDailyLesson({ date, locale = 'bn' }) {
+export async function getTodayDailyLesson({ date }) {
   const targetDate = date || todayInZone('Asia/Dhaka');
-  const targetLocale = locale === 'en' ? 'en' : 'bn';
+  const targetLocale = 'en';
 
   let dailyLesson = await DailyLesson.findOne({ date: targetDate, locale: targetLocale }).lean();
   if (!dailyLesson) {
@@ -544,8 +537,8 @@ export async function getTodayDailyLesson({ date, locale = 'bn' }) {
   };
 }
 
-export async function getLatestDailyQuiz({ locale = 'bn' }) {
-  const targetLocale = locale === 'en' ? 'en' : 'bn';
+export async function getLatestDailyQuiz() {
+  const targetLocale = 'en';
   const latestLesson = await DailyLesson.findOne({ locale: targetLocale }).sort({ date: -1 }).lean();
   if (!latestLesson) {
     return {

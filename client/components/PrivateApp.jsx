@@ -12,6 +12,16 @@ import { getRoutineMood } from '../lib/routineMood.js';
 import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
 import { syncAlarmCreate, syncAlarmDelete, syncAlarmUpdate, reportAlarmFired, fetchServerAlarms, fetchMissedAlarms, acknowledgeAlarm } from '../lib/alarmsSync.js';
 import { ensureAlarmPushSubscription } from '../lib/pushClient.js';
+import {
+  addNativeAlarmListener,
+  cancelNativeAlarm,
+  getNativeAlarmPermissions,
+  getNativeAlarmStates,
+  isAndroidNativeApp,
+  requestNativeAlarmPermissions,
+  scheduleNativeAlarm,
+  stopNativeAlarm,
+} from '../lib/nativeAlarm.js';
 import { getFocusRoutines } from '../lib/routineFocus.js';
 import { AiBadge } from './ui/AiBadge.jsx';
 import { Button } from './ui/Button.jsx';
@@ -91,9 +101,10 @@ const COPY = {
     alarmRinging: 'Your alarm is ringing', stopAlarm: 'Stop alarm', removeAlarm: 'Remove alarm',
     snoozeAlarm: 'Snooze 5 min',
     stopwatch: 'Stopwatch', startTimer: 'Start', pauseTimer: 'Pause', resetTimer: 'Reset',
-    voiceAlarmNote: 'When an alarm rings, your Google voice speaks the alarm name and your next routine, and a notification is sent with the same message. Alarms ring while this app is open.', alarmVoiceUnavailable: 'The voice alarm could not play in this browser. The notification was still sent.',
+    voiceAlarmNote: 'When an alarm rings, your Google voice speaks the alarm name and your next routine, and a notification is sent with the same message. Alarms ring while this app is open.', nativeAlarmNote: 'Android uses your phone ringtone and keeps the alarm ringing when Smart Routine is closed. Allow the Android alarm permissions below.', alarmVoiceUnavailable: 'The voice alarm could not play in this browser. The notification was still sent.',
     alarmPushOn: 'Closed-app alerts are on for this device — alarms ring even with the app closed.', alarmPushOff: 'Turn on closed-app alerts so alarms ring even with the app closed.',
     enableClosedAppAlerts: '🔔 Enable closed-app alerts', pushUnavailable: 'Closed-app alerts are unavailable in this browser.',
+    enableNativeAlarm: '📞 Enable Android call-style alarms', nativeAlarmEnabled: 'Android alarms can ring when Smart Routine is closed.', nativeAlarmPermissionMissing: 'Allow notifications, exact alarms, and full-screen alarms in Android settings, then tap enable again.',
     missedAlarms: 'Missed alarms', acknowledgeAlarm: 'Got it', alarmSnoozed: 'Snoozed for 5 minutes.',
     alarmPermissionDenied: 'Browser notifications are blocked. The in-app alarm will still ring while this page is open.',
     focus: 'Focus', setFor: 'Scheduled for', alarmInvalid: 'Choose a future time for this alarm.', alarmDone: 'Rang',
@@ -158,9 +169,10 @@ const COPY = {
     alarmRinging: 'অ্যালার্ম বাজছে', stopAlarm: 'অ্যালার্ম বন্ধ করুন', removeAlarm: 'অ্যালার্ম সরান',
     snoozeAlarm: '৫ মিনিট স্নুজ',
     stopwatch: 'স্টপওয়াচ', startTimer: 'শুরু', pauseTimer: 'থামান', resetTimer: 'রিসেট',
-    voiceAlarmNote: 'অ্যালার্ম বাজলে Google ভয়েসে অ্যালার্মের নাম ও পরের রুটিন শোনা যাবে, আর একই বার্তায় নোটিফিকেশন আসবে। অ্যাপ খোলা থাকলে অ্যালার্ম বাজবে।', alarmVoiceUnavailable: 'এই browser-এ ভয়েস অ্যালার্ম চালানো যায়নি। নোটিফিকেশন পাঠানো হয়েছে।',
+    voiceAlarmNote: 'অ্যালার্ম বাজলে Google ভয়েসে অ্যালার্মের নাম ও পরের রুটিন শোনা যাবে, আর একই বার্তায় নোটিফিকেশন আসবে। অ্যাপ খোলা থাকলে অ্যালার্ম বাজবে।', nativeAlarmNote: 'Android আপনার ফোনের ringtone ব্যবহার করবে এবং Smart Routine বন্ধ থাকলেও অ্যালার্ম বাজতে থাকবে। নিচের Android alarm অনুমতিগুলো দিন।', alarmVoiceUnavailable: 'এই browser-এ ভয়েস অ্যালার্ম চালানো যায়নি। নোটিফিকেশন পাঠানো হয়েছে।',
     alarmPushOn: 'এই ডিভাইসে বন্ধ-অ্যাপ অ্যালার্ট চালু আছে — অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।', alarmPushOff: 'বন্ধ-অ্যাপ অ্যালার্ট চালু করুন, তাহলে অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।',
     enableClosedAppAlerts: '🔔 বন্ধ-অ্যাপ অ্যালার্ট চালু করুন', pushUnavailable: 'এই browser-এ বন্ধ-অ্যাপ অ্যালার্ট সমর্থিত নয়।',
+    enableNativeAlarm: '📞 Android কলের মতো অ্যালার্ম চালু করুন', nativeAlarmEnabled: 'Smart Routine বন্ধ থাকলেও Android অ্যালার্ম বাজতে পারবে।', nativeAlarmPermissionMissing: 'Android সেটিংসে notification, exact alarm ও full-screen alarm অনুমতি দিন, তারপর আবার চালু করুন।',
     missedAlarms: 'মিস হওয়া অ্যালার্ম', acknowledgeAlarm: 'বুঝেছি', alarmSnoozed: '৫ মিনিটের জন্য স্নুজ করা হয়েছে।',
     alarmPermissionDenied: 'ব্রাউজার নোটিফিকেশন বন্ধ আছে। পেজ খোলা থাকলে অ্যাপের ভেতর অ্যালার্ম বাজবে।',
     focus: 'ফোকাস', setFor: 'নির্ধারিত সময়', alarmInvalid: 'অ্যালার্মের জন্য ভবিষ্যতের সময় বেছে নিন।', alarmDone: 'বেজেছে',
@@ -405,6 +417,7 @@ export function PrivateApp() {
   const [dailyLesson, setDailyLesson] = useState(null);
   const [dailyQuiz, setDailyQuiz] = useState(null);
   const [lesson, setLesson] = useState(null);
+  const lessonFocusTargetRef = useRef('story');
   const [model, setModel] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [quizResult, setQuizResult] = useState(null);
@@ -425,6 +438,7 @@ export function PrivateApp() {
   const addAlarm = useAppStore((state) => state.addAlarm);
   const removeAlarm = useAppStore((state) => state.removeAlarm);
   const snoozeAlarm = useAppStore((state) => state.snoozeAlarm);
+  const markAlarmFired = useAppStore((state) => state.markAlarmFired);
   const stopwatchElapsedMs = useAppStore((state) => state.stopwatchElapsedMs);
   const stopwatchStartedAt = useAppStore((state) => state.stopwatchStartedAt);
   const startStopwatch = useAppStore((state) => state.startStopwatch);
@@ -448,6 +462,7 @@ export function PrivateApp() {
   const catchupSpokenRef = useRef(false);
   const snoozeLinkHandledRef = useRef(false);
   const copy = COPY[lang];
+  const nativeAndroid = isAndroidNativeApp();
 
   const reportError = useCallback((err) => {
     setError(messageFrom(err, lang));
@@ -485,7 +500,7 @@ export function PrivateApp() {
   const loadLessons = useCallback(async () => {
     const [publishedResult, dailyResult] = await Promise.allSettled([
       request('/api/lessons'),
-      request(`/api/lessons/today?locale=${encodeURIComponent(lang)}`),
+      request('/api/lessons/today?locale=en'),
     ]);
     if (publishedResult.status === 'fulfilled') {
       setLessons(publishedResult.value.lessons);
@@ -500,7 +515,7 @@ export function PrivateApp() {
       setDailyQuiz(null);
       reportError(dailyResult.reason);
     }
-  }, [lang, reportError]);
+  }, [reportError]);
 
   useEffect(() => {
     let active = true;
@@ -773,6 +788,69 @@ export function PrivateApp() {
   }, []);
 
   useEffect(() => {
+    if (!nativeAndroid) return undefined;
+    let active = true;
+    let nativeListener = null;
+    const syncNativeAlarmState = async () => {
+      const result = await getNativeAlarmStates();
+      if (!active) return;
+      for (const nativeAlarm of result.alarms || []) {
+        const localAlarm = useAppStore.getState().alarms.find((alarm) => alarm.id === nativeAlarm.id);
+        if (!localAlarm) continue;
+        if (nativeAlarm.firedAt && !localAlarm.firedAt) {
+          markAlarmFired(nativeAlarm.id);
+          void reportAlarmFired(user, nativeAlarm.id);
+        } else if (!nativeAlarm.firedAt && localAlarm.firedAt && nativeAlarm.at > Date.now()) {
+          snoozeAlarm(nativeAlarm.id, nativeAlarm.at);
+        }
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void syncNativeAlarmState().catch(reportError);
+    };
+    void syncNativeAlarmState().catch(reportError);
+    document.addEventListener('visibilitychange', onVisible);
+    addNativeAlarmListener(({ id }) => {
+      if (!id) return;
+      const localAlarm = useAppStore.getState().alarms.find((alarm) => alarm.id === id);
+      if (localAlarm && !localAlarm.firedAt) markAlarmFired(id);
+      void reportAlarmFired(user, id);
+    }).then((listener) => {
+      if (!active) listener?.remove();
+      else nativeListener = listener;
+    }).catch(reportError);
+    return () => {
+      active = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      nativeListener?.remove();
+    };
+  }, [nativeAndroid, user, markAlarmFired, snoozeAlarm, reportError]);
+
+  useEffect(() => {
+    if (!nativeAndroid) return undefined;
+    let active = true;
+    const syncPermissionsAndAlarms = async () => {
+      const permissions = await getNativeAlarmPermissions();
+      if (!active) return;
+      const enabled = Boolean(permissions?.notifications && permissions?.exactAlarms && permissions?.fullScreenIntent);
+      setPushAlarmReady(enabled);
+      if (!enabled) return;
+      const pendingAlarms = alarms.filter((alarm) => !alarm.firedAt && alarm.at > Date.now());
+      await Promise.all(pendingAlarms.map((alarm) => scheduleNativeAlarm(alarm)));
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void syncPermissionsAndAlarms().catch(reportError);
+    };
+    void syncPermissionsAndAlarms().catch(reportError);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      active = false;
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [nativeAndroid, alarms, pushAlarmReady, reportError]);
+
+  useEffect(() => {
+    if (nativeAndroid) return undefined;
     const timer = window.setInterval(() => {
       const now = Date.now();
       const due = useAppStore.getState().alarms.filter((alarm) => !alarm.firedAt && alarm.at <= now);
@@ -821,7 +899,7 @@ export function PrivateApp() {
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [lang, routines, user, copy.alarmRinging, copy.alarmVoiceUnavailable, reportError]);
+  }, [lang, routines, user, copy.alarmRinging, copy.alarmVoiceUnavailable, reportError, nativeAndroid]);
 
   useEffect(() => () => {
     alarmSpeechRef.current?.stop();
@@ -895,7 +973,7 @@ export function PrivateApp() {
       setError(copy.alarmInvalid);
       return;
     }
-    if ('Notification' in window && Notification.permission === 'default') {
+    if (!nativeAndroid && 'Notification' in window && Notification.permission === 'default') {
       try {
         await Notification.requestPermission();
       } catch (err) {
@@ -903,13 +981,26 @@ export function PrivateApp() {
       }
     }
     const created = { id: crypto.randomUUID(), at, label: alarmName.trim(), firedAt: null };
+    if (nativeAndroid) {
+      try {
+        const permissions = await getNativeAlarmPermissions();
+        if (!permissions?.notifications || !permissions?.exactAlarms || !permissions?.fullScreenIntent) {
+          setError(copy.nativeAlarmPermissionMissing);
+          return;
+        }
+        await scheduleNativeAlarm(created);
+      } catch (err) {
+        reportError(err);
+        return;
+      }
+    }
     addAlarm(created);
     setAlarmName('');
     setAlarmTime('');
     setNotice(copy.addAlarm);
     setError('');
     // Mirror to the server (logged in only) so push/Telegram reach a closed app.
-    if (user && 'Notification' in window && Notification.permission === 'granted') {
+    if (!nativeAndroid && user && 'Notification' in window && Notification.permission === 'granted') {
       void ensureAlarmPushSubscription()
         .then(() => setPushAlarmReady(true))
         .catch(() => {});
@@ -923,6 +1014,17 @@ export function PrivateApp() {
     setError('');
     setNotice('');
     try {
+      if (nativeAndroid) {
+        const permissions = await requestNativeAlarmPermissions();
+        if (!permissions?.notifications || !permissions?.exactAlarms || !permissions?.fullScreenIntent) {
+          setPushAlarmReady(false);
+          setError(copy.nativeAlarmPermissionMissing);
+          return;
+        }
+        setPushAlarmReady(true);
+        setNotice(copy.nativeAlarmEnabled);
+        return;
+      }
       if (!user) throw new Error(copy.useAccount);
       if (!('Notification' in window)) throw new Error(copy.browserNotificationsUnsupported);
       const permission = Notification.permission === 'granted'
@@ -932,9 +1034,7 @@ export function PrivateApp() {
       if (permission !== 'granted') {
         throw new Error(lang === 'bn' ? '❌ ব্যর্থ হয়েছে! ব্রাউজার সেটিংস থেকে Notification Allow (অনুমতি) দিন।' : '❌ Failed! Please allow notifications in browser settings.');
       }
-      try {
-        await ensureAlarmPushSubscription();
-      } catch {}
+      await ensureAlarmPushSubscription();
       setPushAlarmReady(true);
       const successMsg = lang === 'bn'
         ? '✅ সফল হয়েছে! আপনার অ্যালার্ম ও নোটিফিকেশন বেল চালু হয়েছে।'
@@ -1030,6 +1130,7 @@ export function PrivateApp() {
   }
 
   function dismissAlarm() {
+    if (nativeAndroid && firingAlarm) void stopNativeAlarm(firingAlarm.id).catch(reportError);
     alarmSpeechRef.current?.stop();
     alarmSpeechRef.current = null;
     if (alarmSpeechTimer.current) window.clearInterval(alarmSpeechTimer.current);
@@ -1041,6 +1142,10 @@ export function PrivateApp() {
   function snoozeOneAlarm(id) {
     const at = Date.now() + 5 * 60 * 1000;
     snoozeAlarm(id, at);
+    if (nativeAndroid) {
+      const alarm = useAppStore.getState().alarms.find((row) => row.id === id);
+      if (alarm) void scheduleNativeAlarm({ ...alarm, at }).catch(reportError);
+    }
     void syncAlarmUpdate(user, id, { at });
     setNotice(copy.alarmSnoozed);
     setError('');
@@ -1049,6 +1154,7 @@ export function PrivateApp() {
   function deleteAlarm(id) {
     removeAlarm(id);
     setMissedAlarms((rows) => rows.filter((alarm) => alarm.id !== id));
+    if (nativeAndroid) void cancelNativeAlarm(id).catch(reportError);
     void syncAlarmDelete(user, id);
   }
 
@@ -1248,11 +1354,12 @@ export function PrivateApp() {
     }
   }
 
-  async function loadLesson(slug) {
+  async function loadLesson(slug, focusTarget = 'story') {
     setBusy(true);
     setError('');
     try {
       const result = await request(`/api/lessons/${encodeURIComponent(slug)}`);
+      lessonFocusTargetRef.current = focusTarget;
       setLesson(result.lesson);
       setAnswers([]);
       setQuizResult(null);
@@ -1262,6 +1369,14 @@ export function PrivateApp() {
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!lesson) return;
+    const targetId = lessonFocusTargetRef.current === 'quiz'
+      ? 'published-lesson-quiz'
+      : 'published-lesson-story';
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [lesson]);
 
   async function submitQuiz() {
     if (!lesson || answers.length !== lesson.quiz.length) return;
@@ -1801,16 +1916,16 @@ export function PrivateApp() {
                   <Button type="submit" className="min-h-[52px] w-full text-lg"><span aria-hidden="true">⏰</span><span className="ml-2">{copy.addAlarm}</span></Button>
                 </div>
               </form>
-              <p className="text-sm opacity-75">{copy.voiceAlarmNote}</p>
+              <p className="text-sm opacity-75">{nativeAndroid ? copy.nativeAlarmNote : copy.voiceAlarmNote}</p>
               <div className="flex flex-col gap-2">
-                {pushAlarmReady || browserNotificationPermission === 'granted' ? (
-                  <p role="status" className="text-sm font-semibold text-sapphire">🔔 {pushAlarmReady ? copy.alarmPushOn : copy.browserNotificationsOn}</p>
+                {pushAlarmReady || (!nativeAndroid && browserNotificationPermission === 'granted') ? (
+                  <p role="status" className="text-sm font-semibold text-sapphire">🔔 {nativeAndroid ? copy.nativeAlarmEnabled : pushAlarmReady ? copy.alarmPushOn : copy.browserNotificationsOn}</p>
                 ) : (
                   <Button type="button" onClick={enableClosedAppAlerts} className="min-h-[52px] w-full text-lg">
-                    {copy.enableClosedAppAlerts}
+                    {nativeAndroid ? copy.enableNativeAlarm : copy.enableClosedAppAlerts}
                   </Button>
                 )}
-                {!pushAlarmReady && browserNotificationPermission === 'granted' ? (
+                {!nativeAndroid && !pushAlarmReady && browserNotificationPermission === 'granted' ? (
                   <>
                     <p className="text-sm opacity-75">{copy.alarmPushOff}</p>
                     <Button type="button" variant="secondary" onClick={enableClosedAppAlerts} className="min-h-[48px]">
@@ -1818,10 +1933,10 @@ export function PrivateApp() {
                     </Button>
                   </>
                 ) : null}
-                {browserNotificationPermission === 'denied' ? <p role="alert" className="text-sm text-gold">{copy.browserNotificationsBlocked}</p> : null}
-                {browserNotificationPermission === 'unsupported' ? <p role="status" className="text-sm">{copy.browserNotificationsUnsupported}</p> : null}
+                {!nativeAndroid && browserNotificationPermission === 'denied' ? <p role="alert" className="text-sm text-gold">{copy.browserNotificationsBlocked}</p> : null}
+                {!nativeAndroid && browserNotificationPermission === 'unsupported' ? <p role="status" className="text-sm">{copy.browserNotificationsUnsupported}</p> : null}
               </div>
-              {typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'denied' ? <p role="status" className="text-sm text-gold">{copy.alarmPermissionDenied}</p> : null}
+              {!nativeAndroid && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'denied' ? <p role="status" className="text-sm text-gold">{copy.alarmPermissionDenied}</p> : null}
               {missedAlarms.length ? (
                 <div className="rounded-xl border border-gold/50 bg-gold/10 p-3" role="status">
                   <p className="font-bold">🔔 {copy.missedAlarms} ({missedAlarms.length})</p>
@@ -1873,7 +1988,7 @@ export function PrivateApp() {
                           variant="primary"
                           className="flex min-h-[42px] w-full items-center justify-center text-xs font-bold"
                           disabled={busy}
-                          onClick={() => loadLesson(item.slug)}
+                          onClick={() => loadLesson(item.slug, 'story')}
                         >
                           📖 {copy.read}
                         </Button>
@@ -1881,7 +1996,7 @@ export function PrivateApp() {
                           variant="secondary"
                           className="flex min-h-[42px] w-full items-center justify-center text-xs font-bold"
                           disabled={busy}
-                          onClick={() => loadLesson(item.slug)}
+                          onClick={() => loadLesson(item.slug, 'quiz')}
                         >
                           🧩 {copy.quiz}
                         </Button>
@@ -1890,34 +2005,34 @@ export function PrivateApp() {
                   ))}
                 </div>
               </Card>
-              <Card className="surface-card space-y-4 p-4 sm:p-6">
+              <Card id="published-lesson-story" className="surface-card scroll-mt-6 space-y-4 p-4 sm:p-6">
                 {!lesson ? <p>{copy.chooseLesson}</p> : (
                   <>
                     <div className="rounded-xl border-2 border-gold/40 bg-paper p-4">
                       <p className="text-xs font-bold uppercase tracking-wider text-gold-soft">
                         📖 {lang === 'bn' ? 'নির্বাচিত গল্প ও কুইজ' : 'Selected Story & Quiz'}
                       </p>
-                      <h2 className="mt-1 text-xl font-extrabold text-ink sm:text-2xl">{localized(lesson.title, lang)}</h2>
+                      <h2 className="mt-1 text-xl font-extrabold text-ink sm:text-2xl">{localized(lesson.title, 'en')}</h2>
                     </div>
                     <AudioDramaPlayer
-                      title={localized(lesson.title, lang)}
-                      content={localized(lesson.body, lang)}
+                      title={localized(lesson.title, 'en')}
+                      content={localized(lesson.body, 'en')}
                       vocabulary={lesson.vocabulary || []}
                       lang={lang}
                     />
                     {lesson.quiz?.length ? (
-                      <div className="space-y-4">
+                      <div id="published-lesson-quiz" className="scroll-mt-6 space-y-4">
                         <h3 className="text-xl font-semibold">{copy.quiz}</h3>
                         {lesson.quiz.map((question, index) => (
                           <fieldset key={`${lesson.id}-${index}`} className="space-y-2">
-                            <legend>{localized(question.question, lang)}</legend>
+                            <legend>{localized(question.question, 'en')}</legend>
                             {question.options.map((option, optionIndex) => (
                               <label key={optionIndex} className="block">
                                 <input type="radio" name={`question-${index}`} checked={answers[index] === optionIndex} onChange={() => setAnswers((previous) => {
                                   const next = [...previous];
                                   next[index] = optionIndex;
                                   return next;
-                                })} />{' '}{localized(option, lang)}
+                                })} />{' '}{localized(option, 'en')}
                               </label>
                             ))}
                           </fieldset>

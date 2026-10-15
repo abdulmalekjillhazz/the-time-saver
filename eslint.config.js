@@ -4,7 +4,7 @@ import globals from 'globals';
 // Flat config (ESLint 9). Lints the server, the client's JavaScript, and shared code.
 export default [
   {
-    ignores: ['**/node_modules/**', '**/.next/**', '**/.next-dev/**', '**/dist/**', '**/coverage/**', 'ml/**', 'docs/**'],
+    ignores: ['**/node_modules/**', '**/.next/**', '**/.next-dev/**', '**/dist/**', '**/coverage/**', '**/assets/public/**', 'ml/**', 'docs/**'],
   },
   js.configs.recommended,
   {

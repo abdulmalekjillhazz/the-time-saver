@@ -17,19 +17,14 @@ if (!config.GEMINI_API_KEY && !config.GROQ_API_KEY) {
 }
 
 await mongoose.connect(mongoUri);
-console.log('Connected to MongoDB. Generating 2 daily lessons (Bangla & English)...');
+console.log('Connected to MongoDB. Generating one English daily lesson...');
 
 const today = new Date().toISOString().slice(0, 10);
 
 try {
-  console.log(`\n1. Generating Bengali Lesson for ${today}...`);
-  const bn = await generateDailyLesson({ date: today, locale: 'bn', config, force: true });
-  console.log(`✅ Bangla Created: "${bn.dailyLesson.title}" (slug: ${bn.dailyLesson.slug})`);
-
-  console.log(`\n2. Generating English Lesson for ${today}...`);
-  console.log(`✅ English Created: "${en.dailyLesson.title}" (slug: ${en.dailyLesson.slug})`);
-
-  console.log('\nP🎉 Successfully created both stories and saved to database!');
+  const result = await generateDailyLesson({ date: today, locale: 'en', config, force: true });
+  console.log(`✅ English lesson created: "${result.dailyLesson.title}" (slug: ${result.dailyLesson.slug})`);
+  console.log('\n🎉 Successfully created one English story and saved it to the database!');
 } catch (err) {
   console.error('Generation failed:', err.message);
 } finally {

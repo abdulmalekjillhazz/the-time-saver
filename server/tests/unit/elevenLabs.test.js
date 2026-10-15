@@ -10,6 +10,7 @@ import {
   generateAndUploadLessonAudio,
   generateAndUploadAudioDrama,
   generateElevenLabsAudio,
+  generateNarrationAudio,
   parseNarrationSegments,
   resolveNarrationVoice,
 } from '../../src/services/elevenLabs.js';
@@ -139,7 +140,7 @@ describe('Daily lesson narration', () => {
     expect(hasCompleteStoryScript(complete.replace('[Storyteller]: মাঝের কথা।\n', ''))).toBe(false);
   });
 
-  it('uploads generated narration once and returns the Cloudinary URL', async () => {
+  it('generates a whole lesson narration with one ElevenLabs request', async () => {
     const uploadBuffer = vi.fn(async ({ buffer, publicId }) => ({
       secure_url: 'https://media.example/family-story.mp3',
       public_id: `smart-routine/daily-lessons/${publicId}`,
@@ -168,9 +169,9 @@ describe('Daily lesson narration', () => {
       url: 'https://media.example/family-story.mp3',
       publicId: expect.stringMatching(/^smart-routine\/daily-lessons\/family-focus-[a-f0-9]{20}$/),
     });
-    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch).toHaveBeenCalledOnce();
     expect(uploadBuffer).toHaveBeenCalledTimes(1);
-    expect(uploadBuffer.mock.calls[0][0].buffer).toEqual(Buffer.from([1, 2, 3, 1, 2, 3, 1, 2, 3]));
+    expect(uploadBuffer.mock.calls[0][0].buffer).toEqual(Buffer.from([1, 2, 3]));
   });
 
   it('reuses an existing Cloudinary asset without calling ElevenLabs again', async () => {
@@ -202,7 +203,7 @@ describe('Daily lesson narration', () => {
     expect(providerRequest).not.toHaveBeenCalled();
   });
 
-  it('generates, saves, and reuses a full audio drama and its playable segments', async () => {
+  it('generates, saves, and reuses one Cloudinary audio file per story', async () => {
     configureCloudinary(config);
     const assets = new Map();
     const uploadBuffer = vi.fn(async ({ buffer, publicId, folder }) => {
@@ -218,11 +219,11 @@ describe('Daily lesson narration', () => {
     }));
     vi.stubGlobal('fetch', providerRequest);
     const content = [
-      '[Storyteller]: গল্প শুরু।',
-      '[Father]: বাবা বলল।',
-      '[Storyteller]: এরপর তারা কথা বলল।',
-      '[Mother]: মা বলল।',
-      '[Storyteller]: গল্প শেষ।',
+      '[Storyteller]: The story begins.',
+      '[Father]: Dad lost his tiny shoe.',
+      '[Storyteller]: They checked the kitchen.',
+      '[Mother]: Mum found it inside a lunchbox.',
+      '[Storyteller]: Everyone laughed and made a plan.',
     ].join('\n');
 
     const first = await generateAndUploadAudioDrama({ content, config });
@@ -230,23 +231,35 @@ describe('Daily lesson narration', () => {
     expect(first).toMatchObject({
       url: expect.stringMatching(/^https:\/\/media\.example\/drama-[a-f0-9]{24}\.mp3$/),
       cached: false,
-      segments: [
-        { speaker: 'storyteller', text: 'গল্প শুরু।' },
-        { speaker: 'father', text: 'বাবা বলল।' },
-        { speaker: 'storyteller', text: 'এরপর তারা কথা বলল।' },
-        { speaker: 'mother', text: 'মা বলল।' },
-        { speaker: 'storyteller', text: 'গল্প শেষ।' },
-      ],
     });
-    expect(first.segments.every(({ url }) => url.startsWith('https://media.example/'))).toBe(true);
-    expect(providerRequest).toHaveBeenCalledTimes(5);
-    expect(uploadBuffer).toHaveBeenCalledTimes(6);
+    expect(providerRequest).toHaveBeenCalledOnce();
+    expect(uploadBuffer).toHaveBeenCalledOnce();
 
     const second = await generateAndUploadAudioDrama({ content, config });
 
-    expect(second).toMatchObject({ url: first.url, cached: true, segments: first.segments });
-    expect(providerRequest).toHaveBeenCalledTimes(5);
-    expect(uploadBuffer).toHaveBeenCalledTimes(6);
+    expect(second).toMatchObject({ url: first.url, cached: true });
+    expect(providerRequest).toHaveBeenCalledOnce();
+    expect(uploadBuffer).toHaveBeenCalledOnce();
+  });
+
+  it('sends the complete story to ElevenLabs in one call', async () => {
+    const providerRequest = vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => Uint8Array.from([4, 5, 6]).buffer,
+    }));
+    vi.stubGlobal('fetch', providerRequest);
+
+    const result = await generateNarrationAudio({
+      lesson: { content: '[Father]: First sentence.\n[Mother]: Second sentence.' },
+      config,
+    });
+
+    expect(providerRequest).toHaveBeenCalledOnce();
+    const spokenStory = JSON.parse(providerRequest.mock.calls[0][1].body).text;
+    expect(spokenStory).toContain('First sentence.');
+    expect(spokenStory).toContain('Second sentence.');
+    expect(spokenStory.indexOf('First sentence.')).toBeLessThan(spokenStory.indexOf('Second sentence.'));
+    expect(result.audioBuffer).toEqual(Buffer.from([4, 5, 6]));
   });
 
 });

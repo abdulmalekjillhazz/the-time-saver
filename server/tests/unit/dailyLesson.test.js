@@ -219,6 +219,15 @@ describe('Daily Lesson: pure utilities and validation', () => {
       expect(parsed.quiz.questions).toHaveLength(3);
     });
 
+    it('rejects Bengali story or quiz text so daily output stays English-only', () => {
+      const invalid = JSON.parse(validJson);
+      invalid.lesson.content = invalid.lesson.content.replace(
+        '[Storyteller]: The family wants a calmer morning.',
+        '[Storyteller]: The family wants a calmer morning গল্প.',
+      );
+      expect(() => parseAndValidateDailyLessonPayload(JSON.stringify(invalid))).toThrow();
+    });
+
     it('strips markdown code fences', () => {
       const wrapped = `\`\`\`json\n${validJson}\n\`\`\``;
       const parsed = parseAndValidateDailyLessonPayload(wrapped);

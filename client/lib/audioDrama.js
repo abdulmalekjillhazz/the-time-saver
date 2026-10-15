@@ -126,21 +126,19 @@ export function narrationSpeakerForRole(role) {
   })[role] || 'storyteller';
 }
 
+const savedStoryAudioCache = new Map();
+
 async function createSavedAudioDrama(lines, signal, lang) {
+  const content = `[Storyteller]: ${lines.map((line) => line.text).join(' ')}`;
+  const cached = savedStoryAudioCache.get(content);
+  if (cached) return cached;
+
   const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin', signal });
   const csrfBody = await csrfResponse.json().catch(() => ({}));
   if (!csrfResponse.ok || typeof csrfBody.csrfToken !== 'string') {
     throw new Error(lang === 'bn' ? 'নিরাপত্তা যাচাই করা যায়নি। আবার চেষ্টা করুন।' : 'Could not establish a security token.');
   }
 
-  const speakerNames = {
-    male: 'Father',
-    female: 'Mother',
-    child: 'Son',
-    storyteller: 'Storyteller',
-    narrator: 'Storyteller',
-  };
-  const content = lines.map((line) => `[${speakerNames[line.role] || 'Storyteller'}]: ${line.text}`).join('\n');
   const response = await fetch('/api/speech/audio-drama', {
     method: 'POST',
     credentials: 'same-origin',
@@ -162,11 +160,10 @@ async function createSavedAudioDrama(lines, signal, lang) {
   }
 
   const result = await response.json();
-  if (typeof result.audioUrl !== 'string' || !Array.isArray(result.segments)
-      || result.segments.length !== lines.length
-      || result.segments.some((segment) => typeof segment.url !== 'string')) {
+  if (typeof result.audioUrl !== 'string' || !result.audioUrl.startsWith('https://')) {
     throw new Error(lang === 'bn' ? 'সংরক্ষিত অডিওর তথ্য সঠিক নয়।' : 'The saved audio response was invalid.');
   }
+  savedStoryAudioCache.set(content, result);
   return result;
 }
 
@@ -179,7 +176,6 @@ function createCloudinaryAudio(url) {
 export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   lang = 'bn',
   volume = 1,
-  spatial = true,
   onError = () => {},
   onNotice = () => {},
 } = {}) {
@@ -187,16 +183,10 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   let isPlaying = false;
   let isPaused = false;
   let currentAudio = null;
-  let currentObjectUrl = null;
-  let currentAudioSource = null;
   let requestAbortController = null;
   let savedAudioDramaPromise = null;
-  let audioContext = null;
-  let audioSource = null;
-  let panner = null;
   let runId = 0;
   let currentVolume = Math.max(0, Math.min(1, volume));
-  let spatialEnabled = spatial;
 
   const emitProgress = (fraction = 0) => {
     const line = lines[index];
@@ -206,14 +196,16 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       fraction,
       percent: ((index + fraction) / lines.length) * 100,
       line,
-      source: currentAudio ? currentAudioSource : 'native',
-      spatialAvailable: Boolean(currentAudio && spatialEnabled && panner),
+      source: currentAudio ? 'cloudinary' : null,
+      spatialAvailable: false,
     });
   };
 
   const cleanupAudio = () => {
     requestAbortController?.abort();
     requestAbortController = null;
+    const cacheKey = `[Storyteller]: ${lines.map((line) => line.text).join(' ')}`;
+    if (!savedStoryAudioCache.has(cacheKey)) savedAudioDramaPromise = null;
     if (currentAudio) {
       currentAudio.onended = null;
       currentAudio.onerror = null;
@@ -222,29 +214,13 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       currentAudio.removeAttribute('src');
       currentAudio.load();
     }
-    if (audioSource) {
-      try {
-        audioSource.disconnect();
-      } catch {
-        // The source may already have been disconnected by the browser.
-      }
-    }
     currentAudio = null;
-    currentAudioSource = null;
-    if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-    currentObjectUrl = null;
-    audioSource = null;
-    panner = null;
-  };
-
-  const stopCurrentLine = () => {
-    cleanupAudio();
   };
 
   const fail = (message) => {
     isPlaying = false;
     isPaused = false;
-    stopCurrentLine();
+    cleanupAudio();
     onError(lang === 'bn' && !/[\u0980-\u09FF]/.test(message)
       ? message === 'Audio could not resume.'
         ? 'অডিও আবার চালানো যায়নি।'
@@ -252,119 +228,12 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       : message);
   };
 
-  const finish = (id) => {
-    if (id !== runId || !isPlaying) return;
-    index += 1;
-    if (index >= lines.length) {
-      isPlaying = false;
-      isPaused = false;
-      cleanupAudio();
-      onProgress({ index: lines.length, fraction: 0, percent: 100, line: null, source: null, spatialAvailable: false });
-      onEnd();
-      return;
-    }
-    void speakCurrent(id);
-  };
-
-  const playRemoteLine = async (line, id, source, loadAudio) => {
-    let spatialFailed = source === 'cloudinary' && spatialEnabled;
-    const AudioContextType = typeof globalThis.window === 'undefined'
-      ? null
-      : (globalThis.window.AudioContext || globalThis.window.webkitAudioContext);
-    const useSpatialAudio = spatialEnabled && source !== 'cloudinary';
-
-    if (useSpatialAudio && AudioContextType) {
-      try {
-        audioContext ??= new AudioContextType();
-        await audioContext.resume();
-        if (id !== runId || !isPlaying) return false;
-      } catch {
-        spatialFailed = true;
-      }
-    }
-
-    requestAbortController = new AbortController();
-    let audioResult;
+  const playSavedStory = async (id, startAt = 0) => {
+    if (id !== runId || !isPlaying || !lines.length) return;
+    const abortController = new AbortController();
+    requestAbortController = abortController;
     try {
-      audioResult = await loadAudio(line.text, requestAbortController.signal);
-    } catch (error) {
-      if (id !== runId || error.name === 'AbortError') return false;
-      fail(error.message || (lang === 'bn'
-        ? 'ElevenLabs-এর অডিও Cloudinary-তে তৈরি বা সংরক্ষণ করা যায়নি।'
-        : 'ElevenLabs audio could not be generated or saved to Cloudinary.'));
-      return false;
-    } finally {
-      requestAbortController = null;
-    }
-    if (id !== runId || !isPlaying) {
-      URL.revokeObjectURL(audioResult.objectUrl);
-      return false;
-    }
-    currentAudio = audioResult.audio;
-    currentObjectUrl = audioResult.objectUrl;
-    currentAudioSource = source;
-    currentAudio.volume = currentVolume;
-    if (useSpatialAudio && audioContext && !spatialFailed) {
-      try {
-        audioSource = audioContext.createMediaElementSource(currentAudio);
-        panner = audioContext.createStereoPanner();
-        panner.pan.value = line.pan;
-        audioSource.connect(panner);
-        panner.connect(audioContext.destination);
-      } catch {
-        spatialFailed = true;
-        if (audioSource) {
-          try {
-            audioSource.disconnect();
-          } catch {
-            // Ignore an already-disconnected Web Audio node.
-          }
-        }
-        audioSource = null;
-        panner = null;
-      }
-    }
-
-    currentAudio.ontimeupdate = () => {
-      if (!currentAudio || !Number.isFinite(currentAudio.duration) || currentAudio.duration <= 0) return;
-      emitProgress(currentAudio.currentTime / currentAudio.duration);
-    };
-    currentAudio.onended = () => finish(id);
-    currentAudio.onerror = () => {
-      if (id !== runId) return;
-      fail(lang === 'bn'
-        ? 'Cloudinary থেকে সংরক্ষিত ElevenLabs অডিও চালানো যায়নি।'
-        : 'The Cloudinary-saved ElevenLabs audio could not be played.');
-    };
-    currentAudio.onplaying = () => {
-      if (spatialFailed) {
-        onProgress({ index, fraction: 0, percent: (index / lines.length) * 100, line, source, spatialAvailable: false });
-      }
-      emitProgress(0);
-    };
-    try {
-      await currentAudio.play();
-    } catch {
-      if (id === runId) fail(lang === 'bn'
-        ? 'Cloudinary থেকে সংরক্ষিত ElevenLabs অডিও চালু করা যায়নি।'
-        : 'Could not start the Cloudinary-saved ElevenLabs audio.');
-      return false;
-    }
-    return true;
-  };
-
-  const speakCurrent = async (id) => {
-    if (id !== runId || !isPlaying || index >= lines.length) return;
-    const line = lines[index];
-    emitProgress(0);
-    if (!savedAudioDramaPromise) {
-      requestAbortController = new AbortController();
-      savedAudioDramaPromise = createSavedAudioDrama(lines, requestAbortController.signal, lang)
-        .finally(() => {
-          requestAbortController = null;
-        });
-    }
-    try {
+      savedAudioDramaPromise ??= createSavedAudioDrama(lines, abortController.signal, lang);
       const drama = await savedAudioDramaPromise;
       if (id !== runId || !isPlaying) return;
       onNotice(drama.cached
@@ -374,26 +243,43 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
         : (lang === 'bn'
           ? 'ElevenLabs-এর অডিও Cloudinary-তে সংরক্ষণ করা হয়েছে।'
           : 'ElevenLabs audio has been saved to Cloudinary.'));
-      const segment = drama.segments[index];
-      await playRemoteLine(line, id, 'cloudinary', async () => ({
-        audio: createCloudinaryAudio(segment.url),
-        objectUrl: null,
-      }));
+      currentAudio = createCloudinaryAudio(drama.audioUrl);
+      currentAudio.volume = currentVolume;
+      currentAudio.ontimeupdate = () => {
+        if (!currentAudio || !Number.isFinite(currentAudio.duration) || currentAudio.duration <= 0) return;
+        const position = (currentAudio.currentTime / currentAudio.duration) * lines.length;
+        index = Math.min(Math.floor(position), lines.length - 1);
+        emitProgress(Math.min(1, position - index));
+      };
+      currentAudio.onended = () => {
+        if (id !== runId) return;
+        isPlaying = false;
+        isPaused = false;
+        index = lines.length - 1;
+        cleanupAudio();
+        onProgress({ index: lines.length, fraction: 0, percent: 100, line: null, source: null, spatialAvailable: false });
+        onEnd();
+      };
+      currentAudio.onerror = () => {
+        if (id === runId) fail(lang === 'bn'
+          ? 'Cloudinary থেকে সংরক্ষিত ElevenLabs অডিও চালানো যায়নি।'
+          : 'The Cloudinary-saved ElevenLabs audio could not be played.');
+      };
+      currentAudio.onloadedmetadata = () => {
+        if (startAt > 0 && Number.isFinite(currentAudio.duration)) {
+          currentAudio.currentTime = currentAudio.duration * Math.min(startAt, lines.length - 1) / lines.length;
+        }
+      };
+      await currentAudio.play();
+      emitProgress(0);
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        onNotice(lang === 'bn' ? '🌿 ডিভাইসের বিল্ট-ইন কণ্ঠে গল্প চালানো হচ্ছে' : '🌿 Playing using built-in device voice');
-        const utterance = new window.SpeechSynthesisUtterance(line.text);
-        utterance.lang = /[\u0980-\u09ff]/.test(line.text) ? 'bn-BD' : 'en-US';
-        utterance.rate = line.rate || 1;
-        utterance.pitch = line.pitch || 1;
-        utterance.volume = currentVolume;
-        utterance.onend = () => finish(id);
-        utterance.onerror = () => finish(id);
-        window.speechSynthesis.speak(utterance);
-        return;
+      if (savedAudioDramaPromise && !savedStoryAudioCache.has(`[Storyteller]: ${lines.map((line) => line.text).join(' ')}`)) {
+        savedAudioDramaPromise = null;
       }
       fail(error.message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play audio.'));
+    } finally {
+      if (requestAbortController === abortController) requestAbortController = null;
     }
   };
 
@@ -403,12 +289,12 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
         onEnd();
         return;
       }
-      stopCurrentLine();
+      cleanupAudio();
       runId += 1;
       index = Math.max(0, Math.min(lines.length - 1, Math.floor(startAt)));
       isPlaying = true;
       isPaused = false;
-      void speakCurrent(runId);
+      void playSavedStory(runId, index);
     },
     pause() {
       if (!isPlaying || isPaused) return;
@@ -419,47 +305,42 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       if (!isPlaying || !isPaused) return;
       isPaused = false;
       if (currentAudio) void currentAudio.play().catch(() => fail('Audio could not resume.'));
-      else void speakCurrent(runId);
+      else void playSavedStory(runId, index);
     },
     stop() {
       runId += 1;
       isPlaying = false;
       isPaused = false;
-      stopCurrentLine();
+      cleanupAudio();
     },
     seek(position) {
       const target = Math.max(0, Math.min(lines.length - 1, Math.floor(position)));
-      const shouldPlay = isPlaying && !isPaused;
-      const shouldPause = isPlaying && isPaused;
-      runId += 1;
-      stopCurrentLine();
       index = target;
-      if (shouldPlay) {
-        isPlaying = true;
-        isPaused = false;
-        void speakCurrent(runId);
-      } else if (shouldPause) {
-        isPlaying = true;
-        isPaused = true;
+      if (currentAudio && Number.isFinite(currentAudio.duration)) {
+        currentAudio.currentTime = currentAudio.duration * target / lines.length;
         emitProgress(0);
       } else {
-        emitProgress(0);
+        const shouldPlay = isPlaying && !isPaused;
+        if (shouldPlay) {
+          runId += 1;
+          cleanupAudio();
+          isPlaying = true;
+          isPaused = false;
+          void playSavedStory(runId, target);
+        } else {
+          emitProgress(0);
+        }
       }
     },
     setVolume(value) {
       currentVolume = Math.max(0, Math.min(1, value));
       if (currentAudio) currentAudio.volume = currentVolume;
     },
-    setSpatial(enabled) {
-      spatialEnabled = Boolean(enabled);
-      if (panner && currentAudio) {
-        panner.pan.setTargetAtTime(spatialEnabled ? (lines[index]?.pan ?? 0) : 0, audioContext.currentTime, 0.02);
-      }
+    setSpatial() {
+      return false;
     },
     close() {
       this.stop();
-      if (audioContext && audioContext.state !== 'closed') void audioContext.close();
-      audioContext = null;
     },
   };
 }

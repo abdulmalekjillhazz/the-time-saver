@@ -29,7 +29,7 @@ export default async function LessonsPage(props) {
   const d = getDictionary(lang).lessons;
   const [result, todayResult] = await Promise.all([
     getLessons(),
-    getTodayLesson(lang),
+    getTodayLesson('en'),
   ]);
 
   const list = result.ok && result.lessons.length > 0 ? (

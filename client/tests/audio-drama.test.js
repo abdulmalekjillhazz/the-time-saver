@@ -106,11 +106,7 @@ describe('offline audio drama', () => {
     player.close();
   });
 
-  it('plays audio drama segments saved to Cloudinary without calling per-line TTS', async () => {
-    const savedSegments = [
-      { speaker: 'storyteller', text: 'গল্প শুরু।', url: 'https://media.example/story-segment.mp3' },
-      { speaker: 'father', text: 'চলুন শুরু করি।', url: 'https://media.example/father-segment.mp3' },
-    ];
+  it('uses one saved Cloudinary audio file and reuses its URL for later playback', async () => {
     globalThis.fetch = vi.fn(async (url) => {
       if (url === '/api/auth/csrf') {
         return { ok: true, json: async () => ({ csrfToken: 'test-token' }) };
@@ -120,7 +116,6 @@ describe('offline audio drama', () => {
           ok: true,
           json: async () => ({
             audioUrl: 'https://media.example/full-story.mp3',
-            segments: savedSegments,
             cached: false,
           }),
         };
@@ -128,13 +123,7 @@ describe('offline audio drama', () => {
       throw new Error(`Unexpected request: ${url}`);
     });
 
-    const createMediaElementSource = vi.fn();
-    globalThis.window = {
-      AudioContext: class {
-        resume() { return Promise.resolve(); }
-        createMediaElementSource(...args) { return createMediaElementSource(...args); }
-      },
-    };
+    globalThis.window = {};
     const audioInstances = [];
     globalThis.Audio = class {
       constructor(src) {
@@ -143,7 +132,6 @@ describe('offline audio drama', () => {
       }
 
       play() {
-        this.onplaying?.();
         return Promise.resolve();
       }
 
@@ -156,28 +144,29 @@ describe('offline audio drama', () => {
 
     const progress = vi.fn();
     const onNotice = vi.fn();
+    const lines = parseStoryScript('[Storyteller]: The story begins.\n[Father]: Dad lost a shoe.');
     const player = playDrama(
-      parseStoryScript('[Storyteller]: গল্প শুরু।\n[Father]: চলুন শুরু করি।'),
+      lines,
       progress,
       vi.fn(),
-      { lang: 'bn', onNotice, spatial: true },
+      { lang: 'en', onNotice },
     );
 
     player.play();
     await vi.waitFor(() => expect(audioInstances).toHaveLength(1));
-    expect(audioInstances[0].src).toBe(savedSegments[0].url);
-    audioInstances[0].onended();
-    await vi.waitFor(() => expect(audioInstances).toHaveLength(2));
-
-    expect(audioInstances[1].src).toBe(savedSegments[1].url);
+    expect(audioInstances[0].src).toBe('https://media.example/full-story.mp3');
     expect(progress.mock.calls.some(([event]) => event.source === 'cloudinary')).toBe(true);
-    expect(createMediaElementSource).not.toHaveBeenCalled();
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/speech/audio-drama', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ content: '[Storyteller]: গল্প শুরু।\n[Father]: চলুন শুরু করি।' }),
+      body: JSON.stringify({ content: '[Storyteller]: The story begins. Dad lost a shoe.' }),
     }));
+    audioInstances[0].onended();
+    player.play();
+    await vi.waitFor(() => expect(audioInstances).toHaveLength(2));
+    expect(audioInstances[1].src).toBe('https://media.example/full-story.mp3');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     expect(globalThis.fetch.mock.calls.some(([url]) => /google-tts|audio-drama\/free|elevenlabs-tts/.test(url))).toBe(false);
-    expect(onNotice).toHaveBeenCalledWith('ElevenLabs-এর অডিও Cloudinary-তে সংরক্ষণ করা হয়েছে।');
+    expect(onNotice).toHaveBeenCalledWith('ElevenLabs audio has been saved to Cloudinary.');
     player.close();
   });
 });

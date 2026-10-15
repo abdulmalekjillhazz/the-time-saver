@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Smart Routine</string>
+    <string name="title_activity_main">Smart Routine</string>
+    <string name="package_name">com.madeyourdreambigger.smartroutine</string>
+    <string name="custom_url_scheme">com.madeyourdreambigger.smartroutine</string>
+    <string name="alarm_channel_name">Alarms</string>
+    <string name="alarm_channel_description">Full-screen alarms that ring until stopped or snoozed.</string>
+    <string name="alarm_notification_title">Smart Routine alarm</string>
+    <string name="alarm_notification_body">Your alarm is ringing.</string>
+    <string name="alarm_ringing_title">Alarm is ringing</string>
+    <string name="alarm_stop">Stop</string>
+    <string name="alarm_snooze">Snooze 5 min</string>
+</resources>

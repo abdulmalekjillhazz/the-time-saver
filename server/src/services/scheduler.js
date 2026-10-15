@@ -347,30 +347,28 @@ async function runDailyLessonGeneration({ config, owner }) {
   const generationOwner = `${owner}-daily-lesson-${randomToken(8)}`;
   if (await hasDailyLessonsAndQuizzes(date)) return;
 
-  const leased = await acquireLease('daily-ai-lesson-generation-v3', generationOwner, DAILY_LESSON_LEASE_MS, now);
+  const leased = await acquireLease('daily-ai-lesson-generation-v4', generationOwner, DAILY_LESSON_LEASE_MS, now);
   if (!leased) return;
   if (await hasDailyLessonsAndQuizzes(date)) return;
   let generated = 0;
   let failed = 0;
 
-  for (const locale of ['bn', 'en']) {
-    try {
-      await generateDailyLesson({ date, locale, config });
-      generated += 1;
-    } catch (err) {
-      failed += 1;
-      logger.warn({ locale, errName: err.name, code: err.code }, 'daily AI lesson generation failed for locale');
-    }
+  try {
+    await generateDailyLesson({ date, locale: 'en', config });
+    generated += 1;
+  } catch (err) {
+    failed += 1;
+    logger.warn({ errName: err.name, code: err.code }, 'daily English AI lesson generation failed');
   }
 
   logger.info({ date, generated, failed }, 'daily AI lesson generation batch completed');
 }
 
 async function hasDailyLessonsAndQuizzes(date) {
-  const lessons = await DailyLesson.find({ date, locale: { $in: ['bn', 'en'] } }).select('_id locale').lean();
-  if (lessons.length !== 2) return false;
-  const quizLessonIds = await Quiz.distinct('dailyLessonId', { dailyLessonId: { $in: lessons.map((lesson) => lesson._id) } });
-  return quizLessonIds.length === 2;
+  const lesson = await DailyLesson.findOne({ date, locale: 'en' }).select('_id').lean();
+  if (!lesson) return false;
+  const quiz = await Quiz.exists({ dailyLessonId: lesson._id });
+  return Boolean(quiz);
 }
 
 async function runWeeklySummaryGeneration({ config, owner }) {

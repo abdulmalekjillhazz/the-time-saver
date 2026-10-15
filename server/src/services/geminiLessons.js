@@ -34,6 +34,27 @@ function responseText(payload) {
     .trim();
 }
 
+function englishOnlyDraft(item) {
+  const english = (value) => value?.en || '';
+  return {
+    ...item,
+    title: { bn: english(item.title), en: english(item.title) },
+    body: { bn: english(item.body), en: english(item.body) },
+    vocabulary: (item.vocabulary || []).map((entry) => ({
+      ...entry,
+      meaning: { bn: english(entry.meaning), en: english(entry.meaning) },
+    })),
+    quiz: (item.quiz || []).map((question) => ({
+      ...question,
+      question: { bn: english(question.question), en: english(question.question) },
+      options: (question.options || []).map((option) => ({
+        bn: english(option),
+        en: english(option),
+      })),
+    })),
+  };
+}
+
 function parseDrafts(text, count) {
   const json = text?.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   let payload;
@@ -43,7 +64,10 @@ function parseDrafts(text, count) {
     throw failed();
   }
   if (!Array.isArray(payload) || payload.length !== count) throw failed();
-  const drafts = payload.map((item) => lessonDraftSchema.parse({ ...item, aiDrafted: true }));
+  const drafts = payload.map((item) => lessonDraftSchema.parse({
+    ...englishOnlyDraft(item),
+    aiDrafted: true,
+  }));
   if (
     drafts.some((draft) => draft.quiz.length !== 3)
     || drafts.some((draft) => !hasCompleteStoryScript(draft.body.bn) || !hasCompleteStoryScript(draft.body.en))
@@ -68,7 +92,7 @@ export async function generateLessonDraftsWithGemini(config, author, count = 12,
       body: JSON.stringify({
         systemInstruction: {
           parts: [{
-            text: 'Create practical, original, safe learning lessons about routines, focus, habit formation, time management, rest, and wellbeing. Return only a JSON array, with every lesson fully bilingual in Bengali and simple English. Each lesson must have a unique lowercase-hyphen slug, an informative title, and a longer, reasonable, clearly humanized 280-350 word story (12-16 dialogue lines) as realistic dialogue between exactly three fictional family characters plus a storyteller voice (not a fourth family character). The body in both languages must use these unchanged speaker tags, one turn per line: [Storyteller]:, [Rahim - Father]:, [Asha - Mother]:, [Rafi - Child]:. Start with a short storyteller introduction, alternate the family dialogue with real human back-and-forth full of feelings and gentle humour, include one brief storyteller transition around the middle, and end with a storyteller closing after the family chooses one practical action. Make reactions believable for everyday family life; never claim the fictional characters are real people. Start every story with an irresistible emotional or curiosity hook in line 1 that keeps readers glued until the end. Follow the 80/20 language formula strictly: 80% of the story must be short, simple, everyday conversational sentences (5-10 words) so basic beginners can learn spoken English easily, and 20% must be natural advanced English expressions/vocabulary so intermediate learners level up. Always include 5-8 vocabulary entries covering the 20% advanced words with clear Bengali and English definitions. Generate exactly three HARD bilingual quiz questions based only on that story — each must need inference or application to a new situation, never direct recall alone; each question has four bilingual options and a correct answerIndex from 0 to 3, with distractors that are wrong but highly believable and rooted in common misconceptions. Never include medical advice, invented research claims, or user data. Output objects with exactly: slug, title {bn,en}, body {bn,en}, vocabulary [{word, meaning {bn,en}} x5-8], quiz [{question {bn,en}, options [{bn,en} x4], answerIndex} x3].',
+            text: 'Create practical, original, safe learning lessons about routines, focus, habit formation, time management, rest, and wellbeing. Return only a JSON array. Stories, vocabulary definitions, quiz questions, and answer options must all be in simple English only; fill both bn and en fields with the exact same English text for compatibility. Each lesson must have a unique lowercase-hyphen slug, an informative title, and a funny, humanized 220-300 word story (12-16 dialogue lines) as realistic dialogue between exactly three fictional family characters plus a storyteller voice (not a fourth family character). Use these unchanged speaker tags, one turn per line: [Storyteller]:, [Rahim - Father]:, [Asha - Mother]:, [Rafi - Child]:. Start with a funny or curious hook, include natural back-and-forth and gentle humour, and end with one practical action. Keep sentences short, clear, and beginner-friendly. Include 5-8 useful English vocabulary entries with simple English definitions. Generate exactly three challenging quiz questions based only on the story; each needs inference or application, four believable answer options, and a correct answerIndex from 0 to 3. Never include Bengali text, medical advice, invented research claims, or user data. Output objects with exactly: slug, title {bn,en}, body {bn,en}, vocabulary [{word, meaning {bn,en}} x5-8], quiz [{question {bn,en}, options [{bn,en} x4], answerIndex} x3].',
           }],
         },
         contents: [{

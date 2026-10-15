@@ -52,7 +52,7 @@ describe('Gemini lesson drafts', () => {
     });
   });
 
-  it('validates generated bilingual quizzes and stores them as owner-attributed drafts', async () => {
+  it('stores simple English stories and quizzes in both compatibility fields', async () => {
     vi.spyOn(Lesson, 'distinct').mockResolvedValue(['existing-lesson']);
     vi.spyOn(Lesson, 'insertMany').mockImplementation(async (drafts) => drafts);
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
@@ -68,10 +68,14 @@ describe('Gemini lesson drafts', () => {
 
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ slug: 'steady-morning-routine', aiDrafted: true, createdBy: 'owner-id' });
+    expect(created[0].body.bn).toBe(created[0].body.en);
+    expect(created[0].quiz[0].question.bn).toBe(created[0].quiz[0].question.en);
+    expect(created[0].quiz[0].options[0].bn).toBe(created[0].quiz[0].options[0].en);
     expect(fetchMock.mock.calls[0][0].searchParams.get('key')).toBe('test-only-key');
     const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(requestBody.contents[0].parts[0].text).toContain('existing-lesson');
     expect(requestBody.contents[0].parts[0].text).not.toContain('owner-id');
+    expect(requestBody.systemInstruction.parts[0].text).toContain('simple English only');
     expect(requestBody.generationConfig.maxOutputTokens).toBe(8192);
   });
 
