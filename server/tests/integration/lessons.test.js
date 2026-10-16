@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import fs from 'node:fs';
 import { lessonDraftSchema } from '@smart-routine/shared';
 import { createApp } from '../../src/app.js';
+import { DailyLesson } from '../../src/models/DailyLesson.js';
 import { registerUser } from '../../src/services/account.js';
 import { createDraft, submitForReview, publishLesson } from '../../src/services/lessons.js';
 
@@ -87,6 +88,21 @@ describe.skipIf(!uri)('Phase 4 integration: lessons and quizzes', () => {
     expect(JSON.stringify(one.body)).not.toContain('answerIndex');
   });
 
+  it('awards story points once and ranks the learner without exposing their email', async () => {
+    const firstRead = await learner
+      .post(`/api/lessons/${publishedId}/read`)
+      .set('X-CSRF-Token', learnerCsrf)
+      .send({});
+    const repeatedRead = await learner
+      .post(`/api/lessons/${publishedId}/read`)
+      .set('X-CSRF-Token', learnerCsrf)
+      .send({});
+
+    expect(firstRead.status).toBe(201);
+    expect(firstRead.body.earnedPoints).toBe(50);
+    expect(repeatedRead.body.earnedPoints).toBe(0);
+  });
+
   it('a learner submits answers and the server scores them', async () => {
     const correct = sample.quiz[0].answerIndex;
     const wrong = (correct + 1) % 4;
@@ -96,12 +112,64 @@ describe.skipIf(!uri)('Phase 4 integration: lessons and quizzes', () => {
       .send({ answers: [correct] });
     expect(res.status).toBe(201);
     expect(res.body.score).toBe(1);
+    expect(res.body.earnedPoints).toBe(30);
 
     const res2 = await learner
       .post(`/api/lessons/${publishedId}/attempts`)
       .set('X-CSRF-Token', learnerCsrf)
       .send({ answers: [wrong] });
     expect(res2.body.score).toBe(0);
+    expect(res2.body.earnedPoints).toBe(0);
+
+    const leaderboard = await learner.get('/api/gamification/leaderboard');
+    expect(leaderboard.status).toBe(200);
+    expect(leaderboard.body.members[0]).toMatchObject({
+      name: 'Learner',
+      points: 80,
+      activeDays: 1,
+      level: 1,
+      rank: 1,
+      isKing: true,
+    });
+    expect(JSON.stringify(leaderboard.body)).not.toContain('learner@example.com');
+  });
+
+  it('awards story points once when opening a daily lesson from the published lessons list', async () => {
+    const leaderboardBeforeRead = await learner.get('/api/gamification/leaderboard');
+    const existingPoints = leaderboardBeforeRead.body.members[0]?.points ?? 0;
+    const dailyLesson = await DailyLesson.create({
+      date: '2026-10-16',
+      slug: 'leaderboard-daily-story',
+      title: 'A Daily Story',
+      description: 'A short daily lesson.',
+      content: '[Storyteller]: A short story.',
+      category: 'focus',
+      locale: 'en',
+      storyType: 'personal',
+      keyTakeaway: 'Read a little each day.',
+    });
+
+    const firstRead = await learner
+      .post(`/api/lessons/${dailyLesson._id}/read`)
+      .set('X-CSRF-Token', learnerCsrf)
+      .send({});
+    const repeatedRead = await learner
+      .post(`/api/lessons/${dailyLesson._id}/read`)
+      .set('X-CSRF-Token', learnerCsrf)
+      .send({});
+
+    expect(firstRead.status).toBe(201);
+    expect(firstRead.body.earnedPoints).toBe(50);
+    expect(repeatedRead.status).toBe(201);
+    expect(repeatedRead.body.earnedPoints).toBe(0);
+
+    const leaderboard = await learner.get('/api/gamification/leaderboard');
+    expect(leaderboard.body.members[0]).toMatchObject({
+      name: 'Learner',
+      points: existingPoints + 50,
+      activeDays: 1,
+      rank: 1,
+    });
   });
 
   it('an answer count that does not match the questions is refused', async () => {

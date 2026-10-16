@@ -129,6 +129,11 @@ describe('Google voice preference', () => {
   it('returns undefined when no voices are available', () => {
     expect(pickSpeechVoice([], 'en-US')).toBeUndefined();
   });
+
+  it('does not substitute an English/default voice when Bengali is unavailable', () => {
+    const voices = [{ name: 'Microsoft David', lang: 'en-US', localService: true, default: true }];
+    expect(pickSpeechVoice(voices, 'bn-BD')).toBeUndefined();
+  });
 });
 
 describe('Bengali voice briefing', () => {
@@ -164,6 +169,21 @@ describe('Bengali voice briefing', () => {
     const [utterance] = engine.speak.mock.calls[0];
     expect(utterance.lang).toBe('bn-BD');
     expect(utterance.voice).toBe(voices[1]);
+  });
+
+  it('refuses to read Bengali text with a non-Bengali voice', () => {
+    const engine = {
+      getVoices: () => [{ name: 'Microsoft David', lang: 'en-US', localService: true, default: true }],
+      cancel: vi.fn(),
+      speak: vi.fn(),
+    };
+    globalThis.window = { speechSynthesis: engine };
+    globalThis.SpeechSynthesisUtterance = class {
+      constructor(text) { this.text = text; }
+    };
+    expect(() => speakWithVoice('শুভ সকাল!', { lang: 'bn-BD' }))
+      .toThrow('No Bengali text-to-speech voice is installed on this device.');
+    expect(engine.speak).not.toHaveBeenCalled();
   });
 });
 

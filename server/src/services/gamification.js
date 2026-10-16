@@ -11,13 +11,25 @@ import { Completion } from '../models/Completion.js';
 import { DailyLesson } from '../models/DailyLesson.js';
 import { DailyLessonRead } from '../models/DailyLessonRead.js';
 import { DailyQuizScore } from '../models/DailyQuizScore.js';
+import { LearningActivity } from '../models/LearningActivity.js';
 import { Routine } from '../models/Routine.js';
 import { StreakFreeze } from '../models/StreakFreeze.js';
+import { User } from '../models/User.js';
 import { UserBadge } from '../models/UserBadge.js';
 import { AppError, MSG } from '../lib/AppError.js';
 import { isEnabledFor } from './flags.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const STORY_POINTS = 50;
+const QUIZ_POINTS = 30;
+
+export function getQuizLearningPoints(score, total) {
+  return total > 0 ? Math.round((QUIZ_POINTS * score) / total) : 0;
+}
+
+export function learningLevelForActiveDays(activeDays) {
+  return Math.floor(Math.max(0, activeDays) / 3) + 1;
+}
 
 const BADGE_CATALOG = [
   {
@@ -247,6 +259,85 @@ export async function recordDailyLessonRead({ userId, dailyLessonId, timezone })
   }
 
   const lesson = await DailyLesson.findById(dailyLessonId).select('date').lean();
+  const activity = await recordLearningActivity({
+    userId,
+    activityType: 'story',
+    contentId: `daily:${dailyLessonId}`,
+    points: STORY_POINTS,
+    timezone,
+  });
   const awardedBadges = await evaluateAndAwardBadges(userId, timezone);
-  return { read: true, date: lesson.date, awardedBadges };
+  return { read: true, date: lesson.date, earnedPoints: activity.earnedPoints, awardedBadges };
+}
+
+export async function recordLearningActivity({ userId, activityType, contentId, points, timezone }) {
+  try {
+    await LearningActivity.create({
+      userId,
+      activityType,
+      contentId: String(contentId),
+      points,
+      activeDate: todayInZone(timezone || 'Asia/Dhaka'),
+    });
+    return { earnedPoints: points, recorded: true };
+  } catch (err) {
+    if (err.code !== 11000 || !(await LearningActivity.exists({ userId, activityType, contentId: String(contentId) }))) {
+      throw err;
+    }
+    return { earnedPoints: 0, recorded: false };
+  }
+}
+
+export async function recordQuizPoints({ userId, quizId, score, total, timezone }) {
+  const points = getQuizLearningPoints(score, total);
+  return recordLearningActivity({
+    userId,
+    activityType: 'quiz',
+    contentId: String(quizId),
+    points,
+    timezone,
+  });
+}
+
+export async function getLearningLeaderboard() {
+  const rows = await LearningActivity.aggregate([
+    {
+      $group: {
+        _id: '$userId',
+        points: { $sum: '$points' },
+        activeDates: { $addToSet: '$activeDate' },
+      },
+    },
+    { $match: { points: { $gt: 0 } } },
+    {
+      $lookup: {
+        from: User.collection.name,
+        localField: '_id',
+        foreignField: '_id',
+        as: 'profile',
+      },
+    },
+    { $unwind: '$profile' },
+    { $match: { 'profile.deletedAt': null } },
+    {
+      $project: {
+        _id: 0,
+        userId: { $toString: '$_id' },
+        name: '$profile.displayName',
+        avatarId: '$profile.avatarId',
+        points: 1,
+        activeDays: { $size: '$activeDates' },
+      },
+    },
+    { $sort: { points: -1, activeDays: -1, name: 1 } },
+    { $limit: 100 },
+  ]);
+  const highestPoints = rows[0]?.points ?? 0;
+  return rows.map((row, index) => ({
+    ...row,
+    rank: index + 1,
+    level: learningLevelForActiveDays(row.activeDays),
+    daysToNextLevel: 3 - (row.activeDays % 3),
+    isKing: row.points === highestPoints,
+  }));
 }

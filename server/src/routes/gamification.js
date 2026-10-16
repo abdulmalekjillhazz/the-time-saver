@@ -4,6 +4,7 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { AppError } from '../lib/AppError.js';
 import { Completion } from '../models/Completion.js';
 import { EveningReflection } from '../models/EveningReflection.js';
+import { getLearningLeaderboard } from '../services/gamification.js';
 import { todayInZone } from '@smart-routine/shared';
 
 const MINUTE = 60 * 1000;
@@ -12,6 +13,14 @@ export function gamificationRouter() {
   const r = Router();
   r.use(requireAuth);
   r.use(rateLimit({ name: 'gamification', limit: 60, windowMs: MINUTE, by: 'user' }));
+
+  r.get('/leaderboard', async (_req, res, next) => {
+    try {
+      res.json({ members: await getLearningLeaderboard() });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // GET /api/gamification/stats - user XP, Level, Shields
   r.get('/stats', async (req, res, next) => {

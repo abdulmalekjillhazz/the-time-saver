@@ -16,7 +16,7 @@ import { dailyLessonPayloadSchema, routineCreateSchema } from '@smart-routine/sh
 afterEach(() => vi.restoreAllMocks());
 
 describe('Daily Lesson: pure utilities and validation', () => {
-  it('does not serve stale single-voice saved audio to learners', () => {
+  it('serves an existing saved audio URL even when it uses an older voice config', () => {
     const lesson = {
       audio: {
         status: 'ready',
@@ -24,7 +24,26 @@ describe('Daily Lesson: pure utilities and validation', () => {
         voiceConfigVersion: 'eleven_v3:old-voice-ids',
       },
     };
-    expect(formatDailyLessonForLearner(lesson).audio).toBeNull();
+    expect(formatDailyLessonForLearner(lesson).audio).toEqual({
+      status: 'ready',
+      url: 'https://media.example/old-single-voice.mp3',
+      durationSeconds: undefined,
+    });
+  });
+
+  it('keeps a saved Cloudinary URL playable while narration is being refreshed', () => {
+    const lesson = {
+      audio: {
+        status: 'processing',
+        url: 'https://media.example/already-uploaded.mp3',
+        durationSeconds: 42,
+      },
+    };
+    expect(formatDailyLessonForLearner(lesson).audio).toEqual({
+      status: 'ready',
+      url: 'https://media.example/already-uploaded.mp3',
+      durationSeconds: 42,
+    });
   });
 
   it('reuses saved narration without claiming a new generation', async () => {

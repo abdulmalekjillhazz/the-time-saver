@@ -4,6 +4,7 @@ import { Quiz } from '../models/Quiz.js';
 import { LessonScore } from '../models/LessonScore.js';
 import { AppError, MSG } from '../lib/AppError.js';
 import { scoreQuiz } from '@smart-routine/shared';
+import { recordDailyLessonRead, recordLearningActivity, recordQuizPoints } from './gamification.js';
 
 const LMSG = Object.freeze({
   slugTaken: { en: 'A lesson with this slug already exists.', bn: 'এই স্লাগ দিয়ে একটি পাঠ আগে থেকেই আছে।' },
@@ -200,6 +201,7 @@ export async function archiveLesson(slug) {
 
 export async function submitAttempt(lessonId, user, answers) {
   let lesson = await Lesson.findOne({ _id: lessonId, status: 'published' });
+  let isDailyLesson = false;
   let quizQuestions = lesson ? (lesson.quiz || []) : null;
 
   if (!lesson) {
@@ -209,6 +211,7 @@ export async function submitAttempt(lessonId, user, answers) {
     quizQuestions = (quizDoc?.questions || []).map((q) => ({
       answerIndex: Math.max(0, (q.options || []).findIndex((o) => o.correct === true)),
     }));
+    isDailyLesson = true;
     lesson = dailyLesson;
   }
 
@@ -222,7 +225,37 @@ export async function submitAttempt(lessonId, user, answers) {
     score: result.score,
     total: result.total,
   });
-  return result;
+  const activityKey = isDailyLesson
+    ? `daily:${lesson._id}`
+    : `published:${lesson._id}`;
+  const learningPoints = await recordQuizPoints({
+    userId: user._id,
+    quizId: activityKey,
+    score: result.score,
+    total: result.total,
+    timezone: user.timezone,
+  });
+  return { ...result, earnedPoints: learningPoints.earnedPoints };
+}
+
+export async function recordPublishedLessonRead(lessonId, user) {
+  const lesson = await Lesson.findOne({ _id: lessonId, status: 'published' }).select('_id').lean();
+  if (!lesson) {
+    const dailyLesson = await DailyLesson.findById(lessonId).select('_id').lean();
+    if (!dailyLesson) throw new AppError(404, 'NOT_FOUND', MSG.notFound);
+    return recordDailyLessonRead({
+      userId: user._id,
+      dailyLessonId: dailyLesson._id,
+      timezone: user.timezone,
+    });
+  }
+  return recordLearningActivity({
+    userId: user._id,
+    activityType: 'story',
+    contentId: `published:${lesson._id}`,
+    points: 50,
+    timezone: user.timezone,
+  });
 }
 
 export async function listAllLessons() {

@@ -158,26 +158,78 @@ describe('Cloudinary audio drama', () => {
     player.close();
   });
 
-  it('shows Cloudinary-backed voice generation errors without breaking story text rendering', async () => {
+  it('falls back to Google TTS when a saved Cloudinary audio file cannot be played', async () => {
     FakeAudio.instances = [];
+    globalThis.Audio = FakeAudio;
+    vi.spyOn(globalThis.URL, 'createObjectURL').mockReturnValue('blob:google-fallback');
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    const onNotice = vi.fn();
+    const progress = vi.fn();
+    const player = playDrama(
+      parseStoryScript('[Storyteller]: গল্প শুরু।\n[Father]: ঠিক আছে।'),
+      progress,
+      vi.fn(),
+      {
+        lang: 'bn',
+        audioUrl: 'https://res.cloudinary.com/test/saved.mp3',
+        storyContent: '[Storyteller]: গল্প শুরু।\n[Father]: ঠিক আছে।',
+        onNotice,
+      },
+    );
+
+    player.play();
+    await vi.waitFor(() => expect(FakeAudio.instances[0]?.play).toHaveBeenCalledOnce());
+    FakeAudio.instances[0].onerror();
+    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(2));
+    expect(FakeAudio.instances[1].src).toBe('blob:google-fallback');
+    expect(FakeAudio.instances[1].play).toHaveBeenCalledOnce();
+    FakeAudio.instances[1].currentTime = 3;
+    FakeAudio.instances[1].ontimeupdate();
+    expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'google' }));
+    expect(globalThis.fetch.mock.calls.map(([url]) => url)).toEqual([
+      '/api/auth/csrf',
+      '/api/speech/audio-drama/free',
+    ]);
+    expect(JSON.parse(globalThis.fetch.mock.calls[1][1].body)).toEqual({
+      content: 'গল্প শুরু। ঠিক আছে।',
+      lang: 'bn',
+    });
+    expect(onNotice).toHaveBeenCalledWith('সংরক্ষিত গল্পের voice পাওয়া যায়নি—Google TTS চালানো হচ্ছে।');
+    player.close();
+  });
+
+  it('uses Google TTS when multi-voice audio lookup fails', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = FakeAudio;
+    vi.spyOn(globalThis.URL, 'createObjectURL').mockReturnValue('blob:google-fallback');
     globalThis.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
       .mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: { message: { en: 'ElevenLabs voice is unavailable.', bn: 'ElevenLabs voice পাওয়া যাচ্ছে না।' } } }),
-      });
-    const onError = vi.fn();
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    const onNotice = vi.fn();
     const player = playDrama(
       parseStoryScript('[Storyteller]: শুরু।'),
       vi.fn(),
       vi.fn(),
-      { lang: 'bn', onError },
+      { lang: 'bn', onNotice },
     );
 
     player.play();
-    await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
-    expect(globalThis.fetch.mock.calls[1][0]).toBe('/api/speech/audio-drama');
-    expect(onError.mock.calls[0][0]).toBe('ElevenLabs voice পাওয়া যাচ্ছে না।');
+    await vi.waitFor(() => expect(FakeAudio.instances[0]?.play).toHaveBeenCalledOnce());
+    expect(globalThis.fetch.mock.calls.map(([url]) => url)).toEqual([
+      '/api/auth/csrf',
+      '/api/speech/audio-drama',
+      '/api/auth/csrf',
+      '/api/speech/audio-drama/free',
+    ]);
+    expect(FakeAudio.instances[0].src).toBe('blob:google-fallback');
+    expect(onNotice).toHaveBeenCalledWith('সংরক্ষিত গল্পের voice পাওয়া যায়নি—Google TTS চালানো হচ্ছে।');
     player.close();
   });
 

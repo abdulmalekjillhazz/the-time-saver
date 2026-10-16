@@ -2,6 +2,6 @@
 
 import { ErrorScreen } from '../../components/StatusViews.jsx';
 
-export default function PrivateError({ error, reset }) {
-  return <ErrorScreen error={error} reset={reset} fullPage />;
+export default function PrivateError({ reset }) {
+  return <ErrorScreen reset={reset} fullPage />;
 }

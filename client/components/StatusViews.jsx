@@ -140,7 +140,7 @@ export function LoadingScreen({ fullPage = false }) {
   );
 }
 
-export function ErrorScreen({ error, reset, fullPage = false }) {
+export function ErrorScreen({ reset, fullPage = false }) {
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
@@ -168,8 +168,6 @@ export function ErrorScreen({ error, reset, fullPage = false }) {
       window.location.reload();
     }
   };
-
-  const errorCode = error?.digest || (error?.message ? String(error.message).slice(0, 90) : '');
 
   return (
     <div
@@ -238,11 +236,6 @@ export function ErrorScreen({ error, reset, fullPage = false }) {
                     : 'অফলাইন মোড: লোকাল ক্যাশ থেকে রুটিন নিরাপদ আছে'}
                 </span>
               </span>
-              {errorCode ? (
-                <span className="max-w-full truncate rounded-full border border-gold/30 bg-paper/80 px-3 py-1 font-mono text-xs text-ink/70">
-                  Ref: {errorCode}
-                </span>
-              ) : null}
             </div>
 
             <div className="status-action-grid mt-6">

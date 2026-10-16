@@ -55,11 +55,12 @@ import { TodayProgressCard } from './TodayProgressCard.jsx';
 import { StoryReader } from './StoryReader.jsx';
 import { PrayerAnchorSelector } from './PrayerAnchorSelector.jsx';
 import { AddRoutineBuilderCard } from './AddRoutineBuilderCard.jsx';
+import { LeaderboardPanel } from './LeaderboardPanel.jsx';
 import { formatNaturalTime } from '../lib/prayerAnchors.js';
 
 const COPY = {
   en: {
-    title: 'Smart Routine', today: "Today's routine", lessons: 'Lessons & quizzes', insights: 'Miss risk insights', dashboard: 'Dashboard', voiceBriefing: 'Voice briefing',
+    title: 'Smart Routine', today: "Today's routine", lessons: 'Lessons & quizzes', insights: 'Miss risk insights', dashboard: 'Dashboard', voiceBriefing: 'Voice briefing', leaderboard: 'Leaderboard',
     settings: 'Settings', register: 'Create account', login: 'Sign in', email: 'Email', password: 'Password',
     name: 'Display name', locale: 'Language', create: 'Create account', signIn: 'Sign in', switchRegister: 'Need an account?',
     googleSignIn: 'Continue with Google',
@@ -81,7 +82,7 @@ const COPY = {
     reminder: 'Starting soon', consent: 'Allow my data to help train future routine models',
     export: 'Export my data', deleteAccount: 'Delete my account', confirmPassword: 'Confirm with your password',
     exportNow: 'Download export', deleteNow: 'Permanently delete account', cancel: 'Cancel',
-    noLessons: 'No published lessons are available yet.', read: 'Open lesson', quiz: 'Take quiz', submit: 'Submit answers',
+    noLessons: 'No published lessons are available yet.', read: 'Open lesson', quiz: 'Take quiz', closeLesson: 'Back to lessons', loadingLesson: 'Loading lesson…', lessonPrefetchWarning: 'Some lessons could not be preloaded and will load when opened.', storyPoints: 'points for reading', quizPoints: 'leaderboard points', submit: 'Submit answers',
     risk: 'Estimated miss risk', noModel: 'No validated real-data model is active. The model file currently included is synthetic and is intentionally not used to estimate your personal risk.',
     routineSaved: 'Routine queued for sync.', routineDeleted: 'Routine queued for deletion.',
     completionSaved: 'Routine status saved.', completionPending: 'Routine status is still waiting to sync. The app will retry automatically.',
@@ -127,7 +128,7 @@ const COPY = {
     weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   },
   bn: {
-    title: 'স্মার্ট রুটিন', today: 'আজকের রুটিন', lessons: 'পাঠ ও কুইজ', insights: 'রুটিন মিসের ঝুঁকি', dashboard: 'ড্যাশবোর্ড', voiceBriefing: 'ভয়েস ব্রিফিং',
+    title: 'স্মার্ট রুটিন', today: 'আজকের রুটিন', lessons: 'পাঠ ও কুইজ', insights: 'রুটিন মিসের ঝুঁকি', dashboard: 'ড্যাশবোর্ড', voiceBriefing: 'ভয়েস ব্রিফিং', leaderboard: 'লিডারবোর্ড',
     settings: 'সেটিংস', register: 'অ্যাকাউন্ট তৈরি', login: 'সাইন ইন', email: 'ইমেইল', password: 'পাসওয়ার্ড',
     name: 'নাম', locale: 'ভাষা', create: 'অ্যাকাউন্ট তৈরি', signIn: 'সাইন ইন', switchRegister: 'অ্যাকাউন্ট নেই?',
     googleSignIn: 'Google দিয়ে চালিয়ে যান',
@@ -149,7 +150,7 @@ const COPY = {
     reminder: 'শুরু হতে যাচ্ছে', consent: 'ভবিষ্যতের রুটিন মডেল প্রশিক্ষণে আমার তথ্য ব্যবহারের অনুমতি দিন',
     export: 'আমার তথ্য এক্সপোর্ট', deleteAccount: 'আমার অ্যাকাউন্ট মুছুন', confirmPassword: 'পাসওয়ার্ড দিয়ে নিশ্চিত করুন',
     exportNow: 'এক্সপোর্ট ডাউনলোড', deleteNow: 'স্থায়ীভাবে অ্যাকাউন্ট মুছুন', cancel: 'বাতিল',
-    noLessons: 'এখনো কোনো প্রকাশিত পাঠ নেই।', read: 'পাঠ খুলুন', quiz: 'কুইজ দিন', submit: 'উত্তর জমা দিন',
+    noLessons: 'এখনো কোনো প্রকাশিত পাঠ নেই।', read: 'পাঠ খুলুন', quiz: 'কুইজ দিন', closeLesson: 'পাঠের তালিকায় ফিরুন', loadingLesson: 'পাঠ লোড হচ্ছে…', lessonPrefetchWarning: 'কিছু পাঠ আগে থেকে লোড করা যায়নি; খুললে তখন লোড হবে।', storyPoints: 'গল্প পড়ার পয়েন্ট', quizPoints: 'লিডারবোর্ড পয়েন্ট', submit: 'উত্তর জমা দিন',
     risk: 'মিস হওয়ার আনুমানিক ঝুঁকি', noModel: 'যাচাইকৃত বাস্তব-তথ্যের কোনো মডেল চালু নেই। বর্তমানে থাকা মডেল ফাইলটি কৃত্রিম তথ্যের, তাই আপনার ব্যক্তিগত ঝুঁকি অনুমানে এটি ব্যবহার করা হয় না।',
     routineSaved: 'রুটিনটি সিঙ্কের জন্য রাখা হয়েছে।', routineDeleted: 'রুটিন মোছার অনুরোধ সিঙ্কের জন্য রাখা হয়েছে।',
     completionSaved: 'রুটিনের অবস্থা সংরক্ষিত হয়েছে।', completionPending: 'রুটিনের অবস্থা এখনো সিঙ্ক হয়নি। অ্যাপটি স্বয়ংক্রিয়ভাবে আবার চেষ্টা করবে।',
@@ -425,6 +426,10 @@ export function PrivateApp() {
   const [dailyLesson, setDailyLesson] = useState(null);
   const [dailyQuiz, setDailyQuiz] = useState(null);
   const [lesson, setLesson] = useState(null);
+  const [storyAward, setStoryAward] = useState(null);
+  const [lessonLoadingSlug, setLessonLoadingSlug] = useState('');
+  const lessonDetailsRef = useRef(new Map());
+  const lessonRequestsRef = useRef(new Map());
   const [offlineLessonPreview, setOfflineLessonPreview] = useState(null);
   const [offlineCacheAllowed, setOfflineCacheAllowed] = useState(false);
   const [offlineConsentOpen, setOfflineConsentOpen] = useState(false);
@@ -541,6 +546,53 @@ export function PrivateApp() {
       reportError(dailyResult.reason);
     }
   }, [reportError]);
+
+  const getLessonDetails = useCallback((slug) => {
+    const cached = lessonDetailsRef.current.get(slug);
+    if (cached) return Promise.resolve(cached);
+
+    const pending = lessonRequestsRef.current.get(slug);
+    if (pending) return pending;
+
+    const requestPromise = request(`/api/lessons/${encodeURIComponent(slug)}`)
+      .then((result) => {
+        lessonDetailsRef.current.set(slug, result.lesson);
+        lessonRequestsRef.current.delete(slug);
+        return result.lesson;
+      })
+      .catch((requestError) => {
+        lessonRequestsRef.current.delete(slug);
+        throw requestError;
+      });
+    lessonRequestsRef.current.set(slug, requestPromise);
+    return requestPromise;
+  }, []);
+
+  useEffect(() => {
+    if (!lessons.length) return undefined;
+    let active = true;
+    let prefetchFailed = false;
+    let nextIndex = 0;
+    const prefetchNext = async () => {
+      while (active && nextIndex < lessons.length) {
+        const item = lessons[nextIndex];
+        nextIndex += 1;
+        try {
+          await getLessonDetails(item.slug);
+        } catch {
+          if (active && !prefetchFailed) {
+            prefetchFailed = true;
+            setNotice(copy.lessonPrefetchWarning);
+          }
+          active = false;
+        }
+      }
+    };
+    void Promise.all([prefetchNext(), prefetchNext()]);
+    return () => {
+      active = false;
+    };
+  }, [getLessonDetails, lang, lessons]);
 
   useEffect(() => {
     let active = true;
@@ -1290,6 +1342,7 @@ export function PrivateApp() {
       setDailyLesson(null);
       setDailyQuiz(null);
       setLesson(null);
+      setStoryAward(null);
       setModel(null);
     } catch (err) {
       reportError(err);
@@ -1412,18 +1465,26 @@ export function PrivateApp() {
   }
 
   async function loadLesson(slug, focusTarget = 'story') {
+    setLessonLoadingSlug(slug);
     setBusy(true);
     setError('');
     try {
-      const result = await request(`/api/lessons/${encodeURIComponent(slug)}`);
+      const loadedLesson = await getLessonDetails(slug);
       lessonFocusTargetRef.current = focusTarget;
-      setLesson(result.lesson);
+      setLesson(loadedLesson);
+      setStoryAward(null);
       setAnswers([]);
       setQuizResult(null);
       setOfflineCacheStatus('');
+      request(`/api/lessons/${encodeURIComponent(loadedLesson.id)}/read`, {
+        method: 'POST',
+        body: {},
+      })
+        .then(({ earnedPoints }) => setStoryAward({ lessonId: loadedLesson.id, earnedPoints }))
+        .catch(reportError);
       if (getOfflineCacheConsent() === true) {
         setOfflineCacheStatus('গল্প ও শব্দার্থ অফলাইনে সংরক্ষণ করা হচ্ছে…');
-        cacheOfflineLesson(result.lesson, request)
+        cacheOfflineLesson(loadedLesson, request)
           .then(async ({ lessonSaved, meaningsSaved, meaningsMissing }) => {
             if (!lessonSaved) return;
             setOfflineCacheStatus(meaningsMissing
@@ -1454,6 +1515,7 @@ export function PrivateApp() {
         reportError(cacheError);
       }
     } finally {
+      setLessonLoadingSlug('');
       setBusy(false);
     }
   }
@@ -1737,6 +1799,29 @@ export function PrivateApp() {
                   <path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8" />
                 </svg>
               </Button>
+              <Button
+                variant="secondary"
+                className="app-header-leaderboard"
+                aria-label={copy.leaderboard}
+                title={copy.leaderboard}
+                aria-current={tab === 'leaderboard' ? 'page' : undefined}
+                onClick={() => setTab('leaderboard')}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="leaderboard-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 21h8m-4-4v4m-7-17h14v5a7 7 0 0 1-14 0V4Z" />
+                  <path d="M5 6H3v2a5 5 0 0 0 5 5m11-7h2v2a5 5 0 0 1-5 5" />
+                </svg>
+              </Button>
+              <Button
+                variant="secondary"
+                className="app-header-theme"
+                aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
+                title={theme === 'dark' ? copy.themeLight : copy.themeDark}
+                aria-pressed={theme === 'dark'}
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -1777,11 +1862,13 @@ export function PrivateApp() {
             <span className={`tab-icon tab-icon-${key}`} aria-hidden="true">
               {icon}
             </span>
-            <span className="tab-label-desktop">{label}</span>
+            <span className="tab-label-desktop">{shortLabel}</span>
             <span className="tab-label-mobile" aria-hidden="true">{shortLabel}</span>
           </Button>
         ))}
       </nav>
+
+      {tab === 'leaderboard' ? <LeaderboardPanel lang={lang} /> : null}
 
       {tab === 'dashboard' ? (
         <section className="space-y-4">
@@ -1933,9 +2020,9 @@ export function PrivateApp() {
             <div className="calendar-weekdays grid grid-cols-7 gap-1 text-center text-xs font-semibold sm:text-sm">
               {copy.weekdays.map((weekday) => <div key={weekday} className="py-1">{weekday}</div>)}
             </div>
-            <div className="grid grid-cols-7 gap-1">
+            <div className="calendar-month-grid grid grid-cols-7 gap-1">
               {calendarDays.map((day, index) => {
-                if (!day) return <div key={`empty-${index}`} aria-hidden="true" className="min-h-16 rounded-lg" />;
+                if (!day) return <div key={`empty-${index}`} aria-hidden="true" className="calendar-empty-day min-h-16 rounded-lg" />;
                 const isDayOff = day.weekend || Boolean(day.holidayName);
                 const holidayName = day.holidayName?.[lang] || day.holidayName?.en || day.holidayName?.bn;
                 const dayOffLabel = holidayName || (day.weekend ? copy.weeklyDayOff : '');
@@ -1948,7 +2035,7 @@ export function PrivateApp() {
                     className={`calendar-day ${isDayOff ? 'calendar-day-off' : ''} ${day.date === calendarToday ? 'calendar-day-today' : ''}`}
                   >
                     <div className="calendar-day-number">
-                      <span>{day.day}</span>{day.bengaliDay ? <span className="text-[10px] opacity-70 sm:text-xs">{day.bengaliDay}</span> : null}
+                      <span>{day.day}</span>{day.bengaliDay ? <span className="calendar-day-bengali-number text-[10px] opacity-70 sm:text-xs">{day.bengaliDay}</span> : null}
                     </div>
                     {dayOffLabel ? <p className="calendar-day-label">{dayOffLabel}</p> : null}
                   </div>
@@ -2074,10 +2161,10 @@ export function PrivateApp() {
               {offlineCacheAllowed ? 'অফলাইন সংরক্ষণ সেটিংস' : 'অফলাইনে পড়ার জন্য সংরক্ষণ'}
             </Button>
           </div>
-          {dailyLesson ? <DailyLessonCard dailyLesson={dailyLesson} quiz={dailyQuiz} lang={lang} collapsible /> : null}
+          {dailyLesson ? <DailyLessonCard dailyLesson={dailyLesson} quiz={dailyQuiz} lang={lang} collapsible trackLearning /> : null}
           {lessons.length ? (
             <div className="space-y-4">
-              <Card className="surface-card space-y-3 p-4 sm:p-6">
+              <Card className={`surface-card ${lesson || lessonLoadingSlug ? 'lesson-catalog-reading' : ''} space-y-3 p-4 sm:p-6`}>
                 <h2 className="text-xl font-extrabold text-gold-soft">{copy.lessons}</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {lessons.map((item) => (
@@ -2110,8 +2197,27 @@ export function PrivateApp() {
                   ))}
                 </div>
               </Card>
-              <Card id="published-lesson-story" className="surface-card scroll-mt-6 space-y-5 rounded-2xl border border-gold/30 p-4 shadow-md sm:p-6">
-                {!lesson ? <p>{copy.chooseLesson}</p> : (
+              <Card id="published-lesson-story" className={`surface-card scroll-mt-6 space-y-5 rounded-2xl border border-gold/30 p-4 shadow-md sm:p-6 ${lesson || lessonLoadingSlug ? 'lesson-reader-overlay-open' : ''}`}>
+                {lesson || lessonLoadingSlug ? (
+                  <header className="lesson-reader-header">
+                    <Button type="button" variant="secondary" disabled={Boolean(lessonLoadingSlug)} onClick={() => setLesson(null)}>
+                      ← {copy.closeLesson}
+                    </Button>
+                    <p className="min-w-0 truncate font-bold text-ink">
+                      {lesson ? localized(lesson.title, 'en') : localized(lessons.find((item) => item.slug === lessonLoadingSlug)?.title || '', 'en')}
+                      {lesson && storyAward?.lessonId === lesson.id && storyAward.earnedPoints > 0 ? (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-sapphire/10 px-2 py-1 text-xs font-extrabold text-sapphire">
+                          +{storyAward.earnedPoints} ⭐ {copy.storyPoints}
+                        </span>
+                      ) : null}
+                    </p>
+                  </header>
+                ) : null}
+                {!lesson ? (
+                  <p role={lessonLoadingSlug ? 'status' : undefined}>
+                    {lessonLoadingSlug ? copy.loadingLesson : copy.chooseLesson}
+                  </p>
+                ) : (
                   <>
                     <div className="rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 via-paper to-sapphire/10 p-4 sm:p-5">
                       <p className="text-xs font-extrabold uppercase tracking-wider text-gold-soft">
@@ -2147,7 +2253,12 @@ export function PrivateApp() {
                           </fieldset>
                         ))}
                         <Button disabled={busy || !lesson.quiz.every((_, index) => Number.isInteger(answers[index]))} onClick={submitQuiz}>{copy.submit}</Button>
-                        {quizResult ? <p role="status">{quizResult.score} / {quizResult.total}</p> : null}
+                        {quizResult ? (
+                          <p role="status">
+                            {quizResult.score} / {quizResult.total}
+                            {quizResult.earnedPoints > 0 ? ` · +${quizResult.earnedPoints} ⭐ ${copy.quizPoints}` : ''}
+                          </p>
+                        ) : null}
                       </div>
                     ) : <p>{copy.noQuiz}</p>}
                   </>

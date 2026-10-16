@@ -1,4 +1,4 @@
-import { apiRequest } from './apiClient.js';
+import { apiRequest, apiRequestAudio } from './apiClient.js';
 
 const CHARACTERS = {
   narrator: { character: 'Narrator', pan: 0, pitch: 1, rate: 1 },
@@ -140,11 +140,15 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   let isPlaying = false;
   let isPaused = false;
   let audio = null;
+  let audioObjectUrl = null;
+  let audioSource = null;
   let requestAbortController = null;
   let runId = 0;
+  let googleFallbackStarted = false;
   let currentVolume = Math.max(0, Math.min(1, volume));
   let desiredStartIndex = 0;
   const content = storyContent || lines.map(({ character, text }) => `[${character}]: ${text}`).join('\n');
+  const googleFallbackContent = lines.map(({ text }) => text).join(' ');
 
   const emitProgress = (position) => {
     if (!lines.length) return;
@@ -158,7 +162,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       fraction,
       percent: ((index + fraction) / lines.length) * 100,
       line: lines[index],
-      source: audio?.currentSrc || audio?.src ? 'cloudinary' : null,
+      source: audioSource,
       spatialAvailable: false,
     });
   };
@@ -166,15 +170,21 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   const cleanupAudio = () => {
     requestAbortController?.abort();
     requestAbortController = null;
-    if (!audio) return;
-    audio.pause();
-    audio.onloadedmetadata = null;
-    audio.ontimeupdate = null;
-    audio.onended = null;
-    audio.onerror = null;
-    audio.removeAttribute?.('src');
-    audio.load?.();
-    audio = null;
+    if (audio) {
+      audio.pause();
+      audio.onloadedmetadata = null;
+      audio.ontimeupdate = null;
+      audio.onended = null;
+      audio.onerror = null;
+      audio.removeAttribute?.('src');
+      audio.load?.();
+      audio = null;
+    }
+    audioSource = null;
+    if (audioObjectUrl) {
+      globalThis.URL?.revokeObjectURL?.(audioObjectUrl);
+      audioObjectUrl = null;
+    }
   };
 
   const fail = (message) => {
@@ -182,6 +192,69 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     isPaused = false;
     cleanupAudio();
     onError(message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play the story audio.'));
+  };
+
+  const configureAudio = (id, src, source) => {
+    audioSource = source;
+    audio = new globalThis.Audio();
+    audio.preload = 'auto';
+    audio.volume = currentVolume;
+    audio.onloadedmetadata = () => {
+      if (id !== runId || !audio) return;
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = (audio.duration * Math.min(desiredStartIndex, lines.length - 1)) / lines.length;
+        emitProgress(desiredStartIndex);
+      }
+      if (!isPaused) void startAudio(id);
+    };
+    audio.ontimeupdate = () => {
+      if (id !== runId || !audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+      emitProgress((audio.currentTime / audio.duration) * lines.length);
+    };
+    audio.onended = () => finishPlayback(id);
+    audio.onerror = () => {
+      if (id !== runId) return;
+      if (source === 'cloudinary') void fallbackToGoogle(id);
+      else fail(lang === 'bn'
+        ? 'Cloudinary ও Google TTS—কোনোটিই থেকে অডিও চালানো যায়নি। আবার চেষ্টা করুন।'
+        : 'Audio could not be played from Cloudinary or Google TTS. Please try again.');
+    };
+    audio.src = src;
+    audio.load();
+  };
+
+  const fallbackToGoogle = async (id) => {
+    if (id !== runId || !isPlaying || googleFallbackStarted) return;
+    googleFallbackStarted = true;
+    cleanupAudio();
+    const abortController = new AbortController();
+    requestAbortController = abortController;
+    onNotice(lang === 'bn'
+      ? 'সংরক্ষিত গল্পের voice পাওয়া যাচ্ছে না—Google TTS দিয়ে চেষ্টা করা হচ্ছে…'
+      : 'Saved story audio is unavailable—trying Google TTS…');
+    try {
+      const buffer = await apiRequestAudio('/api/speech/audio-drama/free', {
+        body: { content: googleFallbackContent, lang },
+        locale: lang,
+        signal: abortController.signal,
+      });
+      if (id !== runId || !isPlaying) return;
+      if (typeof globalThis.URL?.createObjectURL !== 'function') {
+        throw new Error('This browser cannot play fallback audio.');
+      }
+      audioObjectUrl = globalThis.URL.createObjectURL(new Blob([buffer], { type: 'audio/mpeg' }));
+      onNotice(lang === 'bn'
+        ? 'সংরক্ষিত গল্পের voice পাওয়া যায়নি—Google TTS চালানো হচ্ছে।'
+        : 'Saved story audio was unavailable—playing Google TTS.');
+      configureAudio(id, audioObjectUrl, 'google');
+    } catch (error) {
+      if (id !== runId || error.name === 'AbortError') return;
+      fail(error.message || (lang === 'bn'
+        ? 'Cloudinary ও Google TTS থেকে অডিও চালানো যায়নি।'
+        : 'Could not play audio from Cloudinary or Google TTS.'));
+    } finally {
+      if (requestAbortController === abortController) requestAbortController = null;
+    }
   };
 
   const finishPlayback = (id) => {
@@ -197,7 +270,12 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     try {
       await audio.play();
     } catch (error) {
-      if (id === runId) fail(error.message);
+      if (id !== runId) return;
+      if (audioSource === 'cloudinary' && error.name !== 'NotAllowedError') {
+        void fallbackToGoogle(id);
+      } else {
+        fail(error.message);
+      }
     }
   };
 
@@ -221,35 +299,13 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
           : 'The saved story audio link could not be retrieved.');
       }
 
-      audio = new globalThis.Audio();
-      audio.preload = 'auto';
-      audio.volume = currentVolume;
-      audio.onloadedmetadata = () => {
-        if (id !== runId || !audio) return;
-        if (Number.isFinite(audio.duration) && audio.duration > 0) {
-          audio.currentTime = (audio.duration * Math.min(desiredStartIndex, lines.length - 1)) / lines.length;
-          emitProgress(desiredStartIndex);
-        }
-        if (!isPaused) void startAudio(id);
-      };
-      audio.ontimeupdate = () => {
-        if (id !== runId || !audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
-        emitProgress((audio.currentTime / audio.duration) * lines.length);
-      };
-      audio.onended = () => finishPlayback(id);
-      audio.onerror = () => {
-        if (id === runId) fail(lang === 'bn'
-          ? 'Cloudinary থেকে গল্পের অডিও লোড করা যায়নি। আবার চেষ্টা করুন।'
-          : 'Could not load the saved story audio from Cloudinary. Please try again.');
-      };
-      audio.src = result.audioUrl;
-      audio.load();
       onNotice(result.cached
         ? (lang === 'bn' ? 'Cloudinary-তে সংরক্ষিত voice চালানো হচ্ছে।' : 'Playing the saved voice from Cloudinary.')
         : (lang === 'bn' ? 'ElevenLabs voice Cloudinary-তে সংরক্ষণ করা হয়েছে।' : 'The ElevenLabs voice has been saved to Cloudinary.'));
+      configureAudio(id, result.audioUrl, 'cloudinary');
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
-      fail(error.message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play audio.'));
+      void fallbackToGoogle(id);
     } finally {
       if (requestAbortController === abortController) requestAbortController = null;
     }
@@ -263,6 +319,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       }
       cleanupAudio();
       runId += 1;
+      googleFallbackStarted = false;
       desiredStartIndex = Math.max(0, Math.min(lines.length - 0.001, Number(startAt) || 0));
       index = Math.floor(desiredStartIndex);
       isPlaying = true;

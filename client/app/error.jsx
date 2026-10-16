@@ -6,6 +6,6 @@ import '@fontsource/noto-sans-bengali/700.css';
 import './globals.css';
 import { ErrorScreen } from '../components/StatusViews.jsx';
 
-export default function GlobalError({ error, reset }) {
-  return <ErrorScreen error={error} reset={reset} fullPage />;
+export default function GlobalError({ reset }) {
+  return <ErrorScreen reset={reset} fullPage />;
 }

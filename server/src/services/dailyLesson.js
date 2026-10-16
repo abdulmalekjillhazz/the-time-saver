@@ -8,14 +8,13 @@ import { QuizReport } from '../models/QuizReport.js';
 import { askAI } from './aiProvider.js';
 import { AppError } from '../lib/AppError.js';
 import { logger } from '../lib/logger.js';
-import { evaluateAndAwardBadges } from './gamification.js';
+import { evaluateAndAwardBadges, recordQuizPoints } from './gamification.js';
 import { hasCompleteStoryScript } from './geminiLessons.js';
 import { createCuratedDailyLesson } from './dailyLessonFallback.js';
 import {
   generateAndUploadLessonAudio,
   getNarrationVoiceConfigVersion,
   hasCompleteNarrationVoiceConfig,
-  NARRATION_AUDIO_VERSION,
 } from './elevenLabs.js';
 
 const NARRATION_PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
@@ -252,13 +251,12 @@ export function formatQuizForLearner(quiz) {
 
 export function formatDailyLessonForLearner(lesson) {
   const dailyLesson = lesson.toObject ? lesson.toObject() : lesson;
-  const audioIsCurrent = dailyLesson.audio?.voiceConfigVersion
-    ?.startsWith(`${NARRATION_AUDIO_VERSION}:`);
+  const savedAudioUrl = dailyLesson.audio?.url;
   return {
     ...dailyLesson,
-    audio: audioIsCurrent ? {
-      status: dailyLesson.audio.status,
-      url: dailyLesson.audio.url,
+    audio: typeof savedAudioUrl === 'string' && savedAudioUrl.trim() ? {
+      status: 'ready',
+      url: savedAudioUrl,
       durationSeconds: dailyLesson.audio.durationSeconds,
     } : null,
   };
@@ -665,8 +663,17 @@ export async function submitDailyQuizAttempt({ quizId, userId, answers, timezone
     });
   }
 
+  const learningPoints = userId
+    ? await recordQuizPoints({
+      userId,
+      quizId: `daily:${quiz.dailyLessonId}`,
+      score,
+      total,
+      timezone,
+    })
+    : { earnedPoints: 0 };
   const awardedBadges = userId ? await evaluateAndAwardBadges(userId, timezone) : [];
-  return { score, total, results, awardedBadges };
+  return { score, total, results, earnedPoints: learningPoints.earnedPoints, awardedBadges };
 }
 
 export async function recordLessonFeedback({ dailyLessonId, userId = null, helpful = null, accurate = null, rating = null, comment = null }) {

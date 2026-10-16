@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { apiRequest } from '../lib/apiClient.js';
 import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
 
-export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = false }) {
+export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = false, trackLearning = false }) {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [submission, setSubmission] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -18,8 +19,8 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
   const [shared, setShared] = useState(false);
   const [reportedQuestion, setReportedQuestion] = useState({});
   const [autoPlaySignal, setAutoPlaySignal] = useState(0);
-
-  if (!dailyLesson) return null;
+  const [storyAward, setStoryAward] = useState(null);
+  const [storyTrackingError, setStoryTrackingError] = useState('');
 
   const isBn = lang === 'bn';
   const copy = {
@@ -47,13 +48,33 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
     listenDrama: isBn ? '🎧 গল্পের অডিও শুনুন' : '🎧 Listen to Story Audio',
     closeDrama: isBn ? '✕ অডিও প্লেয়ার বন্ধ করুন' : '✕ Close Audio Player',
     goToQuiz: isBn ? '🧩 কুইজে অংশ নিন' : '🧩 Take Story Quiz',
-    savedNarration: isBn ? 'AI কণ্ঠে সংরক্ষিত গল্প' : 'Saved AI narration',
     loginRequired: isBn ? 'কুইজ জমা দিতে আগে লগইন করুন।' : 'Sign in before submitting this quiz.',
     login: isBn ? 'লগইন করুন' : 'Sign in',
     requestFailed: isBn ? 'কুইজ জমা দেওয়া যায়নি। আবার চেষ্টা করুন।' : 'Could not submit the quiz. Please try again.',
     csrfFailed: isBn ? 'নিরাপত্তা যাচাই ব্যর্থ হয়েছে। পেজ রিলোড করে আবার চেষ্টা করুন।' : 'Security check failed. Reload the page and try again.',
     curatedFallback: isBn ? 'সংরক্ষিত বিকল্প গল্প' : 'Curated fallback story',
+    storyPoints: isBn ? 'গল্প পড়ার জন্য +৫০ পয়েন্ট' : '+50 points for reading',
+    trackingError: isBn ? 'গল্প পড়ার পয়েন্ট সংরক্ষণ করা যায়নি। আবার খুলে চেষ্টা করুন।' : 'Could not save story points. Close and reopen the lesson to retry.',
+    quizPoints: isBn ? 'লিডারবোর্ডে অর্জিত পয়েন্ট' : 'Leaderboard points earned',
   };
+
+  useEffect(() => {
+    if (!trackLearning || !expanded || !dailyLesson?._id) return undefined;
+    setStoryTrackingError('');
+    apiRequest('/api/lessons/today/read', {
+      method: 'POST',
+      body: { dailyLessonId: dailyLesson._id },
+      locale: lang,
+    })
+      .then((result) => {
+        setStoryAward({ lessonId: String(dailyLesson._id), earnedPoints: result.earnedPoints || 0 });
+      })
+      .catch(() => {
+        setStoryTrackingError(copy.trackingError);
+      });
+  }, [copy.trackingError, dailyLesson?._id, expanded, lang, trackLearning]);
+
+  if (!dailyLesson) return null;
 
   const handleSelect = (questionIndex, optionIndex) => {
     if (submission) return;
@@ -188,7 +209,22 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
   const questionCount = quiz?.questions?.length || 3;
 
   return (
-    <Card id={collapsible ? 'daily-lesson-full-content' : undefined} className="surface-card space-y-6 p-4 sm:p-6">
+    <Card
+      id={collapsible ? 'daily-lesson-full-content' : undefined}
+      className={`surface-card space-y-6 p-4 sm:p-6 ${collapsible ? 'daily-lesson-reader-screen' : ''}`}
+    >
+      {collapsible ? (
+        <header className="daily-lesson-reader-header">
+          <p className="min-w-0 truncate font-bold text-ink">{dailyLesson.title}</p>
+          {storyAward?.lessonId === String(dailyLesson._id) && storyAward.earnedPoints > 0 ? (
+            <span className="shrink-0 text-xs font-extrabold text-sapphire">+{storyAward.earnedPoints} ⭐</span>
+          ) : null}
+          <Button type="button" variant="secondary" onClick={() => setExpanded(false)} aria-label={copy.closeLesson}>
+            {copy.closeLesson}
+          </Button>
+        </header>
+      ) : null}
+      {storyTrackingError ? <p role="alert" className="text-sm text-rose-700">{storyTrackingError}</p> : null}
       <div className="rounded-2xl border-2 border-gold/45 bg-paper p-4 sm:p-5">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-gold/30 bg-gold/10 p-3.5">
@@ -240,13 +276,6 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
         </div>
       </div>
 
-      {dailyLesson.audio?.status === 'ready' && dailyLesson.audio.url ? (
-        <div className="rounded-xl border border-sapphire/25 bg-sapphire/5 p-4">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-sapphire">{copy.savedNarration}</p>
-          <audio controls preload="none" src={dailyLesson.audio.url} className="w-full" aria-label={`${copy.savedNarration}: ${dailyLesson.title}`} />
-        </div>
-      ) : null}
-
       {dailyLesson.generationSource === 'curated-fallback' ? (
         <p className="text-xs font-semibold text-gold-soft" role="status">{copy.curatedFallback}</p>
       ) : null}
@@ -289,7 +318,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
       </div>
 
       {collapsible ? (
-        <Button type="button" variant="secondary" onClick={() => setExpanded(false)} aria-expanded="true" aria-controls="daily-lesson-full-content">
+        <Button type="button" variant="secondary" className="daily-lesson-close-bottom" onClick={() => setExpanded(false)} aria-expanded="true" aria-controls="daily-lesson-full-content">
           {copy.closeLesson}
         </Button>
       ) : null}
@@ -400,6 +429,9 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
               <p className="mt-1 text-2xl font-bold text-ink">
                 {submission.score} / {submission.total}
               </p>
+              {submission.earnedPoints > 0 ? (
+                <p className="mt-2 font-bold text-sapphire">+{submission.earnedPoints} ⭐ {copy.quizPoints}</p>
+              ) : null}
             </div>
           )}
         </section>

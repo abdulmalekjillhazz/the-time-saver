@@ -23,6 +23,7 @@ function tokens(selector) {
 
 const light = tokens(':root');
 const dark = tokens(':root[data-theme="dark"]');
+const lightMode = tokens(':root[data-theme="light"]');
 
 describe('design tokens', () => {
   it('the light theme matches lib/palette.js exactly', () => {
@@ -38,6 +39,25 @@ describe('design tokens', () => {
 
   it('the dark theme defines every token the light theme defines', () => {
     expect(Object.keys(dark).sort()).toEqual(Object.keys(light).sort());
+  });
+
+  it('the selected light theme uses light surfaces and accessible text colors', () => {
+    expect(lightMode.paper).toBe('#F8FAFC');
+    expect(lightMode.ink).toBe('#0F172A');
+    expect(lightMode.paper).not.toBe(dark.paper);
+    for (const [fg, bg] of [
+      ['ink', 'paper'],
+      ['sapphire', 'paper'],
+      ['sapphire-deep', 'paper'],
+      ['on-sapphire', 'sapphire'],
+      ['gold', 'paper'],
+      ['gold-soft', 'paper'],
+      ['on-gold', 'gold'],
+      ['azure', 'paper'],
+    ]) {
+      const ratio = contrast(lightMode[fg], lightMode[bg]);
+      expect(ratio, `${fg} on ${bg}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it('light and dark text pairs used by components meet WCAG 2.2 AA (4.5:1)', () => {

@@ -219,6 +219,7 @@ export function AudioDramaPlayer({
     const restartAt = isPlayingRef.current ? positionRef.current : null;
     controllerRef.current?.close();
     controllerRef.current = null;
+    setError('');
     setNotice('');
     if (restartAt !== null) startPlayback(Math.floor(restartAt));
   }, [lines, lang, audioUrl]);

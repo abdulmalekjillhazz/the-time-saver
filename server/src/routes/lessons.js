@@ -6,7 +6,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { AppError, MSG } from '../lib/AppError.js';
-import { listPublished, findPublishedBySlug, toPublicLesson, submitAttempt } from '../services/lessons.js';
+import { listPublished, findPublishedBySlug, toPublicLesson, submitAttempt, recordPublishedLessonRead } from '../services/lessons.js';
 import {
   getTodayDailyLesson,
   generateDailyLesson,
@@ -266,6 +266,24 @@ export function lessonsRouter(config) {
   });
 
   // Signed-in learners only. Requires a published lesson id.
+  r.post(
+    '/:id/read',
+    requireAuth,
+    rateLimit({ name: 'published-lesson-read', limit: 30, windowMs: MINUTE, by: 'user' }),
+    async (req, res, next) => {
+      try {
+        if (!mongoose.isValidObjectId(req.params.id)) throw new AppError(404, 'NOT_FOUND', MSG.notFound);
+        if (!(await isEnabledFor('lessons.quiz', req.userId))) {
+          throw new AppError(503, 'UNAVAILABLE', { en: 'Lessons are not available for you yet.', bn: 'এখন আপনার জন্য পাঠ চালু হয়নি।' });
+        }
+        const result = await recordPublishedLessonRead(req.params.id, req.user);
+        res.status(201).json(result);
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
   r.post(
     '/:id/attempts',
     requireAuth,
