@@ -27,6 +27,35 @@ jobs:
       - run: npm ci
       - run: npm run build -w server
 
+  android-build:
+    name: Android debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - run: npm ci
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+      - name: Build Android debug APK
+        working-directory: android
+        run: bash gradlew --no-daemon assembleDebug
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-routine-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
   quality:
     name: Lint, unit tests, coverage floor
     runs-on: ubuntu-latest
