@@ -20,6 +20,7 @@ import { getRoutineMood } from '../lib/routineMood.js';
 import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
 import { syncAlarmCreate, syncAlarmDelete, syncAlarmUpdate, reportAlarmFired, fetchServerAlarms, fetchMissedAlarms, acknowledgeAlarm } from '../lib/alarmsSync.js';
 import { ensureAlarmPushSubscription } from '../lib/pushClient.js';
+import { ALARM_SOUNDS, getAlarmSoundDataUri, playAlarmSound, stopAlarmSound } from '../lib/notificationSound.js';
 import {
   addNativeAlarmListener,
   cancelNativeAlarm,
@@ -28,6 +29,8 @@ import {
   isAndroidNativeApp,
   requestNativeAlarmPermissions,
   scheduleNativeAlarm,
+  setNativeAlarmSound,
+  setNativeStopwatchDisplay,
   stopNativeAlarm,
 } from '../lib/nativeAlarm.js';
 import { getFocusRoutines } from '../lib/routineFocus.js';
@@ -100,6 +103,8 @@ const COPY = {
     assistantSend: 'Ask assistant', assistantDisclaimer: '⚠️ AM’s Routine Assistant can make mistakes. Double-check important advice.',
     themeDark: 'Switch to dark mode', themeLight: 'Switch to light mode', alarmTitle: 'Alarms',
     alarmTime: 'Alarm time', alarmName: 'Alarm name', addAlarm: 'Set alarm', noAlarms: 'No alarms set yet.',
+    alarmSound: 'Alarm sound', previewAlarmSound: 'Preview sound', stopAlarmSound: 'Stop preview',
+    alarmSoundHelp: 'This sound plays with alarms while the app is open and for Android alarms when the app is closed. Browser notifications while the app is closed use the sound set by your browser or device.',
     enableBrowserNotifications: 'Enable browser notifications', browserNotificationsOn: 'Browser notifications are enabled.',
     browserNotificationsOff: 'Browser notifications are off. Tap Enable and allow them in your browser prompt.',
     browserNotificationsBlocked: 'Notifications are blocked in browser settings. Allow them for this site, then try again.',
@@ -109,7 +114,8 @@ const COPY = {
     alarmRinging: 'Your alarm is ringing', stopAlarm: 'Stop alarm', removeAlarm: 'Remove alarm',
     snoozeAlarm: 'Snooze 5 min',
     stopwatch: 'Stopwatch', startTimer: 'Start', pauseTimer: 'Pause', resetTimer: 'Reset',
-    voiceAlarmNote: 'When an alarm rings, your Google voice speaks the alarm name and your next routine, and a notification is sent with the same message. Alarms ring while this app is open.', nativeAlarmNote: 'Android uses your phone ringtone and keeps the alarm ringing when Smart Routine is closed. Allow the Android alarm permissions below.', alarmVoiceUnavailable: 'The voice alarm could not play in this browser. The notification was still sent.',
+    expandStopwatch: 'Open full screen', collapseStopwatch: 'Exit full screen',
+    voiceAlarmNote: 'When an alarm rings, your Google voice speaks the alarm name and your next routine, and a notification is sent with the same message. Alarms ring while this app is open.', nativeAlarmNote: 'Android uses your selected alarm sound and keeps alarms ringing when Smart Routine is closed. Allow the Android alarm permissions below.', alarmVoiceUnavailable: 'The voice alarm could not play in this browser. The notification was still sent.',
     alarmPushOn: 'Closed-app alerts are on for this device — alarms ring even with the app closed.', alarmPushOff: 'Turn on closed-app alerts so alarms ring even with the app closed.',
     enableClosedAppAlerts: '🔔 Enable closed-app alerts', pushUnavailable: 'Closed-app alerts are unavailable in this browser.',
     enableNativeAlarm: '📞 Enable Android call-style alarms', nativeAlarmEnabled: 'Android alarms can ring when Smart Routine is closed.', nativeAlarmPermissionMissing: 'Allow notifications, exact alarms, and full-screen alarms in Android settings, then tap enable again.',
@@ -168,6 +174,8 @@ const COPY = {
     assistantSend: 'সহকারীকে জিজ্ঞাসা করুন', assistantDisclaimer: '⚠️ AM’s রুটিন সহকারী ভুল করতে পারে। গুরুত্বপূর্ণ পরামর্শ যাচাই করে নিন।',
     themeDark: 'ডার্ক মোড চালু করুন', themeLight: 'লাইট মোড চালু করুন', alarmTitle: 'অ্যালার্ম',
     alarmTime: 'অ্যালার্মের সময়', alarmName: 'অ্যালার্মের নাম', addAlarm: 'অ্যালার্ম সেট করুন', noAlarms: 'এখনো কোনো অ্যালার্ম সেট করা নেই।',
+    alarmSound: 'অ্যালার্মের শব্দ', previewAlarmSound: 'শব্দ শুনুন', stopAlarmSound: 'শোনা বন্ধ করুন',
+    alarmSoundHelp: 'অ্যাপ খোলা থাকলে এবং Android অ্যাপ বন্ধ থাকলেও অ্যালার্মে এই শব্দ বাজবে। Browser বন্ধ থাকলে notification-এর শব্দ browser বা device-এর সেটিংস অনুযায়ী হবে।',
     enableBrowserNotifications: 'ব্রাউজার নোটিফিকেশন চালু করুন', browserNotificationsOn: 'ব্রাউজার নোটিফিকেশন চালু আছে।',
     browserNotificationsOff: 'ব্রাউজার নোটিফিকেশন বন্ধ। চালু করুন চাপুন এবং ব্রাউজারের অনুমতি দিন।',
     browserNotificationsBlocked: 'ব্রাউজার সেটিংসে নোটিফিকেশন বন্ধ আছে। এই সাইটের জন্য চালু করে আবার চেষ্টা করুন।',
@@ -177,7 +185,8 @@ const COPY = {
     alarmRinging: 'অ্যালার্ম বাজছে', stopAlarm: 'অ্যালার্ম বন্ধ করুন', removeAlarm: 'অ্যালার্ম সরান',
     snoozeAlarm: '৫ মিনিট স্নুজ',
     stopwatch: 'স্টপওয়াচ', startTimer: 'শুরু', pauseTimer: 'থামান', resetTimer: 'রিসেট',
-    voiceAlarmNote: 'অ্যালার্ম বাজলে Google ভয়েসে অ্যালার্মের নাম ও পরের রুটিন শোনা যাবে, আর একই বার্তায় নোটিফিকেশন আসবে। অ্যাপ খোলা থাকলে অ্যালার্ম বাজবে।', nativeAlarmNote: 'Android আপনার ফোনের ringtone ব্যবহার করবে এবং Smart Routine বন্ধ থাকলেও অ্যালার্ম বাজতে থাকবে। নিচের Android alarm অনুমতিগুলো দিন।', alarmVoiceUnavailable: 'এই browser-এ ভয়েস অ্যালার্ম চালানো যায়নি। নোটিফিকেশন পাঠানো হয়েছে।',
+    expandStopwatch: 'পুরো পর্দায় খুলুন', collapseStopwatch: 'পুরো পর্দা বন্ধ করুন',
+    voiceAlarmNote: 'অ্যালার্ম বাজলে Google ভয়েসে অ্যালার্মের নাম ও পরের রুটিন শোনা যাবে, আর একই বার্তায় নোটিফিকেশন আসবে। অ্যাপ খোলা থাকলে অ্যালার্ম বাজবে।', nativeAlarmNote: 'Android-এ আপনার বেছে নেওয়া অ্যালার্মের শব্দ বাজবে এবং Smart Routine বন্ধ থাকলেও অ্যালার্ম চলবে। নিচের Android alarm অনুমতিগুলো দিন।', alarmVoiceUnavailable: 'এই browser-এ ভয়েস অ্যালার্ম চালানো যায়নি। নোটিফিকেশন পাঠানো হয়েছে।',
     alarmPushOn: 'এই ডিভাইসে বন্ধ-অ্যাপ অ্যালার্ট চালু আছে — অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।', alarmPushOff: 'বন্ধ-অ্যাপ অ্যালার্ট চালু করুন, তাহলে অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।',
     enableClosedAppAlerts: '🔔 বন্ধ-অ্যাপ অ্যালার্ট চালু করুন', pushUnavailable: 'এই browser-এ বন্ধ-অ্যাপ অ্যালার্ট সমর্থিত নয়।',
     enableNativeAlarm: '📞 Android কলের মতো অ্যালার্ম চালু করুন', nativeAlarmEnabled: 'Smart Routine বন্ধ থাকলেও Android অ্যালার্ম বাজতে পারবে।', nativeAlarmPermissionMissing: 'Android সেটিংসে notification, exact alarm ও full-screen alarm অনুমতি দিন, তারপর আবার চালু করুন।',
@@ -452,6 +461,8 @@ export function PrivateApp() {
   const showPrayerTimes = useAppStore((state) => state.showPrayerTimes);
   const setShowPrayerTimes = useAppStore((state) => state.setShowPrayerTimes);
   const alarms = useAppStore((state) => state.alarms);
+  const alarmSoundId = useAppStore((state) => state.alarmSoundId);
+  const setAlarmSoundId = useAppStore((state) => state.setAlarmSoundId);
   const addAlarm = useAppStore((state) => state.addAlarm);
   const removeAlarm = useAppStore((state) => state.removeAlarm);
   const snoozeAlarm = useAppStore((state) => state.snoozeAlarm);
@@ -464,6 +475,8 @@ export function PrivateApp() {
   const [clockNow, setClockNow] = useState(() => Date.now());
   const [alarmName, setAlarmName] = useState('');
   const [alarmTime, setAlarmTime] = useState('');
+  const [isAlarmSoundPreviewing, setIsAlarmSoundPreviewing] = useState(false);
+  const [stopwatchFullscreen, setStopwatchFullscreen] = useState(false);
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState('default');
   const [firingAlarm, setFiringAlarm] = useState(null);
   const [missedAlarms, setMissedAlarms] = useState([]);
@@ -475,11 +488,15 @@ export function PrivateApp() {
   const [replanRoutine, setReplanRoutine] = useState(null);
   const alarmSpeechRef = useRef(null);
   const alarmSpeechTimer = useRef(null);
+  const alarmSoundPreviewTimer = useRef(null);
+  const screenWakeLockRef = useRef(null);
   const firingAlarmRef = useRef(null);
   const catchupSpokenRef = useRef(false);
   const snoozeLinkHandledRef = useRef(false);
   const copy = COPY[lang];
   const nativeAndroid = isAndroidNativeApp();
+  const stopwatchElapsed = stopwatchElapsedMs
+    + (stopwatchStartedAt === null ? 0 : Math.max(0, clockNow - stopwatchStartedAt));
 
   const reportError = useCallback((err) => {
     setError(messageFrom(err, lang));
@@ -608,6 +625,34 @@ export function PrivateApp() {
       });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!uiReady || !nativeAndroid) return undefined;
+    let active = true;
+    setNativeAlarmSound(getAlarmSoundDataUri(alarmSoundId))
+      .catch((err) => { if (active) reportError(err); });
+    return () => { active = false; };
+  }, [alarmSoundId, nativeAndroid, reportError, uiReady]);
+
+  useEffect(() => {
+    if (!stopwatchFullscreen) return undefined;
+    let active = true;
+    if (nativeAndroid) {
+      setNativeStopwatchDisplay(true).catch((err) => { if (active) reportError(err); });
+    }
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) setStopwatchFullscreen(false);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => {
+      active = false;
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      if (nativeAndroid) setNativeStopwatchDisplay(false).catch(reportError);
+      const wakeLock = screenWakeLockRef.current;
+      screenWakeLockRef.current = null;
+      if (wakeLock) void wakeLock.release().catch(reportError);
+    };
+  }, [nativeAndroid, reportError, stopwatchFullscreen]);
 
   useEffect(() => {
     let active = true;
@@ -967,6 +1012,11 @@ export function PrivateApp() {
       const store = useAppStore.getState();
       due.forEach((alarm) => store.markAlarmFired(alarm.id));
       const firing = due[0];
+      if (alarmSoundPreviewTimer.current) window.clearTimeout(alarmSoundPreviewTimer.current);
+      alarmSoundPreviewTimer.current = null;
+      setIsAlarmSoundPreviewing(false);
+      stopAlarmSound();
+      playAlarmSound(store.alarmSoundId);
       setFiringAlarm(firing);
       firingAlarmRef.current = firing;
       // Tell the server we rang it ourselves, so the closed-app tick skips it.
@@ -1001,7 +1051,7 @@ export function PrivateApp() {
       }, 25_000);
       if ('Notification' in window && Notification.permission === 'granted') {
         try {
-          new Notification(copy.alarmRinging, { body: announcement.text, tag: `smart-routine-alarm-${firing.id}` });
+          new Notification(copy.alarmRinging, { body: announcement.text, tag: `smart-routine-alarm-${firing.id}`, silent: true });
         } catch (err) {
           reportError(err);
         }
@@ -1014,6 +1064,8 @@ export function PrivateApp() {
     alarmSpeechRef.current?.stop();
     alarmSpeechRef.current = null;
     if (alarmSpeechTimer.current) window.clearInterval(alarmSpeechTimer.current);
+    if (alarmSoundPreviewTimer.current) window.clearTimeout(alarmSoundPreviewTimer.current);
+    stopAlarmSound();
   }, []);
 
   // Merge server alarms on login: pull missing ones down, push offline ones up.
@@ -1240,12 +1292,59 @@ export function PrivateApp() {
 
   function dismissAlarm() {
     if (nativeAndroid && firingAlarm) void stopNativeAlarm(firingAlarm.id).catch(reportError);
+    stopAlarmSound();
     alarmSpeechRef.current?.stop();
     alarmSpeechRef.current = null;
     if (alarmSpeechTimer.current) window.clearInterval(alarmSpeechTimer.current);
     alarmSpeechTimer.current = null;
     firingAlarmRef.current = null;
     setFiringAlarm(null);
+  }
+
+  function previewAlarmSound() {
+    if (isAlarmSoundPreviewing) {
+      if (alarmSoundPreviewTimer.current) window.clearTimeout(alarmSoundPreviewTimer.current);
+      alarmSoundPreviewTimer.current = null;
+      stopAlarmSound();
+      setIsAlarmSoundPreviewing(false);
+      return;
+    }
+    playAlarmSound(alarmSoundId);
+    setIsAlarmSoundPreviewing(true);
+    alarmSoundPreviewTimer.current = window.setTimeout(() => {
+      stopAlarmSound();
+      setIsAlarmSoundPreviewing(false);
+      alarmSoundPreviewTimer.current = null;
+    }, 6000);
+  }
+
+  async function openStopwatchFullscreen() {
+    setStopwatchFullscreen(true);
+    if (!nativeAndroid && document.documentElement.requestFullscreen) {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch (err) {
+        reportError(err);
+      }
+    }
+    if (!nativeAndroid && 'wakeLock' in navigator) {
+      try {
+        screenWakeLockRef.current = await navigator.wakeLock.request('screen');
+      } catch (err) {
+        reportError(err);
+      }
+    }
+  }
+
+  async function closeStopwatchFullscreen() {
+    setStopwatchFullscreen(false);
+    if (!nativeAndroid && document.fullscreenElement) {
+      try {
+        await document.exitFullscreen();
+      } catch (err) {
+        reportError(err);
+      }
+    }
   }
 
   function snoozeOneAlarm(id) {
@@ -2078,11 +2177,14 @@ export function PrivateApp() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="section-heading"><span aria-hidden="true">⏱️</span> {copy.stopwatch}</h2>
                 <span className="stopwatch-display" role="timer" aria-live="off">
-                  {formatStopwatch(stopwatchElapsedMs + (stopwatchStartedAt === null ? 0 : Math.max(0, clockNow - stopwatchStartedAt)))}
+                  {formatStopwatch(stopwatchElapsed)}
                 </span>
               </div>
               <p className="opacity-75">{copy.focus}</p>
               <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" onClick={openStopwatchFullscreen}>
+                  <span aria-hidden="true">⛶</span><span className="ml-2">{copy.expandStopwatch}</span>
+                </Button>
                 {stopwatchStartedAt === null
                   ? <Button onClick={() => startStopwatch()}><span aria-hidden="true">▶️</span><span className="ml-2">{copy.startTimer}</span></Button>
                   : <Button variant="secondary" onClick={() => stopStopwatch()}><span aria-hidden="true">⏸️</span><span className="ml-2">{copy.pauseTimer}</span></Button>}
@@ -2099,6 +2201,28 @@ export function PrivateApp() {
                   <Button type="submit" className="min-h-[52px] w-full text-lg"><span aria-hidden="true">⏰</span><span className="ml-2">{copy.addAlarm}</span></Button>
                 </div>
               </form>
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <label className="block">{copy.alarmSound}
+                  <select
+                    className="polished-input mt-1 block min-h-[48px] w-full"
+                    value={alarmSoundId}
+                    onChange={(event) => {
+                      setAlarmSoundId(event.target.value);
+                      if (isAlarmSoundPreviewing) {
+                        playAlarmSound(event.target.value);
+                      }
+                    }}
+                  >
+                    {ALARM_SOUNDS.map((sound) => (
+                      <option key={sound.id} value={sound.id}>{lang === 'bn' ? sound.bn : sound.en}</option>
+                    ))}
+                  </select>
+                </label>
+                <Button type="button" variant="secondary" className="min-h-[48px]" disabled={Boolean(firingAlarm)} onClick={previewAlarmSound}>
+                  {isAlarmSoundPreviewing ? copy.stopAlarmSound : copy.previewAlarmSound}
+                </Button>
+                <p className="text-sm opacity-75 sm:col-span-2">{copy.alarmSoundHelp}</p>
+              </div>
               <p className="text-sm opacity-75">{nativeAndroid ? copy.nativeAlarmNote : copy.voiceAlarmNote}</p>
               <div className="flex flex-col gap-2">
                 {pushAlarmReady || (!nativeAndroid && browserNotificationPermission === 'granted') ? (
@@ -2516,6 +2640,30 @@ export function PrivateApp() {
             </div>
           </section>
         </div>
+      ) : null}
+      {stopwatchFullscreen ? (
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-label={copy.stopwatch}
+          className="fixed inset-0 z-[200] flex min-h-[100dvh] flex-col items-center justify-center gap-8 overflow-auto bg-slate-950 px-5 py-8 text-white"
+          style={{
+            paddingTop: 'max(2rem, env(safe-area-inset-top))',
+            paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
+          }}
+        >
+          <h2 className="text-lg font-bold uppercase tracking-[0.24em] text-amber-300">{copy.stopwatch}</h2>
+          <output className="whitespace-nowrap font-mono text-[clamp(3rem,18vw,10rem)] font-extrabold tabular-nums leading-none tracking-tight" role="timer" aria-live="off">
+            {formatStopwatch(stopwatchElapsed)}
+          </output>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {stopwatchStartedAt === null
+              ? <Button type="button" className="min-h-14 min-w-32 text-lg" onClick={() => startStopwatch()}><span aria-hidden="true">▶️</span><span className="ml-2">{copy.startTimer}</span></Button>
+              : <Button type="button" className="min-h-14 min-w-32 text-lg" variant="secondary" onClick={() => stopStopwatch()}><span aria-hidden="true">⏸️</span><span className="ml-2">{copy.pauseTimer}</span></Button>}
+            <Button type="button" variant="secondary" className="min-h-14" onClick={() => resetStopwatch()}><span aria-hidden="true">↻</span><span className="ml-2">{copy.resetTimer}</span></Button>
+            <Button type="button" variant="secondary" className="min-h-14" onClick={closeStopwatchFullscreen}><span aria-hidden="true">⤢</span><span className="ml-2">{copy.collapseStopwatch}</span></Button>
+          </div>
+        </section>
       ) : null}
     </main>
   );

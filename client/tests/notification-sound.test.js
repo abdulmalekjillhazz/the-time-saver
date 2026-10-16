@@ -9,7 +9,7 @@ vi.mock('howler', () => ({
   },
 }));
 
-import { ALARM_SOUNDS, playAlarmSound, stopAlarmSound } from '../lib/notificationSound.js';
+import { ALARM_SOUNDS, getAlarmSoundDataUri, playAlarmSound, stopAlarmSound } from '../lib/notificationSound.js';
 
 describe('alarm sound lifecycle', () => {
   afterEach(() => {
@@ -49,6 +49,17 @@ describe('alarm sound lifecycle', () => {
     const options = HowlMock.mock.calls[0][0];
     expect(options.src[0]).toMatch(/^data:audio\/wav;base64,/);
     expect(sound.play).toHaveBeenCalledOnce();
+  });
+
+  it('exports a bounded WAV data URI for native Android alarm playback', () => {
+    const dataUri = getAlarmSoundDataUri('ocean');
+    const wav = Buffer.from(dataUri.slice('data:audio/wav;base64,'.length), 'base64');
+
+    expect(dataUri).toMatch(/^data:audio\/wav;base64,/);
+    expect(dataUri.length).toBeLessThan(250_000);
+    expect(wav.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(wav.subarray(8, 12).toString('ascii')).toBe('WAVE');
+    expect(dataUri).not.toBe(getAlarmSoundDataUri('birds'));
   });
 
   it('unloads the old preview before switching to a different selection', () => {

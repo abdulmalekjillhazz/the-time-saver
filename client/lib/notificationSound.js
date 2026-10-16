@@ -175,6 +175,11 @@ function makeSoundDataUri(soundId) {
   return `data:audio/wav;base64,${btoa(binary)}`;
 }
 
+export function getAlarmSoundDataUri(soundId = ALARM_SOUNDS[0].id) {
+  const sound = ALARM_SOUNDS.some((option) => option.id === soundId) ? soundId : ALARM_SOUNDS[0].id;
+  return makeSoundDataUri(sound);
+}
+
 let alarmSound;
 let activeSoundId;
 

@@ -128,6 +128,7 @@ export function speechRouter({ config = {} } = {}) {
           text: req.body.content,
           lang: req.body.lang,
         });
+        logger.info({ audioSource: 'google-tts', storyAudio: true }, 'story audio generated');
         res.set({
           'Cache-Control': 'private, no-store',
           'Content-Length': String(audio.length),
@@ -161,6 +162,11 @@ export function speechRouter({ config = {} } = {}) {
           content: req.body.content,
           config,
         });
+        logger.info({
+          audioSource: 'cloudinary',
+          cached: Boolean(result.cached),
+          storyAudio: true,
+        }, 'story audio ready');
         return res.json({
           cached: Boolean(result.cached),
           audioUrl: result.url,

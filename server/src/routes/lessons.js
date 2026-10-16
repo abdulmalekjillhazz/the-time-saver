@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { AppError, MSG } from '../lib/AppError.js';
+import { logger } from '../lib/logger.js';
 import { listPublished, findPublishedBySlug, toPublicLesson, submitAttempt, recordPublishedLessonRead } from '../services/lessons.js';
 import {
   getTodayDailyLesson,
@@ -102,6 +103,9 @@ export function lessonsRouter(config) {
       const locale = req.query.locale || req.user?.locale || 'bn';
       const date = req.query.date;
       const data = await getTodayDailyLesson({ date, locale });
+      if (data.dailyLesson?.audio?.url) {
+        logger.info({ audioSource: 'cloudinary', lessonType: 'daily' }, 'saved story audio URL returned');
+      }
       res.json(data);
     } catch (err) {
       next(err);
@@ -259,7 +263,11 @@ export function lessonsRouter(config) {
   r.get('/:slug', rateLimit({ name: 'lessons-read', limit: 120, windowMs: MINUTE }), async (req, res, next) => {
     try {
       const lesson = await findPublishedBySlug(req.params.slug);
-      res.json({ lesson: toPublicLesson(lesson) });
+      const publicLesson = toPublicLesson(lesson);
+      if (publicLesson.media?.type === 'audio') {
+        logger.info({ audioSource: 'cloudinary', lessonType: 'published' }, 'saved story audio URL returned');
+      }
+      res.json({ lesson: publicLesson });
     } catch (err) {
       next(err);
     }

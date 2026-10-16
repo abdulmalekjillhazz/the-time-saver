@@ -1,6 +1,7 @@
 package com.madeyourdreambigger.smartroutine;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
@@ -9,6 +10,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Build;
+import android.util.Base64;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import androidx.activity.result.ActivityResult;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
@@ -29,7 +34,10 @@ import org.json.JSONObject;
     permissions = { @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }) }
 )
 public class NativeAlarmPlugin extends Plugin {
+    static final String PREFS_ALARM = "smart-routine-alarm";
+    static final String PREF_ALARM_SOUND = "alarmSoundDataUri";
     private BroadcastReceiver alarmEventReceiver;
+    private int originalSystemUiVisibility = -1;
 
     @Override
     public void load() {
@@ -52,6 +60,7 @@ public class NativeAlarmPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        setStopwatchDisplay(false);
         if (alarmEventReceiver != null) {
             getContext().unregisterReceiver(alarmEventReceiver);
             alarmEventReceiver = null;
@@ -131,6 +140,70 @@ public class NativeAlarmPlugin extends Plugin {
     public void stop(PluginCall call) {
         stopAlarmService(call.getString("id", ""));
         call.resolve();
+    }
+
+    @PluginMethod
+    public void setAlarmSound(PluginCall call) {
+        String dataUri = call.getString("dataUri");
+        String prefix = "data:audio/wav;base64,";
+        if (dataUri == null || !dataUri.startsWith(prefix) || dataUri.length() > 250_000) {
+            call.reject("The selected alarm sound is invalid.");
+            return;
+        }
+        try {
+            byte[] wav = Base64.decode(dataUri.substring(prefix.length()), Base64.DEFAULT);
+            if (
+                wav.length < 44 || wav.length > 180_000
+                || wav[0] != 'R' || wav[1] != 'I' || wav[2] != 'F' || wav[3] != 'F'
+                || wav[8] != 'W' || wav[9] != 'A' || wav[10] != 'V' || wav[11] != 'E'
+            ) {
+                call.reject("The selected alarm sound is not a valid WAV file.");
+                return;
+            }
+            getContext().getSharedPreferences(PREFS_ALARM, Context.MODE_PRIVATE)
+                .edit()
+                .putString(PREF_ALARM_SOUND, dataUri)
+                .apply();
+            call.resolve();
+        } catch (IllegalArgumentException error) {
+            call.reject("The selected alarm sound could not be decoded.", error);
+        }
+    }
+
+    @PluginMethod
+    public void setStopwatchDisplay(PluginCall call) {
+        boolean active = call.getBoolean("active", false);
+        setStopwatchDisplay(active);
+        call.resolve();
+    }
+
+    private void setStopwatchDisplay(boolean active) {
+        Activity activity = getActivity();
+        if (activity == null) return;
+        activity.runOnUiThread(() -> {
+            Window window = activity.getWindow();
+            View decor = window.getDecorView();
+            if (active) {
+                if (originalSystemUiVisibility < 0) {
+                    originalSystemUiVisibility = decor.getSystemUiVisibility();
+                }
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                decor.setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                );
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                if (originalSystemUiVisibility >= 0) {
+                    decor.setSystemUiVisibility(originalSystemUiVisibility);
+                    originalSystemUiVisibility = -1;
+                }
+            }
+        });
     }
 
     @PluginMethod

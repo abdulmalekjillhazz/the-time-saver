@@ -14,8 +14,11 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.util.Base64;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import java.io.File;
+import java.io.FileOutputStream;
 
 public class AlarmRingingService extends Service {
     static final String ACTION_RING = "com.madeyourdreambigger.smartroutine.RING";
@@ -27,6 +30,7 @@ public class AlarmRingingService extends Service {
     private String alarmLabel = "";
     private MediaPlayer player;
     private PowerManager.WakeLock wakeLock;
+    private File customSoundFile;
 
     @Override
     public void onCreate() {
@@ -73,25 +77,86 @@ public class AlarmRingingService extends Service {
 
     private void startRingtone() {
         stopRingtone();
-        Uri ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-        if (ringtone == null) ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        String dataUri = getSharedPreferences(NativeAlarmPlugin.PREFS_ALARM, MODE_PRIVATE)
+            .getString(NativeAlarmPlugin.PREF_ALARM_SOUND, null);
+        if (dataUri != null) {
+            try {
+                customSoundFile = writeCustomSoundFile(dataUri);
+                startPlayer(customSoundFile.getAbsolutePath());
+                acquireWakeLock();
+                return;
+            } catch (Exception error) {
+                Log.w("SmartRoutineAlarm", "Could not play the selected alarm sound; using the phone ringtone.", error);
+                stopRingtone();
+            }
+        }
+        Uri ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+        if (ringtone == null) ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
         try {
-            player = new MediaPlayer();
-            player.setAudioAttributes(new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build());
-            player.setDataSource(this, ringtone);
-            player.setLooping(true);
-            player.prepare();
-            player.start();
-            PowerManager manager = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            wakeLock = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SmartRoutine:Alarm");
-            wakeLock.acquire(2 * 60 * 60 * 1000L);
+            if (ringtone == null) throw new IllegalStateException("No default ringtone is available.");
+            startPlayer(ringtone);
+            acquireWakeLock();
         } catch (Exception error) {
             Log.e("SmartRoutineAlarm", "Could not start the alarm ringtone.", error);
             stopRingtone();
         }
+    }
+
+    private File writeCustomSoundFile(String dataUri) throws Exception {
+        String prefix = "data:audio/wav;base64,";
+        if (!dataUri.startsWith(prefix) || dataUri.length() > 250_000) {
+            throw new IllegalArgumentException("Saved alarm sound data is invalid.");
+        }
+        byte[] wav = Base64.decode(dataUri.substring(prefix.length()), Base64.DEFAULT);
+        if (
+            wav.length < 44 || wav.length > 180_000
+            || wav[0] != 'R' || wav[1] != 'I' || wav[2] != 'F' || wav[3] != 'F'
+            || wav[8] != 'W' || wav[9] != 'A' || wav[10] != 'V' || wav[11] != 'E'
+        ) {
+            throw new IllegalArgumentException("Saved alarm sound is not a valid WAV file.");
+        }
+        File file = new File(getCacheDir(), "smart-routine-alarm.wav");
+        try {
+            try (FileOutputStream output = new FileOutputStream(file, false)) {
+                output.write(wav);
+                output.flush();
+            }
+            return file;
+        } catch (Exception error) {
+            file.delete();
+            throw error;
+        }
+    }
+
+    private void startPlayer(String filePath) throws Exception {
+        player = createPlayer();
+        player.setDataSource(filePath);
+        player.setLooping(true);
+        player.prepare();
+        player.start();
+    }
+
+    private void startPlayer(Uri source) throws Exception {
+        player = createPlayer();
+        player.setDataSource(this, source);
+        player.setLooping(true);
+        player.prepare();
+        player.start();
+    }
+
+    private MediaPlayer createPlayer() {
+        MediaPlayer newPlayer = new MediaPlayer();
+        newPlayer.setAudioAttributes(new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ALARM)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build());
+        return newPlayer;
+    }
+
+    private void acquireWakeLock() {
+        PowerManager manager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        wakeLock = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SmartRoutine:Alarm");
+        wakeLock.acquire(2 * 60 * 60 * 1000L);
     }
 
     private Notification buildNotification() {
@@ -160,6 +225,10 @@ public class AlarmRingingService extends Service {
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
             wakeLock = null;
+        }
+        if (customSoundFile != null) {
+            customSoundFile.delete();
+            customSoundFile = null;
         }
     }
 

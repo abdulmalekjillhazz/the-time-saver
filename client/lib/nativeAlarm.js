@@ -16,6 +16,16 @@ export async function getNativeAlarmPermissions() {
   return NativeAlarm.getAlarmPermissions();
 }
 
+export async function setNativeAlarmSound(dataUri) {
+  if (!isAndroidNativeApp()) return null;
+  return NativeAlarm.setAlarmSound({ dataUri });
+}
+
+export async function setNativeStopwatchDisplay(active) {
+  if (!isAndroidNativeApp()) return null;
+  return NativeAlarm.setStopwatchDisplay({ active });
+}
+
 export async function scheduleNativeAlarm(alarm) {
   if (!isAndroidNativeApp()) return null;
   return NativeAlarm.schedule({

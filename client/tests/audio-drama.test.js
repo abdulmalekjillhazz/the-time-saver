@@ -63,6 +63,8 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('aria-current="step"');
     expect(markup).toContain('aria-label="Seek through the story"');
     expect(markup).toContain('Learn English by Story');
+    expect(markup).not.toContain('Cloudinary');
+    expect(markup).not.toContain('Google TTS');
     expect(markup).not.toContain('3D Audio Drama');
     expect(markup).not.toContain('3D Audio On');
   });

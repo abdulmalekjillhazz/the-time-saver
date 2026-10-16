@@ -110,7 +110,6 @@ export function AudioDramaPlayer({
   const [isPaused, setIsPaused] = useState(false);
   const [position, setPosition] = useState(0);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedWord, setSelectedWord] = useState(null);
   const controllerRef = useRef(null);
@@ -161,7 +160,6 @@ export function AudioDramaPlayer({
   const startPlayback = (startAt = 0) => {
     controllerRef.current?.close();
     setError('');
-    setNotice('');
     isPlayingRef.current = true;
     pausedRef.current = false;
     setIsPlaying(true);
@@ -181,7 +179,6 @@ export function AudioDramaPlayer({
         setPosition(0);
         setIsPlaying(false);
         setIsPaused(false);
-        setNotice('');
       },
       {
         lang,
@@ -194,10 +191,8 @@ export function AudioDramaPlayer({
           pausedRef.current = false;
           setIsPlaying(false);
           setIsPaused(false);
-          setNotice('');
           setError(message || copy.friendlyError);
         },
-        onNotice: setNotice,
       },
     );
     controllerRef.current.play(startAt);
@@ -220,7 +215,6 @@ export function AudioDramaPlayer({
     controllerRef.current?.close();
     controllerRef.current = null;
     setError('');
-    setNotice('');
     if (restartAt !== null) startPlayback(Math.floor(restartAt));
   }, [lines, lang, audioUrl]);
 
@@ -255,7 +249,6 @@ export function AudioDramaPlayer({
     setIsPlaying(false);
     setIsPaused(false);
     setIsFullscreen(false);
-    setNotice('');
   };
 
   const handleSeek = (value) => {
@@ -307,8 +300,6 @@ export function AudioDramaPlayer({
               </button>
             ) : null}
           </div>
-
-          {notice ? <p role="status" className="w-full text-xs font-medium text-gold-soft">{notice}</p> : null}
 
           {lines.length ? (
             <input
