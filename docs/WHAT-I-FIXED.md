@@ -3,10 +3,10 @@
 This file is honest about scope. It is NOT a production sign-off.
 
 ## Fixed in this pass
-- `client/lib/seo.js` (RELEASE-v2.md "Audit item 8"): a production build
-  (`NODE_ENV=production`) with no `NEXT_PUBLIC_SITE_URL` set now throws at build
-  time instead of silently shipping `http://localhost:3000` as the canonical URL,
-  sitemap domain, and JSON-LD. Dev/test behavior is unchanged.
+- `client/lib/seo.js`: production canonical URLs use the primary public domain
+  instead of a generated Vercel deployment alias. Bengali pages are indexable
+  after user approval, noindex pages omit hreflang, and social cards use a
+  verified 1200×630 image endpoint.
 
 ## NOT fixed — needs real infrastructure or a human, not a code edit
 - 68 MongoDB integration tests have never been run against real MongoDB (only a
@@ -19,7 +19,7 @@ This file is honest about scope. It is NOT a production sign-off.
   the outbox engine (shared/src/outbox.js) exists and is unit-tested, but nothing
   in client/ calls it yet — the private app screens themselves are not built
   (see "Still open: Phases 1-8" in RELEASE-v2.md).
-- Bangla copy: needs review by a native speaker before `SEO_BN_INDEXABLE=true`.
+- Bangla copy: user approved for public indexing; `SEO_BN_INDEXABLE` no longer gates public metadata.
 - Privacy policy / terms of use: needs a lawyer's review.
 - Real device testing (Android, iPhone, real PCs): not done.
 
@@ -40,7 +40,7 @@ in "NOT fixed" above as blocking for a real production launch.
 ### Priority 1 — Known Open Bugs & Audit
 - Priority 1.1 (Audit items 5 & 6 — Sync error handling & lost completion updates): Verified done. Fixed `server/src/services/sync.js` and `server/src/routes/completions.js`. Handled concurrent completion upsert race conditions (`err.code === 11000`) on unique compound index `(userId, routineId, date)` with fallback to `updateOne`, ensuring concurrent operations return clean `applied` status instead of 500. Handled Mongoose `ValidationError` and `CastError` in `applyOne` by returning clean `{ status: 'rejected', code: 'VALIDATION_FAILED' }` results. Added integration test coverage for concurrent and invalid completions in `server/tests/integration/sync.test.js`.
 - Priority 1.2 (Audit item 7 — Outbox auto-retry & IndexedDB store): Verified done. Implemented `client/lib/idbStore.js` matching `list()`, `put(op)`, and `remove(opId)` store contract with fallback. Implemented `client/lib/outboxClient.js` wiring data-mutating actions (`enqueueRoutineCreate`, `enqueueRoutineUpdate`, `enqueueRoutineDelete`, `enqueueCompletionSet`) and scheduling auto-flush on `navigator.onLine`, 30s interval, and foreground visibility. Implemented `client/components/SyncStatus.jsx` displaying pending/failed sync states with retry trigger. Verified via `client/tests/outbox-store.test.js`.
-- Priority 1.3 (Audit item 8 — Production site URL): Verified done. Verified in `client/lib/seo.js` that build fails loudly if `NEXT_PUBLIC_SITE_URL` is unset when `NODE_ENV=production`; verified via `node -e` test.
+- Priority 1.3 (Audit item 8 — Production site URL): Production metadata now falls back to the primary public domain and ignores generated Vercel deployment aliases.
 - Priority 1.4 (Audit items 9–16 from docs/B-gap-analysis.md): Verified done. Audited all table rows: argon2id sessions, session authorization, admin roles/MFA/audit logs, strict Zod schemas, error envelope, MongoDB TTL rate limits, crossesMidnight, signed uploads & cleanup job, VAPID push scheduler with atomic deduplication lease, ML consent gate and HMAC pseudonymization, security headers, and SEO/contrast gates.
 
 ### Priority 2 — Planned Features
@@ -50,5 +50,5 @@ in "NOT fixed" above as blocking for a real production launch.
 - Priority 2.4 (Real device testing): Still open. Requires physical Android/iPhone and desktop hardware.
 
 ### Priority 3 — Content & Legal
-- Priority 3.1 (Bangla copy review): Still open. User-facing Bangla copy in `client/i18n/dictionaries.js` remains marked as draft until final sign-off by a designated native Bangla speaker prior to setting `SEO_BN_INDEXABLE=true`.
+- Priority 3.1 (Bangla copy review): The user approved Bangla copy for public indexing. Legal documents remain drafts pending legal review.
 - Priority 3.2 (Privacy policy & Terms of use): Still open. Legal policies in `docs/legal/` remain drafts until reviewed and approved by legal counsel.

@@ -23,7 +23,7 @@
 ## Legal and content
 - [ ] Privacy policy reviewed by a lawyer, in both languages. Owner: ____
 - [ ] Terms of use reviewed by a lawyer, in both languages. Owner: ____
-- [ ] Bangla copy reviewed by a native speaker. Then set SEO_BN_INDEXABLE=true. Owner: ____
+- [ ] Bangla copy approved for public indexing; record reviewer and date. Owner: ____
 - [ ] Support email and hours published on the help page (docs/launch/support.md). Owner: ____
 - [ ] Price stated on the site is confirmed (structured data says 0 BDT). Owner: ____
 

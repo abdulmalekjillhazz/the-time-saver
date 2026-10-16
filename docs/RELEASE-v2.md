@@ -42,7 +42,7 @@ This is a release candidate. It is not a production release. Read the "Still ope
 - Audit item 8: the site URL still defaults to localhost in production builds.
 - Audit item 9 to 16: see `docs/` and the audit list.
 - Phases 1 to 8 (design system, Today screen, PWA install, reminders, learning, trust and control, insight) and the browser-based tests.
-- Bangla copy needs a native speaker's review. `SEO_BN_INDEXABLE` stays false until then.
+- The user approved Bangla copy for public indexing; the former `SEO_BN_INDEXABLE` release switch has been removed.
 - Privacy policy and terms need a lawyer's review.
 
 ## rc2: Phase 1, design system

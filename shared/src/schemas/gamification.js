@@ -6,6 +6,7 @@ export const badgeKeySchema = z.enum([
   'century-focus',
   'quiz-master',
   'consistent-learner',
+  'first-learning-day',
 ]);
 
 const localizedTextSchema = z.object({ en: z.string(), bn: z.string() }).strict();
@@ -33,6 +34,11 @@ export const gamificationSummarySchema = z.object({
       current: z.number().int().nonnegative(),
       longest: z.number().int().nonnegative(),
     }).strict(),
+    learningStreak: z.object({
+      current: z.number().int().nonnegative(),
+      longest: z.number().int().nonnegative(),
+    }).strict(),
+    totalLearningDays: z.number().int().nonnegative(),
     totalDaysLogged: z.number().int().nonnegative(),
     totalRoutinesCompleted: z.number().int().nonnegative(),
     streakFreezeAvailable: z.boolean(),

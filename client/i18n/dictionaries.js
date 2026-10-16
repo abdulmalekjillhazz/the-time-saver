@@ -1,4 +1,4 @@
-// User-facing copy. Bangla uses formal address (আপনি). Bangla is marked draft until a native speaker reviews it.
+// User-facing copy. Bangla uses formal address (আপনি).
 // Copy must match the product: describe only features that exist, or say clearly that they are coming.
 export const DICTIONARIES = {
   en: {
@@ -17,8 +17,8 @@ export const DICTIONARIES = {
     home: {
       title: 'Daily Routine Planner and Habit Coach',
       description: 'Plan your day with flexible routines, reminders, focus tools and bilingual lessons. Smart Routine helps you build steady habits, one manageable step at a time.',
-      h1: 'Make room for the routines that move you forward',
-      lead: 'Build a day that fits real life. Add routines, set reminders, track your progress and find practical lessons in Bangla or English—all in one simple, mobile-friendly place.',
+      h1: 'A daily routine planner for habits that fit real life',
+      lead: 'Plan routines, set reminders, track progress, and explore practical lessons in Bangla or English with Smart Routine—one manageable step at a time.',
       ctaLessons: 'Explore free lessons',
       ctaApp: 'Create your free account',
       proof: 'Free to get started · Built for your phone · Bangla & English',
@@ -97,7 +97,7 @@ export const DICTIONARIES = {
     },
   },
   bn: {
-    draft: true,
+    draft: false,
     brand: 'Smart Routine',
     nav: {
       label: 'প্রধান',
@@ -112,8 +112,8 @@ export const DICTIONARIES = {
     home: {
       title: 'দৈনিক রুটিন পরিকল্পনা ও অভ্যাস কোচ',
       description: 'নিজের দিনের জন্য রুটিন, রিমাইন্ডার, মনোযোগের টুল ও দুই ভাষার পাঠ সাজান। ছোট ও বাস্তবসম্মত পদক্ষেপে অভ্যাস গড়তে Smart Routine পাশে থাকবে, প্রতিদিন।',
-      h1: 'যে অভ্যাস আপনাকে এগিয়ে নেয়, তার জন্য সময় রাখুন',
-      lead: 'বাস্তব জীবনের সঙ্গে মানানসই দিন সাজান। রুটিন যোগ করুন, রিমাইন্ডার সেট করুন, অগ্রগতি দেখুন, আর বাংলা বা ইংরেজিতে কাজের পাঠ পড়ুন—সহজ, মোবাইল-বান্ধব এক জায়গায়।',
+      h1: 'দৈনিক রুটিন পরিকল্পনা করুন, অভ্যাস গড়ুন',
+      lead: 'রুটিন সাজান, রিমাইন্ডার দিন, অগ্রগতি দেখুন এবং Smart Routine-এ বাংলা বা ইংরেজিতে ব্যবহারিক পাঠ পড়ুন—প্রতিদিনের ছোট ও বাস্তবসম্মত পদক্ষেপে।',
       ctaLessons: 'বিনামূল্যের পাঠ দেখুন',
       ctaApp: 'বিনামূল্যে অ্যাকাউন্ট খুলুন',
       proof: 'শুরু করা বিনামূল্যে · ফোনে সহজ · বাংলা ও ইংরেজি',

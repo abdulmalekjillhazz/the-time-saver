@@ -31,6 +31,10 @@ export function learningLevelForActiveDays(activeDays) {
   return Math.floor(Math.max(0, activeDays) / 3) + 1;
 }
 
+export function learningStreakForDates(activeDates, today) {
+  return computeStreak([...new Set(activeDates)], today);
+}
+
 const BADGE_CATALOG = [
   {
     key: 'early-bird',
@@ -60,8 +64,16 @@ const BADGE_CATALOG = [
     key: 'consistent-learner',
     name: { en: 'Consistent Learner', bn: 'নিয়মিত পাঠক' },
     description: {
-      en: 'Read daily lessons on seven consecutive days.',
-      bn: 'টানা সাত দিন দৈনিক পাঠ পড়ুন।',
+      en: 'Earn learning points on seven consecutive days.',
+      bn: 'টানা সাত দিন শেখার পয়েন্ট অর্জন করুন।',
+    },
+  },
+  {
+    key: 'first-learning-day',
+    name: { en: 'First Learning Day', bn: 'শেখার প্রথম দিন' },
+    description: {
+      en: 'Earn your first learning point from a story or quiz.',
+      bn: 'গল্প পড়ে বা কুইজে প্রথম শেখার পয়েন্ট অর্জন করুন।',
     },
   },
 ].map((badge) => badgeSchema.parse(badge));
@@ -101,13 +113,13 @@ function localClockParts(date, timezone) {
 }
 
 async function readUserProgress(userId, timezone) {
-  const [completed, freezeDates, routines, perfectQuizzes, lessonReads] = await Promise.all([
+  const [completed, freezeDates, routines, perfectQuizzes, learningDates] = await Promise.all([
     Completion.find({ userId, status: 'done' }).select('date routineId createdAt updatedAt').lean(),
     StreakFreeze.distinct('date', { userId }),
     Routine.find({ userId }).select('_id startTime').lean(),
     DailyQuizScore.find({ userId, $expr: { $eq: ['$score', '$total'] } })
       .distinct('dailyLessonId'),
-    DailyLessonRead.find({ userId }).select('dailyLessonId').lean(),
+    LearningActivity.distinct('activeDate', { userId, points: { $gt: 0 } }),
   ]);
 
   const routineById = new Map(routines.map((routine) => [String(routine._id), routine]));
@@ -129,21 +141,19 @@ async function readUserProgress(userId, timezone) {
     freezeDates,
     earlyBirdDates,
     perfectQuizCount: new Set(perfectQuizzes.map(String)).size,
-    lessonReadIds: new Set(lessonReads.map(({ dailyLessonId }) => String(dailyLessonId))),
+    learningDates,
   };
 }
 
-async function evaluateBadges(progress) {
-  const lessonIds = [...progress.lessonReadIds];
-  const readLessons = lessonIds.length
-    ? await DailyLesson.find({ _id: { $in: lessonIds } }).select('date').lean()
-    : [];
-  const readDates = readLessons.map(({ date }) => date);
+function evaluateBadges(progress) {
+  const learningDays = new Set(progress.learningDates).size;
+  const longestLearningStreak = consecutiveRun(progress.learningDates);
   return [
     consecutiveRun(progress.earlyBirdDates) >= 5 ? 'early-bird' : null,
     progress.completedCount >= 100 ? 'century-focus' : null,
     progress.perfectQuizCount >= 7 ? 'quiz-master' : null,
-    consecutiveRun(readDates) >= 7 ? 'consistent-learner' : null,
+    longestLearningStreak >= 7 ? 'consistent-learner' : null,
+    learningDays >= 1 ? 'first-learning-day' : null,
   ].filter(Boolean);
 }
 
@@ -151,7 +161,7 @@ export async function evaluateAndAwardBadges(userId, timezone) {
   if (!(await isEnabledFor('gamification.badges', userId))) return [];
   await ensureBadgeCatalog();
   const progress = await readUserProgress(userId, timezone);
-  const eligibleKeys = await evaluateBadges(progress);
+  const eligibleKeys = evaluateBadges(progress);
   if (!eligibleKeys.length) return [];
 
   const badgeDocs = await Badge.find({ key: { $in: eligibleKeys } }).lean();
@@ -186,6 +196,7 @@ export async function getGamificationSummary(userId, timezone) {
   const streakDates = [...new Set([...progress.doneDates, ...progress.freezeDates])];
   const weeklyFreeze = weekKey(today);
   const freezeUsedThisWeek = await StreakFreeze.exists({ userId, week: weeklyFreeze });
+  const learningStreak = learningStreakForDates(progress.learningDates, today);
 
   return gamificationSummarySchema.parse({
     badges: catalog.map((badge) => {
@@ -201,6 +212,8 @@ export async function getGamificationSummary(userId, timezone) {
     newlyAwarded,
     stats: {
       streak: computeStreak(streakDates, today),
+      learningStreak,
+      totalLearningDays: progress.learningDates.length,
       totalDaysLogged: progress.doneDates.length,
       totalRoutinesCompleted: progress.completedCount,
       streakFreezeAvailable: !freezeUsedThisWeek,
@@ -266,26 +279,43 @@ export async function recordDailyLessonRead({ userId, dailyLessonId, timezone })
     points: STORY_POINTS,
     timezone,
   });
-  const awardedBadges = await evaluateAndAwardBadges(userId, timezone);
-  return { read: true, date: lesson.date, earnedPoints: activity.earnedPoints, awardedBadges };
+  return { read: true, date: lesson.date, earnedPoints: activity.earnedPoints, awardedBadges: activity.awardedBadges };
 }
 
 export async function recordLearningActivity({ userId, activityType, contentId, points, timezone }) {
+  if (points <= 0) return { earnedPoints: 0, recorded: false, awardedBadges: [] };
+  const normalizedContentId = String(contentId);
+  const activeDate = todayInZone(timezone || 'Asia/Dhaka');
+  let recorded = true;
   try {
     await LearningActivity.create({
       userId,
       activityType,
-      contentId: String(contentId),
+      contentId: normalizedContentId,
       points,
-      activeDate: todayInZone(timezone || 'Asia/Dhaka'),
+      activeDate,
     });
-    return { earnedPoints: points, recorded: true };
   } catch (err) {
-    if (err.code !== 11000 || !(await LearningActivity.exists({ userId, activityType, contentId: String(contentId) }))) {
-      throw err;
+    if (err.code !== 11000) throw err;
+    const existing = await LearningActivity.findOne({
+      userId,
+      activityType,
+      contentId: normalizedContentId,
+    }).select('_id points').lean();
+    if (!existing) throw err;
+    if (existing.points <= 0) {
+      const upgraded = await LearningActivity.findOneAndUpdate(
+        { _id: existing._id, points: { $lte: 0 } },
+        { $set: { points, activeDate } },
+        { new: true },
+      );
+      recorded = Boolean(upgraded);
+    } else {
+      recorded = false;
     }
-    return { earnedPoints: 0, recorded: false };
   }
+  const awardedBadges = await evaluateAndAwardBadges(userId, timezone);
+  return { earnedPoints: recorded ? points : 0, recorded, awardedBadges };
 }
 
 export async function recordQuizPoints({ userId, quizId, score, total, timezone }) {
@@ -301,6 +331,7 @@ export async function recordQuizPoints({ userId, quizId, score, total, timezone 
 
 export async function getLearningLeaderboard() {
   const rows = await LearningActivity.aggregate([
+    { $match: { points: { $gt: 0 } } },
     {
       $group: {
         _id: '$userId',

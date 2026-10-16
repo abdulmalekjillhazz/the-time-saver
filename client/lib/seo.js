@@ -4,9 +4,14 @@ const DEFAULT_PROD_URL = 'https://made-your-dream-bigger.vercel.app';
 export const SITE_URL = (() => {
   const raw = (process.env.NEXT_PUBLIC_SITE_URL || '').trim().replace(/\/+$/, '');
   if (process.env.NODE_ENV === 'production') {
-    if (!raw || raw.includes('localhost') || raw.includes('127.0.0.1')) {
-      return DEFAULT_PROD_URL;
-    }
+    if (!raw) return DEFAULT_PROD_URL;
+
+    const configured = new URL(raw);
+    const isLocal = configured.hostname === 'localhost' || configured.hostname === '127.0.0.1';
+    const isDeploymentAlias = configured.hostname.endsWith('.vercel.app') &&
+      configured.hostname !== new URL(DEFAULT_PROD_URL).hostname;
+    if (isLocal || isDeploymentAlias) return DEFAULT_PROD_URL;
+    return configured.origin;
   }
   return raw || DEFAULT_PROD_URL;
 })();
@@ -18,8 +23,7 @@ export const DEFAULT_LANG = 'bn';
 export const isLang = (value) => LANGS.includes(value);
 export const isSafeSlug = (value) => typeof value === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(value) && value.length <= 80;
 
-// Both Bangla (/bn) and English (/en) are indexable by default unless explicitly disabled with SEO_BN_INDEXABLE=false.
-export const bnIndexable = () => process.env.SEO_BN_INDEXABLE !== 'false';
+export const bnIndexable = () => true;
 export const indexable = (lang) => lang === 'en' || (lang === 'bn' && bnIndexable());
 
 export const absUrl = (lang, path = '') => `${SITE_URL}/${lang}${path}`;
@@ -87,7 +91,10 @@ export function pageMetadata({ lang, path = '', title, description, keywords, in
     publisher: BRAND,
     category: 'productivity',
     formatDetection: { email: false, address: false, telephone: false },
-    alternates: { canonical: url, languages: languageAlternates(path) },
+    alternates: {
+      canonical: url,
+      ...(index ? { languages: languageAlternates(path) } : {}),
+    },
     robots: index
       ? {
           index: true,
@@ -111,7 +118,7 @@ export function pageMetadata({ lang, path = '', title, description, keywords, in
       alternateLocale: lang === 'bn' ? ['en_US'] : ['bn_BD'],
       images: [
         {
-          url: absUrl(lang, '/opengraph-image'),
+          url: absUrl(lang, '/social-image'),
           width: 1200,
           height: 630,
           alt: `${BRAND} — ${title}`,
@@ -122,7 +129,7 @@ export function pageMetadata({ lang, path = '', title, description, keywords, in
       card: 'summary_large_image',
       title,
       description,
-      images: [absUrl(lang, '/opengraph-image')],
+      images: [absUrl(lang, '/social-image')],
     },
   };
 }

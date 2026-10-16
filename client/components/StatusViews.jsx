@@ -47,9 +47,9 @@ export function LoadingScreen({ fullPage = false }) {
               </div>
               <div className="min-w-0 space-y-1.5">
                 <p className="eyebrow mx-auto sm:mx-0">✦ SMART ROUTINE • LOADING ✦</p>
-                <h1 className="text-xl font-extrabold tracking-tight text-ink sm:text-2xl md:text-3xl">
+                <p role="status" aria-live="polite" className="text-xl font-extrabold tracking-tight text-ink sm:text-2xl md:text-3xl">
                   আপনার স্মার্ট রুটিন সাজানো হচ্ছে…
-                </h1>
+                </p>
                 <p className="text-xs font-medium text-ink/80 sm:text-sm">
                   Preparing your daily schedule, prayer anchors, and bilingual habit story
                 </p>

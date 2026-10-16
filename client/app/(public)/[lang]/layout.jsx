@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
-import '@fontsource/noto-sans-bengali/400.css';
-import '@fontsource/noto-sans-bengali/600.css';
-import '@fontsource/noto-sans-bengali/700.css';
+import '@fontsource/noto-sans-bengali/bengali-400.css';
+import '@fontsource/noto-sans-bengali/bengali-600.css';
+import '@fontsource/noto-sans-bengali/bengali-700.css';
 import { LANGS, isLang, SITE_URL, BRAND, absUrl } from '../../../lib/seo.js';
 import { getDictionary } from '../../../i18n/dictionaries.js';
 import { Header, Footer } from '../../../components/SiteChrome.jsx';
@@ -12,6 +12,10 @@ export const metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: BRAND,
   manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    shortcut: '/icon.svg',
+  },
 };
 
 export function generateStaticParams() {

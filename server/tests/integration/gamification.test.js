@@ -2,13 +2,15 @@ import 'dotenv/config';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
-import { todayInZone } from '@smart-routine/shared';
+import { addDays, todayInZone } from '@smart-routine/shared';
 import { createApp } from '../../src/app.js';
 import { registerUser } from '../../src/services/account.js';
 import { createSession } from '../../src/services/session.js';
 import { Routine } from '../../src/models/Routine.js';
 import { Completion } from '../../src/models/Completion.js';
+import { LearningActivity } from '../../src/models/LearningActivity.js';
 import { StreakFreeze } from '../../src/models/StreakFreeze.js';
+import { getGamificationSummary, recordLearningActivity } from '../../src/services/gamification.js';
 
 const uri = process.env.MONGODB_URI_TEST;
 const config = {
@@ -83,6 +85,7 @@ describe.skipIf(!uri)('Gamification and activity analytics', () => {
       'century-focus',
       'consistent-learner',
       'early-bird',
+      'first-learning-day',
       'quiz-master',
     ]);
     expect(badges.body.badges[0].name.bn).toBeTruthy();
@@ -91,6 +94,105 @@ describe.skipIf(!uri)('Gamification and activity analytics', () => {
     expect(heatmap.body.days).toHaveLength(30);
     expect(heatmap.body.heatmap).toHaveLength(30);
     expect(heatmap.body.days.at(-1).count).toBe(1);
+  });
+
+  it('records point-earning learning streaks and badges separately for each user', async () => {
+    const firstLearner = await registerUser({
+      email: 'first-learner@example.com',
+      password: 'correct-horse-battery',
+      displayName: 'First learner',
+      locale: 'en',
+      timezone: 'Asia/Dhaka',
+    });
+    const secondLearner = await registerUser({
+      email: 'second-learner@example.com',
+      password: 'correct-horse-battery',
+      displayName: 'Second learner',
+      locale: 'en',
+      timezone: 'Asia/Dhaka',
+    });
+    const legacyLearner = await registerUser({
+      email: 'legacy-learner@example.com',
+      password: 'correct-horse-battery',
+      displayName: 'Legacy learner',
+      locale: 'en',
+      timezone: 'Asia/Dhaka',
+    });
+    const streakLearner = await registerUser({
+      email: 'streak-learner@example.com',
+      password: 'correct-horse-battery',
+      displayName: 'Streak learner',
+      locale: 'en',
+      timezone: 'Asia/Dhaka',
+    });
+
+    const firstStory = await recordLearningActivity({
+      userId: firstLearner._id,
+      activityType: 'story',
+      contentId: 'daily:first-story',
+      points: 50,
+      timezone: firstLearner.timezone,
+    });
+    const duplicateStory = await recordLearningActivity({
+      userId: firstLearner._id,
+      activityType: 'story',
+      contentId: 'daily:first-story',
+      points: 50,
+      timezone: firstLearner.timezone,
+    });
+    const zeroPointQuiz = await recordLearningActivity({
+      userId: secondLearner._id,
+      activityType: 'quiz',
+      contentId: 'daily:zero-point-quiz',
+      points: 0,
+      timezone: secondLearner.timezone,
+    });
+    await LearningActivity.create({
+      userId: legacyLearner._id,
+      activityType: 'quiz',
+      contentId: 'daily:previous-zero-point-quiz',
+      points: 0,
+      activeDate: todayInZone(legacyLearner.timezone),
+    });
+    const upgradedLegacyQuiz = await recordLearningActivity({
+      userId: legacyLearner._id,
+      activityType: 'quiz',
+      contentId: 'daily:previous-zero-point-quiz',
+      points: 8,
+      timezone: legacyLearner.timezone,
+    });
+    const today = todayInZone(streakLearner.timezone);
+    await LearningActivity.insertMany(Array.from({ length: 7 }, (_, index) => {
+      const activeDate = addDays(today, index - 6);
+      return {
+        userId: streakLearner._id,
+        activityType: 'story',
+        contentId: `daily:streak-story-${activeDate}`,
+        points: 50,
+        activeDate,
+      };
+    }));
+    const [firstSummary, secondSummary, legacySummary, streakSummary] = await Promise.all([
+      getGamificationSummary(firstLearner._id, firstLearner.timezone),
+      getGamificationSummary(secondLearner._id, secondLearner.timezone),
+      getGamificationSummary(legacyLearner._id, legacyLearner.timezone),
+      getGamificationSummary(streakLearner._id, streakLearner.timezone),
+    ]);
+
+    expect(firstStory.earnedPoints).toBe(50);
+    expect(firstStory.awardedBadges.map(({ badge }) => badge.key)).toContain('first-learning-day');
+    expect(duplicateStory.earnedPoints).toBe(0);
+    expect(zeroPointQuiz.recorded).toBe(false);
+    expect(firstSummary.stats.learningStreak).toEqual({ current: 1, longest: 1 });
+    expect(firstSummary.stats.totalLearningDays).toBe(1);
+    expect(firstSummary.badges.find(({ key }) => key === 'first-learning-day').earned).toBe(true);
+    expect(secondSummary.stats.learningStreak).toEqual({ current: 0, longest: 0 });
+    expect(secondSummary.stats.totalLearningDays).toBe(0);
+    expect(secondSummary.badges.find(({ key }) => key === 'first-learning-day').earned).toBe(false);
+    expect(upgradedLegacyQuiz.earnedPoints).toBe(8);
+    expect(legacySummary.stats.learningStreak).toEqual({ current: 1, longest: 1 });
+    expect(streakSummary.stats.learningStreak).toEqual({ current: 7, longest: 7 });
+    expect(streakSummary.badges.find(({ key }) => key === 'consistent-learner').earned).toBe(true);
   });
 
   it('allows one streak freeze per week and includes protected dates in the streak', async () => {

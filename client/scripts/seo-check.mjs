@@ -1,7 +1,7 @@
 // Audits rendered metadata, crawl directives, structured data, and sitemap behavior on a running build.
 // BASE_URL defaults to the local production server; exits nonzero when an acceptance check fails.
 const BASE = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
-const EXPECT_BN_INDEXABLE = process.env.SEO_BN_INDEXABLE === 'true';
+const PUBLIC_SITE = (process.env.SEO_EXPECTED_SITE_URL || 'https://made-your-dream-bigger.vercel.app').replace(/\/$/, '');
 const failures = [];
 const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : `  (${detail})`}`);
@@ -47,17 +47,18 @@ for (const route of routes) {
   const description = meta(page.text, 'description') || '';
   check(`${route.path} has a 140–160 character description`, description.length >= 140 && description.length <= 160, `${description.length} chars`);
   check(`${route.path} has one clear H1`, (page.text.match(/<h1(?:\s|>)/g) || []).length === 1);
-  check(`${route.path} has a self-referencing canonical`, canonical(page.text) === `${BASE}${route.path}`, canonical(page.text));
+  check(`${route.path} has a self-referencing canonical`, canonical(page.text) === `${PUBLIC_SITE}${route.path}`, canonical(page.text));
   check(`${route.path} has Open Graph and large Twitter share metadata`,
     Boolean(property(page.text, 'og:title')) &&
     Boolean(property(page.text, 'og:description')) &&
-    property(page.text, 'og:url') === `${BASE}${route.path}` &&
+    property(page.text, 'og:url') === `${PUBLIC_SITE}${route.path}` &&
     Boolean(property(page.text, 'og:image')) &&
     /summary_large_image/.test(meta(page.text, 'twitter:card') || '') &&
     Boolean(meta(page.text, 'twitter:image')));
   check(`${route.path} has breadcrumb structured data`, hasBreadcrumb(page.text));
-  check(`${route.path} does not emit hreflang links to noindex Bangla pages`,
-    EXPECT_BN_INDEXABLE || !/hreflang="bn-BD"/.test(page.text));
+  const routeIndexable = route.dynamicIndex ? !hasNoindex(page.text) : route.index;
+  check(`${route.path} hreflang links match its indexing directive`,
+    routeIndexable ? /hreflang="bn-BD"/i.test(page.text) : !/hreflang="bn-BD"/i.test(page.text));
 
   if (route.dynamicIndex) {
     route.index = !hasNoindex(page.text);
@@ -70,13 +71,15 @@ for (const route of routes) {
 const home = englishPages.get('/en');
 if (home?.status === 200) {
   const structured = ldJson(home.text);
+  check('English home H1 includes the daily routine planner keyword',
+    /<h1[^>]*>[^<]*daily routine planner/i.test(home.text));
   check('home structured data includes Organization, WebApplication, and BreadcrumbList',
     structured.some((item) => item['@type'] === 'Organization') &&
     structured.some((item) => item['@type'] === 'WebApplication') &&
     structured.some((item) => item['@type'] === 'BreadcrumbList'));
 }
 
-const share = await fetch(`${BASE}/en/opengraph-image`, { redirect: 'manual' });
+const share = await fetch(`${BASE}/en/social-image`, { redirect: 'manual' });
 const imageBytes = new Uint8Array(await share.arrayBuffer());
 const isPng = imageBytes.length >= 24 &&
   imageBytes[0] === 137 && imageBytes[1] === 80 && imageBytes[2] === 78 && imageBytes[3] === 71;
@@ -99,7 +102,10 @@ check('security headers present (CSP, HSTS, nosniff, frame deny)',
 
 const bengali = await get('/bn');
 check('/bn returns a page with Bengali document language', bengali.status === 200 && /<html lang="bn"/.test(bengali.text), `status ${bengali.status}`);
-check('/bn indexing follows the reviewed-copy release switch', hasNoindex(bengali.text) === !EXPECT_BN_INDEXABLE, meta(bengali.text, 'robots'));
+check('/bn is indexable after Bengali copy approval', !hasNoindex(bengali.text), meta(bengali.text, 'robots'));
+check('/bn has a self-referencing canonical', canonical(bengali.text) === `${PUBLIC_SITE}/bn`, canonical(bengali.text));
+check('/bn home H1 includes the Bengali daily routine keyword', /<h1[^>]*>দৈনিক রুটিন/.test(bengali.text));
+check('/bn declares the site favicon', /rel="icon"[^>]*href="[^"]*icon\.svg"/i.test(bengali.text));
 
 const app = await get('/app');
 check('/app is noindex and nofollow', hasNoindex(app.text) && /nofollow/i.test(meta(app.text, 'robots') || ''), meta(app.text, 'robots'));
@@ -115,15 +121,15 @@ check('robots.txt blocks private/API routes and publishes sitemap location',
 const sitemap = await get('/sitemap.xml');
 const sitemapUrls = [...sitemap.text.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
 check('sitemap is available and contains canonical English public URLs',
-  sitemap.status === 200 && sitemapUrls.includes(`${BASE}/en`) && sitemapUrls.includes(`${BASE}/en/about`));
+  sitemap.status === 200 && sitemapUrls.includes(`${PUBLIC_SITE}/en`) && sitemapUrls.includes(`${PUBLIC_SITE}/en/about`));
 check('sitemap excludes private, API, and draft legal URLs',
   !sitemapUrls.some((url) => /\/(app|admin|api|privacy|terms)(\/|$)/.test(new URL(url).pathname)));
-check('sitemap includes only approved language versions',
-  EXPECT_BN_INDEXABLE || !sitemapUrls.some((url) => new URL(url).pathname.startsWith('/bn')));
+check('sitemap includes the approved Bangla language version',
+  sitemapUrls.some((url) => new URL(url).pathname.startsWith('/bn')));
 check('sitemap excludes the empty/unavailable lessons archive when it is noindex',
   routeIndexable('/en/lessons') || !sitemapUrls.includes(`${BASE}/en/lessons`));
-check('sitemap has hreflang only for indexable variants',
-  EXPECT_BN_INDEXABLE || !/hreflang="bn-BD"/.test(sitemap.text));
+check('sitemap has hreflang for indexable language variants',
+  /hreflang="bn-BD"/i.test(sitemap.text));
 
 const unsafeSlug = await get('/en/lessons/Not_A_Slug');
 check('unsafe lesson slugs return 404', unsafeSlug.status === 404, `status ${unsafeSlug.status}`);

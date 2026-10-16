@@ -1,14 +1,13 @@
 import { ImageResponse } from 'next/og';
-import { BRAND, isLang } from '../../../lib/seo.js';
+import { BRAND, isLang } from '../../../../lib/seo.js';
 
-export const alt = 'Smart Routine — plan your day, build steady habits';
-export const size = { width: 1200, height: 630 };
-export const contentType = 'image/png';
+export const revalidate = 86400;
 
-export default async function OpenGraphImage(props) {
-  const params = await props.params;
-  const language = isLang(params.lang) ? params.lang : 'en';
-  const isBengali = language === 'bn';
+export async function GET(_request, { params }) {
+  const routeParams = await params;
+  if (!isLang(routeParams.lang)) return new Response('Not found', { status: 404 });
+  const isBengali = routeParams.lang === 'bn';
+
   return new ImageResponse(
     (
       <div
@@ -51,6 +50,6 @@ export default async function OpenGraphImage(props) {
         </div>
       </div>
     ),
-    size,
+    { width: 1200, height: 630 },
   );
 }

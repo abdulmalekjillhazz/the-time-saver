@@ -1,4 +1,4 @@
-// Short interface labels used by the design-system components. Bangla is draft until a native speaker reviews it.
+// Short interface labels used by the design-system components.
 export const UI = {
   en: {
     aiBadge: 'AM',

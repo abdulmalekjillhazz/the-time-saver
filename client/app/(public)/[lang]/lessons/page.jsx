@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { isLang, pageMetadata, titleWith, makeDescription, absUrl, breadcrumbData } from '../../../../lib/seo.js';
+import { isLang, indexable, pageMetadata, titleWith, makeDescription, absUrl, breadcrumbData } from '../../../../lib/seo.js';
 import { getDictionary } from '../../../../i18n/dictionaries.js';
 import { getLessons, getTodayLesson } from '../../../../lib/api.js';
 import { JsonLd } from '../../../../components/JsonLd.jsx';
@@ -18,7 +18,7 @@ export async function generateMetadata(props) {
     path: '/lessons',
     title: titleWith(d.title),
     description: d.description,
-    index: hasPublishedLessons && (params.lang === 'en' || process.env.SEO_BN_INDEXABLE === 'true'),
+    index: hasPublishedLessons && indexable(params.lang),
   });
 }
 

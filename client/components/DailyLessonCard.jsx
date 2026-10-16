@@ -68,6 +68,9 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
     })
       .then((result) => {
         setStoryAward({ lessonId: String(dailyLesson._id), earnedPoints: result.earnedPoints || 0 });
+        if (result.earnedPoints > 0 || result.awardedBadges?.length) {
+          window.dispatchEvent(new Event('smart-routine:learning-activity'));
+        }
       })
       .catch(() => {
         setStoryTrackingError(copy.trackingError);
@@ -130,6 +133,9 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
         );
       }
       setSubmission(data);
+      if (data.earnedPoints > 0 || data.awardedBadges?.length) {
+        window.dispatchEvent(new Event('smart-routine:learning-activity'));
+      }
     } catch (err) {
       console.error('Daily quiz submission failed', err);
       setError(err.message || copy.requestFailed);

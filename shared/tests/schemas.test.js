@@ -8,6 +8,7 @@ import {
   completionSchema,
   badgeSchema,
   userBadgeSchema,
+  gamificationSummarySchema,
 } from '../src/index.js';
 
 describe('registerSchema', () => {
@@ -114,10 +115,24 @@ describe('gamification schemas', () => {
     };
     expect(badgeSchema.safeParse(badge).success).toBe(true);
     expect(badgeSchema.safeParse({ ...badge, key: 'unknown' }).success).toBe(false);
+    expect(badgeSchema.safeParse({ ...badge, key: 'first-learning-day' }).success).toBe(true);
     expect(userBadgeSchema.safeParse({
       id: '65f0c0ffee0000000000abcd',
       badge,
       awardedAt: '2026-10-10T00:00:00.000Z',
+    }).success).toBe(true);
+    expect(gamificationSummarySchema.safeParse({
+      badges: [],
+      newlyAwarded: [],
+      stats: {
+        streak: { current: 0, longest: 0 },
+        learningStreak: { current: 1, longest: 1 },
+        totalLearningDays: 1,
+        totalDaysLogged: 0,
+        totalRoutinesCompleted: 0,
+        streakFreezeAvailable: true,
+        streakFreezeDates: [],
+      },
     }).success).toBe(true);
   });
 });

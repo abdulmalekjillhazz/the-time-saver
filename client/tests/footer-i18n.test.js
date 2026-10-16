@@ -26,7 +26,8 @@ describe('footer and navigation copy', () => {
     expect(DICTIONARIES.en.footer).not.toHaveProperty('draftNotice');
   });
 
-  it('the English page has no draft notice, because English is reviewed', () => {
+  it('both language dictionaries are approved for public display', () => {
     expect(DICTIONARIES.en.draft).toBe(false);
+    expect(DICTIONARIES.bn.draft).toBe(false);
   });
 });

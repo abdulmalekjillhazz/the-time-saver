@@ -25,7 +25,7 @@
 ## Not done here, and why
 - The load test has NOT been run. There is no k6 and no staging server here. Results must come from a real run. Do not copy numbers from other projects.
 - The privacy policy and terms have NOT been reviewed by a lawyer. They are drafts.
-- The Bangla copy has NOT been reviewed by a native speaker. It stays noindex until then.
+- The user approved the Bangla copy for public indexing; confirm owner and date in the go/no-go checklist.
 - The support email, hours, and price are placeholders. They need your decision.
 - The go/no-go checklist is a template. Each item needs a named owner and a date.
 
@@ -39,7 +39,7 @@
 - Flag rollout tests: pass (run here).
 - Flag integration tests (tests/integration/flags.test.js, 4 tests): NOT run here (no MongoDB).
 - Load test: NOT run.
-- Rich Results, Lighthouse, lawyer review, native-speaker review: NOT run.
+- Rich Results, Lighthouse, and lawyer review: NOT run.
 
 ## Unverified in this sandbox
 - Everything in "Not done here" above.

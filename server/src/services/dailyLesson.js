@@ -8,7 +8,7 @@ import { QuizReport } from '../models/QuizReport.js';
 import { askAI } from './aiProvider.js';
 import { AppError } from '../lib/AppError.js';
 import { logger } from '../lib/logger.js';
-import { evaluateAndAwardBadges, recordQuizPoints } from './gamification.js';
+import { recordQuizPoints } from './gamification.js';
 import { hasCompleteStoryScript } from './geminiLessons.js';
 import { createCuratedDailyLesson } from './dailyLessonFallback.js';
 import {
@@ -672,7 +672,7 @@ export async function submitDailyQuizAttempt({ quizId, userId, answers, timezone
       timezone,
     })
     : { earnedPoints: 0 };
-  const awardedBadges = userId ? await evaluateAndAwardBadges(userId, timezone) : [];
+  const awardedBadges = learningPoints.awardedBadges || [];
   return { score, total, results, earnedPoints: learningPoints.earnedPoints, awardedBadges };
 }
 

@@ -4,7 +4,6 @@ import { isLang, pageMetadata, DEFAULT_LANG, BRAND, absUrl, SITE_URL, breadcrumb
 import { getDictionary } from '../../../i18n/dictionaries.js';
 import { JsonLd } from '../../../components/JsonLd.jsx';
 import { getIslamicReflection, getLandingQuizzes, getLessons, getTodayLesson } from '../../../lib/api.js';
-import { BRAND_BACKGROUND_URL } from '../../../lib/branding.js';
 import { AudioDramaPlayer } from '../../../components/AudioDramaPlayer.jsx';
 import { LandingQuizGrid } from '../../../components/LandingQuizGrid.jsx';
 import { StoryReader } from '../../../components/StoryReader.jsx';
@@ -29,6 +28,7 @@ export default async function HomePage(props) {
   if (!isLang(params.lang)) notFound();
   const lang = params.lang;
   const isBn = lang === 'bn';
+  const home = getDictionary(lang).home;
   const [today, published, landingQuizResult, reflectionResult] = await Promise.all([
     getTodayLesson(lang),
     getLessons(),
@@ -44,76 +44,76 @@ export default async function HomePage(props) {
   const features = isBn ? [
     {
       icon: '🧠',
-      tag: 'এআই লার্নিং',
-      title: 'দৈনিক এআই পাঠ ও কুইজ',
-      desc: 'প্রতিদিনের ছোট, সহজবোধ্য গল্পে বাস্তব জীবনের চরিত্র ও সংলাপ—সাথে গল্পভিত্তিক ৩ প্রশ্নের কুইজ।',
+      tag: 'পাঠ ও কুইজ',
+      title: 'দৈনিক পাঠ ও গল্পভিত্তিক কুইজ',
+      desc: 'প্রকাশিত ছোট পাঠ পড়ুন এবং গল্পের বিষয় নিয়ে কুইজে অংশ নিন।',
     },
     {
       icon: '⚡',
-      tag: 'স্ট্রিক সেভার',
-      title: '৫-মিনিটের অ্যাডাপ্টিভ রি-প্ল্যান',
-      desc: 'ব্যস্ত বা ক্লান্ত দিনে রুটিন যাতে ভেঙে না যায়, সেজন্য এআই তৎক্ষণাৎ যেকোনো কাজের ৫ মিনিটের সহজ বিকল্প তৈরি করে দেয়।',
+      tag: 'পরিকল্পনা',
+      title: 'নিজের মতো রুটিন ও রিমাইন্ডার',
+      desc: 'আপনার সময়ের সঙ্গে মানানসই রুটিন তৈরি করুন, কাজের গুরুত্ব ঠিক করুন এবং রিমাইন্ডার বেছে নিন।',
     },
     {
       icon: '📊',
-      tag: 'গভীর বিশ্লেষণ',
-      title: '৩৬৫ দিনের বাৎসরিক হিটম্যাপ',
-      desc: 'গিটহাব-স্টাইল ভিজ্যুয়াল গ্রিডে দেখুন আপনার সারাবছরের অভ্যাসের ধারাবাহিকতা এবং কোন কোন দিন আপনি সবচেয়ে বেশি সক্রিয় ছিলেন।',
+      tag: 'অগ্রগতি',
+      title: 'অভ্যাসের অগ্রগতি ও স্ট্রিক',
+      desc: 'সম্পন্ন কাজ ও পাঠের ইতিহাস দেখে সময়ের সঙ্গে আপনার ধারাবাহিকতা বুঝুন।',
     },
     {
       icon: '🎧',
-      tag: 'অডিও কোচ',
-      title: 'গল্প শুনুন নিজের ডিভাইসের কণ্ঠে',
-      desc: 'গল্পের সংলাপ ব্রাউজারের speech synthesis দিয়ে শুনুন—অতিরিক্ত paid voice API ছাড়াই।',
+      tag: 'অডিও',
+      title: 'ডিভাইসের কণ্ঠে গল্প শুনুন',
+      desc: 'সমর্থিত ব্রাউজারে speech synthesis ব্যবহার করে গল্পের সংলাপ শুনুন।',
     },
     {
       icon: '🏅',
-      tag: 'গ্যামিফিকেশন',
-      title: 'মাইলফলক ব্যাজ ও এক্সপি',
-      desc: 'প্রতিটি রুটিন সম্পন্ন করলেই অর্জিত হবে এক্সপি পয়েন্ট। আনলক করুন প্রভাতী সাধক, সপ্তপদ ধারা ও শতকের সাধনার মতো অনন্য ব্যাজ।',
+      tag: 'মাইলফলক',
+      title: 'পাঠের জন্য পয়েন্ট ও ব্যাজ',
+      desc: 'পাঠ সম্পন্ন করে পয়েন্ট অর্জন করুন এবং শেখার ধারাবাহিকতার মাইলফলক দেখুন।',
     },
     {
       icon: '🕌',
-      tag: 'ইনক্লুসিভ ফিচার',
-      title: 'নামাজের ওয়াক্ত ও সরকারি ছুটি',
-      desc: 'সম্পূর্ণ ঐচ্ছিক টগল—ব্যস্ত দিনের মাঝে ৫ ওয়াক্ত নামাজের সঠিক সময়সূচী এবং বাংলাদেশের ক্যালেন্ডার ছুটি অনুযায়ী রুটিন সমন্বয়।',
+      tag: 'ক্যালেন্ডার',
+      title: 'নামাজের সময় ও ছুটির দিন',
+      desc: 'ঐচ্ছিকভাবে নামাজের সময় ও বাংলাদেশের ছুটির দিন দেখে আপনার দিন সাজান।',
     },
   ] : [
     {
       icon: '🧠',
-      tag: 'AI Learning',
-      title: 'Daily AI Lessons & Quizzes',
-      desc: 'A short, simple daily story with realistic characters, followed by a three-question quiz based on what happened.',
+      tag: 'Lessons & quizzes',
+      title: 'Daily lessons and story quizzes',
+      desc: 'Read published short lessons and take quizzes about what you have learned.',
     },
     {
       icon: '⚡',
-      tag: 'Streak Shield',
-      title: '5-Minute Adaptive Re-planning',
-      desc: 'Too busy for a 45-minute routine? The AI instantly generates a 5-minute micro action so your streak never collapses.',
+      tag: 'Planning',
+      title: 'Flexible routines and reminders',
+      desc: 'Create routines around your schedule, set priorities, and choose reminders that work for you.',
     },
     {
       icon: '📊',
-      tag: 'Visual Analytics',
-      title: '365-Day Annual Habit Heatmap',
-      desc: 'GitHub-style activity grid showing your habit completion intensity across every day of the calendar year.',
+      tag: 'Progress',
+      title: 'Habit progress and learning streaks',
+      desc: 'Review completed activities and lesson history to see your consistency over time.',
     },
     {
       icon: '🎧',
-      tag: 'Audio Coach',
-      title: 'Listen to the story in your device voice',
-      desc: 'Play dialogue stories with your browser’s speech synthesis—without a paid voice API.',
+      tag: 'Audio',
+      title: 'Listen to stories in a device voice',
+      desc: 'Use speech synthesis in supported browsers to listen to story dialogue.',
     },
     {
       icon: '🏅',
-      tag: 'Gamification',
-      title: 'Milestone Badges & XP Levels',
-      desc: 'Earn XP on every completed routine. Level up and collect coveted badges from Early Bird to Century Club.',
+      tag: 'Milestones',
+      title: 'Points and badges for learning',
+      desc: 'Earn points for completing lessons and see milestones for your learning streak.',
     },
     {
       icon: '🕌',
-      tag: 'Cultural Context',
-      title: 'Prayer Times & Holidays Sync',
-      desc: 'Completely optional toggle: track daily prayer times and adapt your routines around Bangladesh national holidays.',
+      tag: 'Calendar',
+      title: 'Prayer times and holidays',
+      desc: 'Optionally check prayer times and Bangladesh holidays while planning your day.',
     },
   ];
 
@@ -166,26 +166,19 @@ export default async function HomePage(props) {
         {/* Hero Section — matches app-hero in globals.css */}
         <section
           className="landing-hero app-hero relative isolate overflow-hidden rounded-3xl border border-gold/60 p-6 shadow-xl sm:p-12"
-          style={{
-            backgroundImage: `linear-gradient(100deg, rgb(0 0 0 / 72%), rgb(0 0 0 / 30%)), url("${BRAND_BACKGROUND_URL}")`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
         >
           <div className="max-w-2xl">
             <div className="eyebrow inline-flex items-center gap-2">
               <span className="brand-spark">✦</span>
-              <span>{isBn ? 'দক্ষিণ এশিয়ার প্রথম ইন্টেলিজেন্ট হ্যাবিট কোচ' : 'South Asia’s First Intelligent Habit Coach'}</span>
+              <span>{isBn ? 'দৈনিক রুটিন ও অভ্যাস গড়ার অ্যাপ' : 'Daily routine planner & habit tracker'}</span>
             </div>
 
             <h1 className="display-1 mt-4 max-w-2xl">
-              {isBn ? 'প্রতিদিনের ছোট পদক্ষেপে গড়ে তুলুন অটল ভবিষ্যৎ' : 'Make Room for the Routines that Move You Forward'}
+              {home.h1}
             </h1>
 
             <p className="hero-description mt-4 text-base font-medium leading-relaxed sm:text-lg">
-              {isBn 
-                ? 'দৈনিক এআই পাঠ, ৫-মিনিটের মাইক্রো রুটিন, বাৎসরিক হিটম্যাপ ও এআই ভয়েস ব্রিফিং—সবকিছু এক জায়গায়। কোনো বিভ্রান্তি নেই, শুধুই ধারাবাহিক অগ্রগতি।'
-                : 'Plan your day with adaptive routines, daily AI habit lessons, 365-day heatmaps, and voice briefings—all in one calm, mobile-friendly app.'}
+              {home.lead}
             </p>
 
             <div className="landing-actions mt-8 flex flex-wrap items-center gap-3">
@@ -405,10 +398,10 @@ export default async function HomePage(props) {
         <section className="landing-features space-y-6">
           <div className="text-center max-w-xl mx-auto">
             <h2 className="text-2xl font-extrabold text-ink sm:text-4xl">
-              {isBn ? 'একটি অ্যাপ, অভ্যাসের সম্পূর্ণ ইকোসিস্টেম' : 'One Calm App, A Complete Habit Ecosystem'}
+              {isBn ? 'দৈনিক রুটিন ও অভ্যাস গড়ার ফিচার' : 'Tools for daily routine planning and habit tracking'}
             </h2>
             <p className="mt-2 text-sm font-medium text-ink/75">
-              {isBn ? 'জটিলতা পরিহার করে বাস্তব জীবনের জন্য ডিজাইন করা আধুনিক ফিচারসমূহ।' : 'Designed for real life with tools that protect habit momentum.'}
+              {isBn ? 'আপনার সময়, কাজ ও শেখার অগ্রগতি এক জায়গায় গুছিয়ে নিন।' : 'Plan your schedule, keep track of tasks, and review your learning progress.'}
             </p>
           </div>
 
@@ -453,11 +446,6 @@ export default async function HomePage(props) {
         {/* Final Conversion CTA — brand banner + app-hero */}
         <section
           className="app-hero relative isolate overflow-hidden p-8 text-center sm:p-14"
-          style={{
-            backgroundImage: `linear-gradient(100deg, rgb(0 0 0 / 72%), rgb(0 0 0 / 30%)), url("${BRAND_BACKGROUND_URL}")`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
         >
           <p className="eyebrow mx-auto">✦ {isBn ? 'শুরু করুন' : 'Get started'}</p>
           <h2 className="display-2 text-gold-shine mt-3">

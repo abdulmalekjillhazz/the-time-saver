@@ -16,7 +16,7 @@ const badgeSchema = new Schema(
       type: String,
       required: true,
       unique: true,
-      enum: ['early-bird', 'century-focus', 'quiz-master', 'consistent-learner'],
+      enum: ['early-bird', 'century-focus', 'quiz-master', 'consistent-learner', 'first-learning-day'],
     },
     name: { type: localizedTextSchema, required: true },
     description: { type: localizedTextSchema, required: true },

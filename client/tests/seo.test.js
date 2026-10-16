@@ -46,6 +46,20 @@ describe('metadata and indexing rules', () => {
     const m = pageMetadata({ lang: 'bn', path: '', title: 't', description: 'd' });
     expect(m.robots.index).toBe(true);
     expect(m.alternates.canonical).toMatch(/\/bn$/);
+    expect(m.openGraph.images[0].url).toBe(`${SITE_URL}/bn/social-image`);
+    expect(m.twitter.images).toEqual([`${SITE_URL}/bn/social-image`]);
+  });
+
+  it('keeps Bangla indexing enabled after copy approval regardless of the old release switch', () => {
+    const original = process.env.SEO_BN_INDEXABLE;
+    process.env.SEO_BN_INDEXABLE = 'false';
+    try {
+      expect(indexable('bn')).toBe(true);
+      expect(pageMetadata({ lang: 'bn', title: 'Bangla', description: 'Description' }).robots.index).toBe(true);
+    } finally {
+      if (original === undefined) delete process.env.SEO_BN_INDEXABLE;
+      else process.env.SEO_BN_INDEXABLE = original;
+    }
   });
 
   it('English and Bangla pages emit complete hreflang alternates', () => {
@@ -62,6 +76,12 @@ describe('metadata and indexing rules', () => {
   it('draft legal documents can stay accessible without being indexed', () => {
     const m = pageMetadata({ lang: 'en', path: '/privacy', title: 'Privacy', description: 'd', index: false });
     expect(m.robots).toEqual({ index: false, follow: true });
+    expect(m.alternates).toEqual({ canonical: `${SITE_URL}/en/privacy` });
+  });
+
+  it('homepage headings use the primary routine-planning search phrases', () => {
+    expect(DICTIONARIES.en.home.h1.toLowerCase()).toContain('daily routine planner');
+    expect(DICTIONARIES.bn.home.h1).toContain('দৈনিক রুটিন');
   });
 
   it('private screens are never indexed or followed', () => {

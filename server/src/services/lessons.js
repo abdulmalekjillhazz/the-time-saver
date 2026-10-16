@@ -235,7 +235,7 @@ export async function submitAttempt(lessonId, user, answers) {
     total: result.total,
     timezone: user.timezone,
   });
-  return { ...result, earnedPoints: learningPoints.earnedPoints };
+  return { ...result, earnedPoints: learningPoints.earnedPoints, awardedBadges: learningPoints.awardedBadges };
 }
 
 export async function recordPublishedLessonRead(lessonId, user) {

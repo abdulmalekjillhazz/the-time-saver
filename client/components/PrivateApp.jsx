@@ -1579,7 +1579,12 @@ export function PrivateApp() {
         method: 'POST',
         body: {},
       })
-        .then(({ earnedPoints }) => setStoryAward({ lessonId: loadedLesson.id, earnedPoints }))
+        .then(({ earnedPoints, awardedBadges }) => {
+          setStoryAward({ lessonId: loadedLesson.id, earnedPoints });
+          if (earnedPoints > 0 || awardedBadges?.length) {
+            window.dispatchEvent(new Event('smart-routine:learning-activity'));
+          }
+        })
         .catch(reportError);
       if (getOfflineCacheConsent() === true) {
         setOfflineCacheStatus('গল্প ও শব্দার্থ অফলাইনে সংরক্ষণ করা হচ্ছে…');
@@ -1649,7 +1654,11 @@ export function PrivateApp() {
     setBusy(true);
     setError('');
     try {
-      setQuizResult(await request(`/api/lessons/${lesson.id}/attempts`, { method: 'POST', body: { answers } }));
+      const result = await request(`/api/lessons/${lesson.id}/attempts`, { method: 'POST', body: { answers } });
+      setQuizResult(result);
+      if (result.earnedPoints > 0 || result.awardedBadges?.length) {
+        window.dispatchEvent(new Event('smart-routine:learning-activity'));
+      }
     } catch (err) {
       reportError(err);
     } finally {
