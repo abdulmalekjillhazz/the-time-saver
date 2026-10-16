@@ -1,4 +1,4 @@
-import { apiRequestAudio } from './apiClient.js';
+import { apiRequest } from './apiClient.js';
 
 const CHARACTERS = {
   narrator: { character: 'Narrator', pan: 0, pitch: 1, rate: 1 },
@@ -128,73 +128,53 @@ export function narrationSpeakerForRole(role) {
   })[role] || 'storyteller';
 }
 
-const freeStoryAudioCache = new Map();
-
 export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   lang = 'bn',
   volume = 1,
+  audioUrl = '',
+  storyContent = '',
   onError = () => {},
   onNotice = () => {},
 } = {}) {
   let index = 0;
   let isPlaying = false;
   let isPaused = false;
-  let audioContext = null;
-  let gainNode = null;
-  let audioBuffer = null;
-  let currentSource = null;
+  let audio = null;
   let requestAbortController = null;
-  let audioRequestPromise = null;
-  let progressTimer = null;
   let runId = 0;
   let currentVolume = Math.max(0, Math.min(1, volume));
-  let playbackOffset = 0;
-  let playbackStartedAt = 0;
   let desiredStartIndex = 0;
-  const content = lines.map(({ text }) => text).join(' ');
-  const audioLang = /[\u0980-\u09ff]/u.test(content) ? 'bn' : 'en';
-  const cacheKey = `${audioLang}:${content}`;
+  const content = storyContent || lines.map(({ character, text }) => `[${character}]: ${text}`).join('\n');
 
-  const emitProgress = (fraction = 0) => {
-    const line = lines[index];
-    if (!line) return;
+  const emitProgress = (position) => {
+    if (!lines.length) return;
+    const boundedPosition = Math.max(0, Math.min(lines.length, position));
+    index = Math.min(Math.floor(boundedPosition), lines.length - 1);
+    const fraction = index === lines.length - 1 && boundedPosition === lines.length
+      ? 1
+      : boundedPosition - index;
     onProgress({
       index,
       fraction,
       percent: ((index + fraction) / lines.length) * 100,
-      line,
-      source: currentSource ? 'google-free' : null,
+      line: lines[index],
+      source: audio?.currentSrc || audio?.src ? 'cloudinary' : null,
       spatialAvailable: false,
     });
   };
 
-  const clearProgressTimer = () => {
-    if (progressTimer !== null) {
-      clearInterval(progressTimer);
-      progressTimer = null;
-    }
-  };
-
-  const closeAudioContext = () => {
-    clearProgressTimer();
-    if (audioContext && audioContext.state !== 'closed') void audioContext.close();
-    audioContext = null;
-    gainNode = null;
-  };
-
-  const stopSource = () => {
-    if (!currentSource) return;
-    const oldSource = currentSource;
-    currentSource = null;
-    oldSource.onended = null;
-    oldSource.stop();
-  };
-
-  const cleanupAudio = (closeContext = true) => {
+  const cleanupAudio = () => {
     requestAbortController?.abort();
     requestAbortController = null;
-    stopSource();
-    if (closeContext) closeAudioContext();
+    if (!audio) return;
+    audio.pause();
+    audio.onloadedmetadata = null;
+    audio.ontimeupdate = null;
+    audio.onended = null;
+    audio.onerror = null;
+    audio.removeAttribute?.('src');
+    audio.load?.();
+    audio = null;
   };
 
   const fail = (message) => {
@@ -204,52 +184,18 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     onError(message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play the story audio.'));
   };
 
-  const updatePosition = (id) => {
-    if (id !== runId || !currentSource || !audioBuffer) return;
-    const elapsed = audioContext.currentTime - playbackStartedAt;
-    const position = Math.min(lines.length, ((playbackOffset + elapsed) / audioBuffer.duration) * lines.length);
-    index = Math.min(Math.floor(position), lines.length - 1);
-    emitProgress(Math.min(1, position - index));
-  };
-
   const finishPlayback = (id) => {
     if (id !== runId) return;
     isPlaying = false;
     isPaused = false;
-    playbackOffset = 0;
-    if (currentSource) {
-      currentSource.onended = null;
-      currentSource = null;
-    }
-    clearProgressTimer();
-    closeAudioContext();
-    index = lines.length - 1;
-    onProgress({ index: lines.length, fraction: 0, percent: 100, line: null, source: null, spatialAvailable: false });
+    emitProgress(lines.length);
     onEnd();
   };
 
-  const startAudio = async (id, offset = playbackOffset) => {
-    if (id !== runId || !isPlaying || isPaused || !audioBuffer || !audioContext || currentSource) return;
+  const startAudio = async (id) => {
+    if (id !== runId || !isPlaying || isPaused || !audio) return;
     try {
-      await audioContext.resume();
-      if (id !== runId || !isPlaying || isPaused || !audioBuffer || !audioContext || currentSource) return;
-      const safeOffset = Math.max(0, Math.min(offset, audioBuffer.duration - 0.01));
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(gainNode);
-      source.onended = () => {
-        if (currentSource !== source || id !== runId) return;
-        finishPlayback(id);
-      };
-      currentSource = source;
-      playbackOffset = safeOffset;
-      playbackStartedAt = audioContext.currentTime;
-      const startIndex = Math.min(lines.length - 1, Math.floor((safeOffset / audioBuffer.duration) * lines.length));
-      index = Math.max(0, startIndex);
-      source.start(0, safeOffset);
-      emitProgress((safeOffset / audioBuffer.duration) * lines.length - index);
-      clearProgressTimer();
-      progressTimer = setInterval(() => updatePosition(id), 100);
+      await audio.play();
     } catch (error) {
       if (id === runId) fail(error.message);
     }
@@ -260,28 +206,47 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     const abortController = new AbortController();
     requestAbortController = abortController;
     try {
-      audioRequestPromise ??= freeStoryAudioCache.has(cacheKey)
-        ? Promise.resolve(freeStoryAudioCache.get(cacheKey))
-        : apiRequestAudio('/api/speech/audio-drama/free', {
-          body: { content, lang: audioLang },
+      const result = audioUrl
+        ? { audioUrl, cached: true }
+        : await apiRequest('/api/speech/audio-drama', {
+          method: 'POST',
+          body: { content },
           locale: lang,
           signal: abortController.signal,
-        }).then((audioData) => {
-          freeStoryAudioCache.set(cacheKey, audioData);
-          return audioData;
         });
-      const audioData = await audioRequestPromise;
-      if (id !== runId || !isPlaying || !audioContext) return;
-      audioBuffer = await audioContext.decodeAudioData(audioData.slice(0));
-      if (id !== runId || !isPlaying || !audioContext) return;
-      gainNode = audioContext.createGain();
-      gainNode.gain.value = currentVolume;
-      gainNode.connect(audioContext.destination);
-      playbackOffset = (audioBuffer.duration * Math.min(desiredStartIndex, lines.length - 1)) / lines.length;
-      onNotice(lang === 'bn'
-        ? 'বিনামূল্যের Google voice-এ গল্পটি পড়া হচ্ছে।'
-        : 'Reading the story with free Google voice.');
-      if (!isPaused) await startAudio(id, playbackOffset);
+      if (id !== runId || !isPlaying) return;
+      if (typeof result.audioUrl !== 'string' || !result.audioUrl) {
+        throw new Error(lang === 'bn'
+          ? 'Cloudinary থেকে গল্পের অডিও লিংক পাওয়া যায়নি।'
+          : 'The saved story audio link could not be retrieved.');
+      }
+
+      audio = new globalThis.Audio();
+      audio.preload = 'auto';
+      audio.volume = currentVolume;
+      audio.onloadedmetadata = () => {
+        if (id !== runId || !audio) return;
+        if (Number.isFinite(audio.duration) && audio.duration > 0) {
+          audio.currentTime = (audio.duration * Math.min(desiredStartIndex, lines.length - 1)) / lines.length;
+          emitProgress(desiredStartIndex);
+        }
+        if (!isPaused) void startAudio(id);
+      };
+      audio.ontimeupdate = () => {
+        if (id !== runId || !audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+        emitProgress((audio.currentTime / audio.duration) * lines.length);
+      };
+      audio.onended = () => finishPlayback(id);
+      audio.onerror = () => {
+        if (id === runId) fail(lang === 'bn'
+          ? 'Cloudinary থেকে গল্পের অডিও লোড করা যায়নি। আবার চেষ্টা করুন।'
+          : 'Could not load the saved story audio from Cloudinary. Please try again.');
+      };
+      audio.src = result.audioUrl;
+      audio.load();
+      onNotice(result.cached
+        ? (lang === 'bn' ? 'Cloudinary-তে সংরক্ষিত voice চালানো হচ্ছে।' : 'Playing the saved voice from Cloudinary.')
+        : (lang === 'bn' ? 'ElevenLabs voice Cloudinary-তে সংরক্ষণ করা হয়েছে।' : 'The ElevenLabs voice has been saved to Cloudinary.'));
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
       fail(error.message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play audio.'));
@@ -298,46 +263,23 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       }
       cleanupAudio();
       runId += 1;
-      index = Math.max(0, Math.min(lines.length - 1, Math.floor(startAt)));
-      desiredStartIndex = index;
+      desiredStartIndex = Math.max(0, Math.min(lines.length - 0.001, Number(startAt) || 0));
+      index = Math.floor(desiredStartIndex);
       isPlaying = true;
       isPaused = false;
-      playbackOffset = 0;
-      audioRequestPromise = null;
-      const AudioContextConstructor = globalThis.window?.AudioContext
-        || globalThis.window?.webkitAudioContext;
-      if (typeof AudioContextConstructor !== 'function') {
-        fail(lang === 'bn' ? 'এই ব্রাউজারে অডিও চালানো যাচ্ছে না।' : 'This browser cannot play audio.');
-        return;
-      }
-      try {
-        audioContext = new AudioContextConstructor();
-        void audioContext.resume().catch((error) => {
-          if (isPlaying) fail(error.message);
-        });
-      } catch (error) {
-        fail(error.message);
-        return;
-      }
+      emitProgress(desiredStartIndex);
+      onNotice(lang === 'bn' ? 'Cloudinary-তে সংরক্ষিত voice খোঁজা হচ্ছে…' : 'Checking for saved story audio…');
       void loadAndPlayStory(runId, index);
     },
     pause() {
       if (!isPlaying || isPaused) return;
       isPaused = true;
-      if (currentSource && audioContext && audioBuffer) {
-        playbackOffset = Math.min(
-          audioBuffer.duration,
-          playbackOffset + audioContext.currentTime - playbackStartedAt,
-        );
-        stopSource();
-        clearProgressTimer();
-      }
+      audio?.pause();
     },
     resume() {
       if (!isPlaying || !isPaused) return;
       isPaused = false;
-      if (audioBuffer) void startAudio(runId, playbackOffset);
-      else if (audioContext) void audioContext.resume().catch((error) => fail(error.message));
+      if (audio) void startAudio(runId);
     },
     stop() {
       runId += 1;
@@ -346,33 +288,19 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       cleanupAudio();
     },
     seek(position) {
-      const target = Math.max(0, Math.min(lines.length - 1, Math.floor(position)));
-      index = target;
+      const target = Number.isFinite(Number(position))
+        ? Math.max(0, Math.min(lines.length - 0.001, Number(position)))
+        : 0;
+      index = Math.min(Math.floor(target), lines.length - 1);
       desiredStartIndex = target;
-      if (audioBuffer) {
-        playbackOffset = audioBuffer.duration * target / lines.length;
-        if (currentSource) {
-          stopSource();
-          clearProgressTimer();
-          void startAudio(runId, playbackOffset);
-        } else {
-          emitProgress(0);
-        }
-      } else {
-        const shouldPlay = isPlaying && !isPaused;
-        if (shouldPlay) {
-          playbackOffset = audioBuffer
-            ? audioBuffer.duration * target / lines.length
-            : playbackOffset;
-          emitProgress(0);
-        } else {
-          emitProgress(0);
-        }
+      if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = audio.duration * target / lines.length;
       }
+      emitProgress(target);
     },
     setVolume(value) {
       currentVolume = Math.max(0, Math.min(1, value));
-      if (gainNode) gainNode.gain.value = currentVolume;
+      if (audio) audio.volume = currentVolume;
     },
     setSpatial() {
       return false;

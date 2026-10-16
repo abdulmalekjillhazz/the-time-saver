@@ -2122,6 +2122,7 @@ export function PrivateApp() {
                     <AudioDramaPlayer
                       title={localized(lesson.title, 'en')}
                       content={localized(lesson.body, 'en')}
+                      audioUrl={lesson.media?.type === 'audio' ? lesson.media.url : ''}
                       vocabulary={lesson.vocabulary || []}
                       lang={lang}
                     />

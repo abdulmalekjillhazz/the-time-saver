@@ -255,6 +255,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
         <AudioDramaPlayer
           title={dailyLesson.title}
           content={dailyLesson.content}
+          audioUrl={dailyLesson.audio?.status === 'ready' ? dailyLesson.audio.url : ''}
           vocabulary={dailyLesson.vocabulary || []}
           lang={lang}
           autoPlaySignal={autoPlaySignal}

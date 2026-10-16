@@ -310,6 +310,50 @@ describe('Daily lesson narration', () => {
     expect(uploadBuffer).toHaveBeenCalledOnce();
   });
 
+  it('reuses a previously saved story when the ElevenLabs API key is absent', async () => {
+    configureCloudinary(config);
+    const resourceInfo = vi.fn(async () => ({
+      secure_url: 'https://media.example/previously-generated.mp3',
+    }));
+    setCloudinaryClient({
+      resourceInfo,
+      uploadBuffer: vi.fn(),
+    });
+    const providerRequest = vi.fn();
+    vi.stubGlobal('fetch', providerRequest);
+
+    const result = await generateAndUploadAudioDrama({
+      content: '[Storyteller]: The story begins.',
+      config: { ...config, ELEVENLABS_API_KEY: undefined },
+    });
+
+    expect(result).toEqual({
+      url: 'https://media.example/previously-generated.mp3',
+      cached: true,
+    });
+    expect(resourceInfo).toHaveBeenCalledOnce();
+    expect(providerRequest).not.toHaveBeenCalled();
+  });
+
+  it('reports a clear configuration error on an uncached story when the ElevenLabs key is absent', async () => {
+    configureCloudinary(config);
+    setCloudinaryClient({
+      resourceInfo: vi.fn(async () => null),
+      uploadBuffer: vi.fn(),
+    });
+    const providerRequest = vi.fn();
+    vi.stubGlobal('fetch', providerRequest);
+
+    const error = await generateAndUploadAudioDrama({
+      content: '[Storyteller]: A new story.',
+      config: { ...config, ELEVENLABS_API_KEY: undefined },
+    }).catch((caught) => caught);
+
+    expect(error).toMatchObject({ status: 503, upstreamCode: 'api_key_not_configured' });
+    expect(audioDramaError(error)).toMatchObject({ status: 503, code: 'UNAVAILABLE' });
+    expect(providerRequest).not.toHaveBeenCalled();
+  });
+
   it('sends the complete story to ElevenLabs in one call', async () => {
     const providerRequest = vi.fn(async () => ({
       ok: true,

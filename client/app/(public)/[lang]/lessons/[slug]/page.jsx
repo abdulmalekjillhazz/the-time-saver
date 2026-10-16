@@ -71,13 +71,11 @@ export default async function LessonPage(props) {
       {lesson.media?.type === 'video' && lesson.media.url ? (
         <video src={lesson.media.url} controls preload="metadata" className="mt-4 w-full rounded-xl" />
       ) : null}
-      {lesson.media?.type === 'audio' && lesson.media.url ? (
-        <audio src={lesson.media.url} controls preload="metadata" className="mt-4 w-full" />
-      ) : null}
       <div className="mt-6">
         <AudioDramaPlayer
           title={lesson.title[lang]}
           content={lesson.body[lang]}
+          audioUrl={lesson.media?.type === 'audio' ? lesson.media.url : ''}
           vocabulary={lesson.vocabulary || []}
           lang={lang}
         />

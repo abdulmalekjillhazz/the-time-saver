@@ -1,9 +1,9 @@
 // Minimal CSRF-aware request helper, usable outside PrivateApp.jsx.
-export async function apiRequest(path, { method = 'GET', body, locale = 'en' } = {}) {
+export async function apiRequest(path, { method = 'GET', body, locale = 'en', signal } = {}) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && method !== 'HEAD') {
-    const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin' });
+    const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin', signal });
     const csrfBody = await csrfResponse.json().catch(() => ({}));
     if (!csrfResponse.ok || typeof csrfBody.csrfToken !== 'string') {
       throw new Error('Could not establish a security token for this request.');
@@ -15,6 +15,7 @@ export async function apiRequest(path, { method = 'GET', body, locale = 'en' } =
     headers,
     credentials: 'same-origin',
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

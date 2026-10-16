@@ -40,6 +40,12 @@ export const googleTtsError = (error) => {
 };
 
 export const elevenLabsError = (error) => {
+  if (error instanceof ElevenLabsApiError && error.status === 503) {
+    return new AppError(503, 'UNAVAILABLE', {
+      en: 'This story audio is not saved yet. Configure ElevenLabs to generate and save it.',
+      bn: 'এই গল্পের অডিও এখনো সংরক্ষিত নেই। তৈরি ও সংরক্ষণ করতে ElevenLabs কনফিগার করুন।',
+    });
+  }
   if (error instanceof ElevenLabsApiError && error.status === 402) {
     return new AppError(402, 'PAYMENT_REQUIRED', {
       en: 'ElevenLabs credits are exhausted. Add credits and try again.',
@@ -145,15 +151,10 @@ export function speechRouter({ config = {} } = {}) {
     validate({ body: audioDramaRequest }),
     async (req, res, next) => {
       try {
-        const hasElevenLabs = Boolean(
-          config.ELEVENLABS_API_KEY &&
-          hasCompleteNarrationVoiceConfig(config) &&
-          isCloudinaryConfigured()
-        );
-        if (!hasElevenLabs) {
+        if (!hasCompleteNarrationVoiceConfig(config) || !isCloudinaryConfigured()) {
           throw new AppError(503, 'UNAVAILABLE', {
-            en: 'Configure ElevenLabs, all four narration voices, and Cloudinary before generating story audio.',
-            bn: 'গল্পের অডিও তৈরির আগে ElevenLabs-এর চারটি voice এবং Cloudinary কনফিগার করুন।',
+            en: 'Configure all four narration voices and Cloudinary to look up saved story audio.',
+            bn: 'সংরক্ষিত গল্পের অডিও খুঁজতে চারটি narration voice ও Cloudinary কনফিগার করুন।',
           });
         }
         const result = await generateAndUploadAudioDrama({

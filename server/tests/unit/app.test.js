@@ -40,6 +40,14 @@ describe('app guards (no database needed)', () => {
     expect(res.body.error.code).toBe('CSRF_FAILED');
   });
 
+  it('Cloudinary story audio generation requires CSRF before any provider request', async () => {
+    const res = await request(app)
+      .post('/api/speech/audio-drama')
+      .send({ content: '[Storyteller]: The story begins.' });
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('CSRF_FAILED');
+  });
+
   it('the batch word-meaning endpoint requires a CSRF token', async () => {
     const res = await request(app)
       .post('/api/word-meanings')

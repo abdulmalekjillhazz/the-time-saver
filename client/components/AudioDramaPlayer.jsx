@@ -98,6 +98,7 @@ export function spokenTextParts(text, fraction, completed, onWordClick, selected
 export function AudioDramaPlayer({
   title = '',
   content = '',
+  audioUrl = '',
   vocabulary = [],
   lang = 'bn',
   autoPlaySignal = 0,
@@ -109,6 +110,7 @@ export function AudioDramaPlayer({
   const [isPaused, setIsPaused] = useState(false);
   const [position, setPosition] = useState(0);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedWord, setSelectedWord] = useState(null);
   const controllerRef = useRef(null);
@@ -116,7 +118,7 @@ export function AudioDramaPlayer({
   const isPlayingRef = useRef(false);
   const positionRef = useRef(0);
   const pausedRef = useRef(false);
-  const playbackSettingsRef = useRef({ lines, lang });
+  const playbackSettingsRef = useRef({ lines, lang, audioUrl });
   const lastAutoPlayRef = useRef(0);
 
   const copy = {
@@ -124,6 +126,7 @@ export function AudioDramaPlayer({
     play: isBn ? '▶ গল্প শুনুন' : '▶ Listen to Story',
     pause: isBn ? '⏸ বিরতি' : '⏸ Pause',
     resume: isBn ? '▶ চালান' : '▶ Resume',
+    seek: isBn ? 'গল্পে এগিয়ে যান' : 'Seek through the story',
     close: isBn ? '✕ বন্ধ' : '✕ Close',
     story: isBn ? 'গল্পের সংলাপ' : 'Story dialogue',
     loading: isBn ? 'পাঠ প্রস্তুত হচ্ছে…' : 'Preparing lesson audio…',
@@ -158,6 +161,7 @@ export function AudioDramaPlayer({
   const startPlayback = (startAt = 0) => {
     controllerRef.current?.close();
     setError('');
+    setNotice('');
     isPlayingRef.current = true;
     pausedRef.current = false;
     setIsPlaying(true);
@@ -177,19 +181,23 @@ export function AudioDramaPlayer({
         setPosition(0);
         setIsPlaying(false);
         setIsPaused(false);
+        setNotice('');
       },
       {
         lang,
         volume: 0.9,
         spatial: false,
-        onError: () => {
+        audioUrl,
+        storyContent: content,
+        onError: (message) => {
           isPlayingRef.current = false;
           pausedRef.current = false;
           setIsPlaying(false);
           setIsPaused(false);
-          setError(copy.friendlyError);
+          setNotice('');
+          setError(message || copy.friendlyError);
         },
-        onNotice: () => {},
+        onNotice: setNotice,
       },
     );
     controllerRef.current.play(startAt);
@@ -203,14 +211,17 @@ export function AudioDramaPlayer({
   }, [autoPlaySignal, lines]);
 
   useEffect(() => {
-    const changed = playbackSettingsRef.current.lines !== lines || playbackSettingsRef.current.lang !== lang;
-    playbackSettingsRef.current = { lines, lang };
+    const changed = playbackSettingsRef.current.lines !== lines
+      || playbackSettingsRef.current.lang !== lang
+      || playbackSettingsRef.current.audioUrl !== audioUrl;
+    playbackSettingsRef.current = { lines, lang, audioUrl };
     if (!changed) return;
     const restartAt = isPlayingRef.current ? positionRef.current : null;
     controllerRef.current?.close();
     controllerRef.current = null;
+    setNotice('');
     if (restartAt !== null) startPlayback(Math.floor(restartAt));
-  }, [lines, lang]);
+  }, [lines, lang, audioUrl]);
 
   useEffect(() => () => {
     isPlayingRef.current = false;
@@ -220,7 +231,7 @@ export function AudioDramaPlayer({
 
   const handlePlayPause = () => {
     if (!controllerRef.current || (!isPlaying && !isPaused)) {
-      startPlayback(Math.floor(position));
+      startPlayback(position);
       return;
     }
     if (isPaused) {
@@ -243,6 +254,14 @@ export function AudioDramaPlayer({
     setIsPlaying(false);
     setIsPaused(false);
     setIsFullscreen(false);
+    setNotice('');
+  };
+
+  const handleSeek = (value) => {
+    const nextPosition = Number(value);
+    positionRef.current = nextPosition;
+    setPosition(nextPosition);
+    controllerRef.current?.seek(nextPosition);
   };
 
   const currentLineIndex = Math.min(Math.floor(position), Math.max(lines.length - 1, 0));
@@ -287,6 +306,21 @@ export function AudioDramaPlayer({
               </button>
             ) : null}
           </div>
+
+          {notice ? <p role="status" className="w-full text-xs font-medium text-gold-soft">{notice}</p> : null}
+
+          {lines.length ? (
+            <input
+              type="range"
+              min="0"
+              max={lines.length}
+              step="0.01"
+              value={Math.min(position, lines.length)}
+              onChange={(event) => handleSeek(event.target.value)}
+              aria-label={copy.seek}
+              className="h-2 w-full cursor-pointer accent-gold"
+            />
+          ) : null}
 
           {selectedWord ? (
             <button

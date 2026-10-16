@@ -316,8 +316,8 @@ export async function generateAndUploadLessonAudio({ lesson, config, signal }) {
 const audioDramaRequests = new Map();
 
 async function createAudioDramaAsset({ content, config, signal }) {
-  if (!config?.ELEVENLABS_API_KEY || !hasCompleteNarrationVoiceConfig(config) || !config?.CLOUDINARY_CLOUD_NAME || !config?.CLOUDINARY_API_KEY || !config?.CLOUDINARY_API_SECRET) {
-    throw new Error('ElevenLabs, all four narration voices, and Cloudinary must be configured to save audio dramas.');
+  if (!hasCompleteNarrationVoiceConfig(config) || !config?.CLOUDINARY_CLOUD_NAME || !config?.CLOUDINARY_API_KEY || !config?.CLOUDINARY_API_SECRET) {
+    throw new Error('All four narration voices and Cloudinary must be configured to save audio dramas.');
   }
 
   const voiceConfigVersion = getNarrationVoiceConfigVersion(config);
@@ -334,6 +334,10 @@ async function createAudioDramaAsset({ content, config, signal }) {
       url: existingFull.secure_url,
       cached: true,
     };
+  }
+
+  if (!config.ELEVENLABS_API_KEY) {
+    throw new ElevenLabsApiError(503, 'api_key_not_configured');
   }
 
   const generated = await generateNarrationAudio({ lesson: { content }, config, signal });
