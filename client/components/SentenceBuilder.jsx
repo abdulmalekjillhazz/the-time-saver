@@ -3,17 +3,23 @@
 import { useMemo, useState } from 'react';
 import { Card } from './ui/Card.jsx';
 
-const CATEGORIES = ['everyday', 'explaining', 'reading'];
-const EXPLANATION_WORDS = /\b(because|so|if|when|but|although|therefore|while|which)\b/i;
-const ACADEMIC_WORDS = /\b(study|studies|research|brain|health|focus|attention|habit|science|scientist|energy|memory|learning)\b/i;
+const LEVELS = ['basic', 'intermediate', 'advanced'];
 
-function sentenceCategory(sentence, wordCount, story) {
-  if (/[?]$/.test(sentence.trim())) return 'everyday';
-  if (EXPLANATION_WORDS.test(sentence)) return 'explaining';
-  if (story.category === 'science' || story.storyType === 'science' || wordCount >= 12 || ACADEMIC_WORDS.test(sentence)) {
-    return 'reading';
+function sentenceLevel(wordCount) {
+  if (wordCount <= 5) return 'basic';
+  if (wordCount <= 9) return 'intermediate';
+  return 'advanced';
+}
+
+export function getUnlockedLevels(levelCounts, completedLevels) {
+  const unlocked = ['basic'];
+  if (!levelCounts.basic || completedLevels.basic >= Math.min(3, levelCounts.basic)) {
+    unlocked.push('intermediate');
   }
-  return 'everyday';
+  if (!levelCounts.intermediate || completedLevels.intermediate >= Math.min(3, levelCounts.intermediate)) {
+    unlocked.push('advanced');
+  }
+  return unlocked;
 }
 
 function sentenceStructure(sentence) {
@@ -59,7 +65,7 @@ export function extractGrammarExercises(stories = []) {
     for (const rawSentence of sentences) {
       const sentence = rawSentence.trim();
       const englishWords = sentence.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
-      if (englishWords.length < 4 || englishWords.length > 22 || /[\u0980-\u09ff]/.test(sentence)) continue;
+      if (englishWords.length < 3 || englishWords.length > 22 || /[\u0980-\u09ff]/.test(sentence)) continue;
 
       const identity = `${story.slug || title}:${sentence.toLowerCase()}`;
       if (seen.has(identity)) continue;
@@ -77,13 +83,16 @@ export function extractGrammarExercises(stories = []) {
         sentence,
         words: shuffledWords,
         answer: chunks,
-        category: sentenceCategory(sentence, englishWords.length, story),
+        wordCount: englishWords.length,
+        level: sentenceLevel(englishWords.length),
         structure: sentenceStructure(sentence),
       });
     }
   }
 
-  return exercises;
+  return exercises.sort((left, right) => (
+    left.wordCount - right.wordCount || left.sentence.localeCompare(right.sentence)
+  ));
 }
 
 export function isSentenceCorrect(selectedIndices, exercise) {
@@ -94,33 +103,43 @@ export function isSentenceCorrect(selectedIndices, exercise) {
 export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const isBn = lang === 'bn';
   const exercises = useMemo(() => extractGrammarExercises(stories), [stories]);
-  const [category, setCategory] = useState('everyday');
+  const [level, setLevel] = useState('basic');
   const [storySlug, setStorySlug] = useState('all');
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [selected, setSelected] = useState([]);
   const [result, setResult] = useState('');
+  const [completedLevels, setCompletedLevels] = useState({ basic: 0, intermediate: 0, advanced: 0 });
   const availableStories = useMemo(() => {
     const uniqueStories = new Map();
     for (const exercise of exercises) uniqueStories.set(exercise.slug, exercise.sourceTitle);
     return [...uniqueStories].map(([slug, title]) => ({ slug, title }));
   }, [exercises]);
   const filteredExercises = useMemo(
-    () => exercises.filter((exercise) => exercise.category === category
+    () => exercises.filter((exercise) => exercise.level === level
       && (storySlug === 'all' || exercise.slug === storySlug)),
-    [category, exercises, storySlug],
+    [exercises, level, storySlug],
   );
+  const levelCounts = useMemo(
+    () => Object.fromEntries(LEVELS.map((item) => [
+      item,
+      exercises.filter((exercise) => exercise.level === item).length,
+    ])),
+    [exercises],
+  );
+  const unlockedLevels = new Set(getUnlockedLevels(levelCounts, completedLevels));
   const exercise = filteredExercises.length
     ? filteredExercises[exerciseIndex % filteredExercises.length]
     : null;
   const correct = Boolean(exercise && isSentenceCorrect(selected, exercise));
-  const categoryLabels = {
-    everyday: isBn ? 'দৈনন্দিন কথা' : 'Everyday speaking',
-    explaining: isBn ? 'ব্যাখ্যা করা' : 'Explaining ideas',
-    reading: isBn ? 'থিসিসের মতো লম্বা লেখা' : 'Academic / thesis-style reading',
+  const levelLabels = {
+    basic: isBn ? 'শুরু · ছোট বাক্য' : 'Basic · short sentences',
+    intermediate: isBn ? 'মাঝারি · একটু বড় বাক্য' : 'Intermediate · longer sentences',
+    advanced: isBn ? 'উন্নত · লম্বা বাক্য' : 'Advanced · long sentences',
   };
 
-  const chooseCategory = (nextCategory) => {
-    setCategory(nextCategory);
+  const chooseLevel = (nextLevel) => {
+    if (!unlockedLevels.has(nextLevel)) return;
+    setLevel(nextLevel);
     setExerciseIndex(0);
     setSelected([]);
     setResult('');
@@ -140,7 +159,14 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   };
 
   const checkSentence = () => {
-    setResult(correct ? 'correct' : 'try-again');
+    if (correct) {
+      if (result !== 'correct') {
+        setCompletedLevels((current) => ({ ...current, [level]: current[level] + 1 }));
+      }
+      setResult('correct');
+    } else {
+      setResult('try-again');
+    }
   };
 
   const nextExercise = () => {
@@ -164,36 +190,45 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
               Grammar · Sentence structure
             </span>
             <h2 className="mt-2 text-xl font-black tracking-tight text-ink sm:text-2xl">
-              {isBn ? 'গল্প থেকে ইংরেজি বাক্য গঠন শেখো' : 'Learn sentence structure from stories'}
+              {isBn ? 'সহজ থেকে ধাপে ধাপে ইংরেজি বাক্য গঠন' : 'Build English sentences step by step'}
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-ink/75">
               {isBn
-                ? 'আগে পড়া ইংরেজি গল্পের বাস্তব বাক্য সাজাও—দৈনন্দিন কথা, কিছু ব্যাখ্যা করা, বা থিসিসের মতো লম্বা লেখা পড়ার অনুশীলন করো।'
-                : 'Rebuild real sentences from your English stories. Practise daily conversation, explaining ideas, and reading longer academic text.'}
+                ? 'ছোট ও সহজ বাক্য দিয়ে শুরু করো। কয়েকটি ঠিক হলে পরের স্তর খুলবে—সব অনুশীলন তোমার পড়া গল্প থেকে নেওয়া।'
+                : 'Start with short, easy sentences. Complete a few to unlock the next level. Every exercise comes from a story you have read.'}
             </p>
           </div>
         </div>
 
         {exercises.length ? (
           <>
-            <div className="grid gap-2 sm:grid-cols-3" aria-label={isBn ? 'অনুশীলনের ধরন' : 'Practice category'}>
-              {CATEGORIES.map((item) => {
-                const count = exercises.filter((exerciseItem) => exerciseItem.category === item).length;
+            <div className="grid gap-2 sm:grid-cols-3" aria-label={isBn ? 'বাক্যের স্তর' : 'Sentence level'}>
+              {LEVELS.map((item, levelIndex) => {
+                const unlocked = unlockedLevels.has(item);
+                const previousLevel = LEVELS[levelIndex - 1];
+                const required = previousLevel ? Math.min(3, levelCounts[previousLevel]) : 0;
+                const progress = previousLevel
+                  ? `${Math.min(completedLevels[previousLevel], required)}/${required}`
+                  : '';
                 return (
                   <button
                     key={item}
                     type="button"
-                    aria-pressed={category === item}
-                    disabled={!count}
-                    onClick={() => chooseCategory(item)}
+                    aria-pressed={level === item}
+                    disabled={!unlocked}
+                    onClick={() => chooseLevel(item)}
                     className={`min-h-12 rounded-xl border px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                      category === item
+                      level === item
                         ? 'border-gold bg-gold/15 text-ink shadow-sm'
                         : 'border-sapphire/20 bg-paper/65 text-ink/75 hover:border-gold/50'
                     }`}
                   >
-                    <span className="block">{categoryLabels[item]}</span>
-                    <span className="mt-1 block text-[10px] font-semibold opacity-65">{count} {isBn ? 'টি বাক্য' : (count === 1 ? 'sentence' : 'sentences')}</span>
+                    <span className="block">{levelLabels[item]}</span>
+                    <span className="mt-1 block text-[10px] font-semibold opacity-65">
+                      {!unlocked
+                        ? (isBn ? `আগের স্তর: ${progress} সম্পন্ন` : `Finish previous level: ${progress}`)
+                        : `${levelCounts[item]} ${isBn ? 'টি বাক্য' : (levelCounts[item] === 1 ? 'sentence' : 'sentences')}`}
+                    </span>
                   </button>
                 );
               })}
@@ -220,7 +255,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     {isBn ? `অনুশীলন ${exerciseIndex + 1} / ${filteredExercises.length}` : `Challenge ${exerciseIndex + 1} / ${filteredExercises.length}`}
                   </span>
                   <span className="rounded-full bg-gold/15 px-3 py-1 text-xs font-bold text-gold-soft">
-                    {categoryLabels[category]}
+                    {levelLabels[level]}
                   </span>
                 </div>
 
@@ -236,7 +271,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                       </span>
                     ))
                   ) : (
-                    <span className="text-sm text-ink/50">{isBn ? 'শব্দের অংশগুলো সঠিক ক্রমে বেছে নাও…' : 'Choose the word chunks in the correct order…'}</span>
+                    <span className="text-sm text-ink/50">{isBn ? 'শব্দগুলো সঠিক ক্রমে বেছে নাও…' : 'Put the words in the correct order…'}</span>
                   )}
                 </div>
 
@@ -290,8 +325,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
             ) : (
               <p role="status" className="rounded-2xl border border-gold/25 bg-gold/5 p-4 text-sm leading-relaxed text-ink/75">
                 {isBn
-                  ? 'এই ধরনের যথেষ্ট বাক্য গল্পে নেই। অন্য অনুশীলনের ধরন বা সব গল্প বেছে দেখো।'
-                  : 'There are no story sentences in this practice category. Try another category or select all stories.'}
+                  ? 'এই স্তরে এই গল্পের কোনো বাক্য নেই। অন্য গল্প বেছে নাও অথবা Basic স্তরে ফিরে যাও।'
+                  : 'No story sentences are available at this level for the selected story. Choose another story or return to Basic.'}
               </p>
             )}
           </>

@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   extractGrammarExercises,
+  getUnlockedLevels,
   isSentenceCorrect,
   SentenceBuilder,
 } from '../components/SentenceBuilder.jsx';
@@ -12,7 +13,7 @@ describe('English sentence builder', () => {
     {
       slug: 'morning-walk',
       title: 'A Morning Walk',
-      body: '[Nina]: I take a short walk every morning. Mina rested because her focus became tired.',
+      body: '[Nina]: Mina walks to school. I take a short walk every morning. Mina rested because her focus became tired.',
       category: 'health',
     },
     {
@@ -23,15 +24,31 @@ describe('English sentence builder', () => {
     },
   ];
 
-  it('extracts useful sentence-building exercises from story text', () => {
+  it('extracts story sentences and assigns difficulty by sentence length', () => {
     const exercises = extractGrammarExercises(stories);
 
-    expect(exercises.map(({ sentence, category, sourceTitle }) => ({ sentence, category, sourceTitle }))).toEqual([
-      { sentence: 'I take a short walk every morning.', category: 'everyday', sourceTitle: 'A Morning Walk' },
-      { sentence: 'Mina rested because her focus became tired.', category: 'explaining', sourceTitle: 'A Morning Walk' },
-      { sentence: 'Scientists studied how short breaks changed the way the brain held attention.', category: 'reading', sourceTitle: 'Why Breaks Help the Brain' },
+    expect(exercises.map(({ sentence, level, sourceTitle }) => ({ sentence, level, sourceTitle }))).toEqual([
+      { sentence: 'Mina walks to school.', level: 'basic', sourceTitle: 'A Morning Walk' },
+      { sentence: 'I take a short walk every morning.', level: 'intermediate', sourceTitle: 'A Morning Walk' },
+      { sentence: 'Mina rested because her focus became tired.', level: 'intermediate', sourceTitle: 'A Morning Walk' },
+      { sentence: 'Scientists studied how short breaks changed the way the brain held attention.', level: 'advanced', sourceTitle: 'Why Breaks Help the Brain' },
     ]);
     expect(exercises[0].structure.en).toContain('Subject + verb');
+  });
+
+  it('unlocks harder levels only after completing the current level', () => {
+    const counts = { basic: 4, intermediate: 2, advanced: 1 };
+    expect(getUnlockedLevels(counts, { basic: 0, intermediate: 0, advanced: 0 }))
+      .toEqual(['basic']);
+    expect(getUnlockedLevels(counts, { basic: 3, intermediate: 0, advanced: 0 }))
+      .toEqual(['basic', 'intermediate']);
+    expect(getUnlockedLevels(counts, { basic: 3, intermediate: 2, advanced: 0 }))
+      .toEqual(['basic', 'intermediate', 'advanced']);
+  });
+
+  it('skips levels that have no story-derived sentences', () => {
+    expect(getUnlockedLevels({ basic: 0, intermediate: 0, advanced: 2 }, { basic: 0, intermediate: 0, advanced: 0 }))
+      .toEqual(['basic', 'intermediate', 'advanced']);
   });
 
   it('checks a complete sentence against its story-derived word order', () => {
@@ -42,15 +59,17 @@ describe('English sentence builder', () => {
     expect(isSentenceCorrect(correctOrder.slice(1), exercise)).toBe(false);
   });
 
-  it('renders bilingual categories and uses the selected story as the lesson source', () => {
+  it('starts with Basic and uses the selected story as the lesson source', () => {
     const markup = renderToStaticMarkup(createElement(SentenceBuilder, { lang: 'bn', stories }));
 
     expect(markup).toContain('ইংরেজি বাক্য গঠন');
-    expect(markup).toContain('গল্প থেকে ইংরেজি বাক্য গঠন শেখো');
-    expect(markup).toContain('দৈনন্দিন কথা');
-    expect(markup).toContain('ব্যাখ্যা করা');
-    expect(markup).toContain('থিসিসের মতো লম্বা লেখা');
+    expect(markup).toContain('সহজ থেকে ধাপে ধাপে ইংরেজি বাক্য গঠন');
+    expect(markup).toContain('শুরু · ছোট বাক্য');
+    expect(markup).toContain('মাঝারি · একটু বড় বাক্য');
+    expect(markup).toContain('উন্নত · লম্বা বাক্য');
     expect(markup).toContain('A Morning Walk');
     expect(markup).toContain('বাক্য যাচাই');
+    expect(markup).toContain('অনুশীলন 1 / 1');
+    expect(markup).toContain('আগের স্তর:');
   });
 });
