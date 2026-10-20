@@ -55,7 +55,7 @@ const GoalToRoutine = dynamic(() => import('./GoalToRoutine.jsx').then((m) => m.
 const TemplatePicker = dynamic(() => import('./TemplatePicker.jsx').then((m) => m.TemplatePicker), { ssr: false });
 const AudioDramaPlayer = dynamic(() => import('./AudioDramaPlayer.jsx').then((m) => m.AudioDramaPlayer), { ssr: false });
 const DailyLessonCard = dynamic(() => import('./DailyLessonCard.jsx').then((m) => m.DailyLessonCard), { ssr: false });
-const SentenceBuilder = dynamic(() => import('./SentenceBuilder.jsx').then((m) => m.SentenceBuilder), { ssr: false });
+const GrammarLessons = dynamic(() => import('./GrammarLessons.jsx').then((m) => m.GrammarLessons), { ssr: false });
 import { ProfileAvatar, ProfileAvatarPicker } from './ProfileAvatar.jsx';
 import { TodayProgressCard } from './TodayProgressCard.jsx';
 import { StoryReader } from './StoryReader.jsx';
@@ -2243,7 +2243,7 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'grammar' ? <SentenceBuilder lang={lang} stories={grammarStorySources} /> : null}
+      {tab === 'grammar' ? <GrammarLessons lang={lang} stories={grammarStorySources} /> : null}
 
       {tab === 'today' ? (
         <section className="space-y-4">
