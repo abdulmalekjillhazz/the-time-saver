@@ -502,6 +502,38 @@ body:lang(en) {
   z-index: 40;
 }
 
+.app-shell-main.app-shell-immersive {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  padding: max(4rem, calc(3.25rem + env(safe-area-inset-top, 0px))) max(1rem, env(safe-area-inset-right, 0px)) calc(1.25rem + env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px)) !important;
+}
+
+.app-shell-main.app-shell-immersive::before {
+  border: 0;
+  border-radius: 0;
+}
+
+.app-immersive-back {
+  position: fixed;
+  z-index: 90;
+  top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  left: max(0.75rem, env(safe-area-inset-left, 0px));
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  border-color: rgb(var(--c-gold) / 0.9) !important;
+  background: rgb(var(--c-gold) / 0.16) !important;
+  color: rgb(var(--c-gold)) !important;
+  padding: 0 !important;
+  box-shadow: 0 3px 12px rgb(0 0 0 / 0.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 :root[data-theme="light"] .app-hero {
   border-color: rgb(var(--c-sapphire-deep) / 0.22);
   background: linear-gradient(135deg, rgb(255 255 255 / 0.96), rgb(219 234 254 / 0.94));
@@ -1571,9 +1603,9 @@ select:disabled {
   width: 2.75rem;
   min-width: 2.75rem;
   flex: 0 0 auto;
-  border-color: rgb(var(--c-gold) / 0.72) !important;
-  background: rgb(var(--c-sapphire) / 0.12) !important;
-  color: rgb(var(--c-ink)) !important;
+  border-color: rgb(var(--c-gold) / 0.9) !important;
+  background: rgb(var(--c-gold) / 0.16) !important;
+  color: rgb(var(--c-gold)) !important;
   padding-inline: 0 !important;
 }
 

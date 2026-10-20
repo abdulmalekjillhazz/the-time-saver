@@ -18,13 +18,13 @@ describe('registerSchema', () => {
     });
     expect(r.success).toBe(false);
   });
-  it('accepts a 4–6 digit PIN', () => {
-    for (const password of ['1234', '123456']) {
+  it('accepts any non-empty password up to 128 characters', () => {
+    for (const password of ['1', '123', '1234567', 'abcde', 'short', 'long-enough-pass', 'x'.repeat(128)]) {
       expect(registerSchema.safeParse({ email: 'a@example.com', password, displayName: 'A' }).success).toBe(true);
     }
   });
-  it('rejects PINs outside 4–6 digits and short non-numeric passwords', () => {
-    for (const password of ['123', '1234567', 'abcde', 'short']) {
+  it('rejects empty and overlong passwords', () => {
+    for (const password of ['', 'x'.repeat(129)]) {
       expect(registerSchema.safeParse({ email: 'a@example.com', password, displayName: 'A' }).success).toBe(false);
     }
   });

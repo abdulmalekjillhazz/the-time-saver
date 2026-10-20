@@ -13,7 +13,7 @@ Common codes: VALIDATION_FAILED (400), UNAUTHENTICATED (401), FORBIDDEN (403), C
 |---|---|---|---|---|---|
 | GET /api/health | None | none | { ok } only | none | IP generous |
 | GET /api/ready | Internal token | none | DB and model status | UNAUTHENTICATED | Internal |
-| POST /api/auth/register | None | email, password (4–6 digit PIN or min 12-character passphrase), displayName, locale, timezone | { user } and session | Duplicate email returns generic success | IP 60 per hour (valid requests) |
+| POST /api/auth/register | None | email, password (any non-empty value up to 128 characters), displayName, locale, timezone | { user } and session | Duplicate email returns generic success | IP 60 per hour (valid requests) |
 | POST /api/auth/login | None | email, password | { user } and session | UNAUTHENTICATED (generic) | IP 10 per 15 min; account 5 per 15 min with backoff |
 | POST /api/auth/logout | Session | none | { ok }; session revoked | none | User 30 per min |
 | POST /api/auth/refresh | Refresh cookie | none | New cookies; family revoked on reuse | UNAUTHENTICATED | IP 30 per min |

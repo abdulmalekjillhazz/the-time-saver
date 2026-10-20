@@ -72,7 +72,7 @@ const COPY = {
     name: 'Display name', locale: 'Language', create: 'Create account', signIn: 'Sign in', switchRegister: 'Need an account?',
     googleSignIn: 'Continue with Google',
     profile: 'Your profile', profileName: 'Name shown in the app', profileAvatar: 'Profile avatar', editProfile: 'View or edit your profile', saveProfile: 'Save profile', profileSaved: 'Your profile was updated.',
-    passwordHint: 'Use a 4–6 digit PIN. A password of at least 12 characters also works.',
+    passwordHint: 'Choose any password you like (up to 128 characters).',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     switchLogin: 'Already have an account?', logout: 'Sign out', loading: 'Loading your private app…', addRoutine: 'Add a routine',
@@ -140,7 +140,7 @@ const COPY = {
     name: 'নাম', locale: 'ভাষা', create: 'অ্যাকাউন্ট তৈরি', signIn: 'সাইন ইন', switchRegister: 'অ্যাকাউন্ট নেই?',
     googleSignIn: 'Google দিয়ে চালিয়ে যান',
     profile: 'আপনার প্রোফাইল', profileName: 'অ্যাপে দেখানো নাম', profileAvatar: 'প্রোফাইল অবতার', editProfile: 'প্রোফাইল দেখুন বা সম্পাদনা করুন', saveProfile: 'প্রোফাইল সংরক্ষণ', profileSaved: 'আপনার প্রোফাইল আপডেট হয়েছে।',
-    passwordHint: '৪–৬ সংখ্যার PIN দিন। কমপক্ষে ১২ অক্ষরের password-ও ব্যবহার করা যাবে।',
+    passwordHint: 'আপনার পছন্দমতো যেকোনো password দিন (সর্বোচ্চ ১২৮ অক্ষর)।',
     showPassword: 'পাসওয়ার্ড দেখান',
     hidePassword: 'পাসওয়ার্ড লুকান',
     switchLogin: 'আগে থেকেই অ্যাকাউন্ট আছে?', logout: 'সাইন আউট', loading: 'আপনার ব্যক্তিগত অ্যাপ লোড হচ্ছে…', addRoutine: 'রুটিন যোগ করুন',
@@ -561,6 +561,7 @@ export function PrivateApp() {
   const snoozeLinkHandledRef = useRef(false);
   const copy = COPY[lang];
   const nativeAndroid = isAndroidNativeApp();
+  const immersiveTab = ['focus', 'speaking', 'grammar'].includes(tab);
 
   const reportError = useCallback((err) => {
     setError(messageFrom(err, lang));
@@ -1927,10 +1928,7 @@ export function PrivateApp() {
               copy={copy}
               name="password"
               required
-              minLength={registering ? 4 : undefined}
               maxLength="128"
-              pattern={registering ? '(?:[0-9]{4,6}|.{12,128})' : undefined}
-              inputMode={registering ? 'numeric' : undefined}
               autoComplete={registering ? 'new-password' : 'current-password'}
               hint={registering ? copy.passwordHint : undefined}
             />
@@ -2040,7 +2038,22 @@ export function PrivateApp() {
   }
 
   return (
-    <main className="app-shell app-shell-main mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7">
+    <main className={`app-shell app-shell-main mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7${immersiveTab ? ' app-shell-immersive' : ''}`}>
+      {immersiveTab ? (
+        <Button
+          type="button"
+          variant="secondary"
+          className="app-immersive-back"
+          aria-label={lang === 'bn' ? 'আজকের রুটিনে ফিরুন' : "Return to today's routine"}
+          title={lang === 'bn' ? 'আজকের রুটিনে ফিরুন' : "Return to today's routine"}
+          onClick={() => setTab('today')}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5m7 7-7-7 7-7" />
+          </svg>
+        </Button>
+      ) : null}
+      {!immersiveTab ? (
       <header className="app-hero flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl px-5 py-6 sm:px-8 sm:py-8">
         <div className="relative z-10 w-full">
           <div className="app-hero-heading-row">
@@ -2111,7 +2124,8 @@ export function PrivateApp() {
           </div>
         </div>
       </header>
-      <SyncStatus userId={user.id} lang={lang} />
+      ) : null}
+      {!immersiveTab ? <SyncStatus userId={user.id} lang={lang} /> : null}
       {error ? (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-rose-400 bg-rose-500/15 px-4 py-3 text-sm font-bold text-rose-300 shadow-lg">
           <span>{error.startsWith('❌') ? error : `❌ ${error}`}</span>
@@ -2136,7 +2150,7 @@ export function PrivateApp() {
           </div>
         </Card>
       ) : null}
-      <nav className="app-tabs" aria-label={copy.title}>
+      {!immersiveTab ? <nav className="app-tabs" aria-label={copy.title}>
         {[
           ['today', '🌤️', copy.today, lang === 'bn' ? 'আজ' : 'Today'],
           ['plan', '🗓️', lang === 'bn' ? 'পরিকল্পনা' : 'Plan', lang === 'bn' ? 'পরিকল্পনা' : 'Plan'],
@@ -2152,7 +2166,7 @@ export function PrivateApp() {
             <span className="tab-label-mobile" aria-hidden="true">{shortLabel}</span>
           </Button>
         ))}
-      </nav>
+      </nav> : null}
 
       {tab === 'leaderboard' ? <LeaderboardPanel lang={lang} /> : null}
 
