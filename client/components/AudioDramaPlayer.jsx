@@ -742,47 +742,83 @@ export function AudioDramaPlayer({
         {speechPracticeOpen ? (
           <section
             aria-label={copy.practiceTitle}
-            className="space-y-3 rounded-2xl border border-gold/35 bg-gold/5 p-4"
+            className="relative isolate space-y-4 overflow-hidden rounded-[1.75rem] border border-gold/35 bg-gradient-to-br from-sapphire/15 via-paper to-gold/15 p-4 shadow-xl sm:p-6"
           >
-            <div>
-              <h3 className="font-extrabold text-gold-soft">{copy.practiceTitle}</h3>
-              <p className="mt-1 text-xs leading-relaxed text-ink/75">{copy.practiceHelp}</p>
+            <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 -z-10 size-40 rounded-full bg-gold/15 blur-3xl" />
+            <div className="flex items-start gap-3">
+              <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl border border-gold/30 bg-gold/15 text-2xl shadow-inner sm:size-14 sm:text-3xl">🎙️</span>
+              <div className="min-w-0 flex-1">
+                <span className="inline-flex rounded-full border border-sapphire/25 bg-sapphire/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-sapphire">
+                  {isBn ? 'শুনুন · বলুন · শিখুন' : 'Listen · Speak · Grow'}
+                </span>
+                <h3 className="mt-2 text-lg font-black tracking-tight text-ink sm:text-xl">{copy.practiceTitle}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-ink/75 sm:text-sm">{copy.practiceHelp}</p>
+              </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {practiceLines.map((line, lineIndex) => {
                 const isCurrentPractice = speechPractice.lineIndex === lineIndex;
                 const isListening = isCurrentPractice && speechPractice.status === 'listening';
                 const comparison = isCurrentPractice ? speechPractice.comparison : null;
                 const attempts = attemptsByLine[lineIndex] || 0;
                 const attemptsExhausted = !canAttemptSpeechPractice(attempts);
+                const hasResult = isCurrentPractice && speechPractice.status === 'result';
                 return (
                   <article
                     key={`practice-${lineIndex}-${line.character}`}
-                    className="space-y-2 rounded-xl border border-gold/20 bg-paper/80 p-3"
+                    className={`relative space-y-3 rounded-2xl border p-4 shadow-sm transition-all duration-300 sm:p-5 ${
+                      isListening
+                        ? 'border-sapphire/60 bg-sapphire/10 shadow-lg shadow-sapphire/10'
+                        : hasResult
+                          ? 'border-emerald-500/35 bg-emerald-500/5'
+                          : 'border-gold/20 bg-paper/75 hover:-translate-y-0.5 hover:border-gold/45 hover:shadow-md'
+                    }`}
                   >
-                    <p className="text-sm font-semibold leading-relaxed text-ink">
-                      <span className="mr-1 text-xs font-bold text-gold-soft">{line.character}:</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="inline-flex min-h-7 items-center rounded-full bg-gold/15 px-2.5 text-[10px] font-extrabold uppercase tracking-wider text-gold-soft">
+                        {isBn ? `লাইন ${lineIndex + 1}` : `Line ${lineIndex + 1}`}
+                      </span>
+                      <div className="flex items-center gap-1.5" aria-label={`${copy.attempts}: ${attempts}/${MAX_SPEECH_PRACTICE_ATTEMPTS}`}>
+                        {Array.from({ length: MAX_SPEECH_PRACTICE_ATTEMPTS }, (_, attemptIndex) => (
+                          <span
+                            key={attemptIndex}
+                            aria-hidden="true"
+                            className={`size-2.5 rounded-full transition-colors ${attemptIndex < attempts ? 'bg-gold' : 'bg-ink/15'}`}
+                          />
+                        ))}
+                        <span className="ml-1 text-[10px] font-bold text-ink/60">{attempts}/{MAX_SPEECH_PRACTICE_ATTEMPTS}</span>
+                      </div>
+                    </div>
+                    <p className="text-base font-bold leading-relaxed text-ink sm:text-lg">
                       {spokenTextParts(line.text, 0, false, handleWordLookup, selectedWord, `practice-${lineIndex}`)}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => { void practiceLine(lineIndex); }}
-                      aria-pressed={isListening}
-                      disabled={attemptsExhausted && !isListening}
-                      className={`secondary-button relative min-h-[44px] px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${isListening ? 'animate-pulse border-red-500 bg-red-100 text-red-900' : ''}`}
-                    >
-                      {isListening
-                        ? copy.stopSpeaking
-                        : isCurrentPractice && speechPractice.status === 'result'
-                          ? attemptsExhausted ? copy.attemptsLimit : copy.retrySpeaking
-                          : attemptsExhausted ? copy.attemptsLimit : copy.speakLine}
-                      <span className="ml-2 text-[10px] font-semibold opacity-75">{copy.attempts}: {attempts}/{MAX_SPEECH_PRACTICE_ATTEMPTS}</span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => { void practiceLine(lineIndex); }}
+                        aria-pressed={isListening}
+                        disabled={attemptsExhausted && !isListening}
+                        className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-not-allowed disabled:opacity-50 ${
+                          isListening
+                            ? 'bg-red-600 text-white shadow-red-600/20'
+                            : 'bg-gradient-to-r from-sapphire-deep to-sapphire text-white shadow-sapphire/20'
+                        }`}
+                      >
+                        <span aria-hidden="true" className="text-base">{isListening ? '■' : '🎤'}</span>
+                        {isListening
+                          ? copy.stopSpeaking
+                          : isCurrentPractice && speechPractice.status === 'result'
+                            ? attemptsExhausted ? copy.attemptsLimit : copy.retrySpeaking
+                            : attemptsExhausted ? copy.attemptsLimit : copy.speakLine}
+                      </button>
+                    </div>
                     {isListening ? (
-                      <p role="status" className="flex items-center gap-2 text-xs font-semibold text-sapphire">
-                        <span className="relative inline-flex h-3 w-3" aria-hidden="true">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                          <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
+                      <p role="status" className="flex items-center gap-2 rounded-xl border border-sapphire/25 bg-sapphire/10 px-3 py-2 text-xs font-bold text-sapphire">
+                        <span className="relative inline-flex h-4 items-center gap-0.5" aria-hidden="true">
+                          <span className="h-2 w-1 animate-pulse rounded-full bg-sapphire" />
+                          <span className="h-4 w-1 animate-pulse rounded-full bg-sapphire [animation-delay:120ms]" />
+                          <span className="h-3 w-1 animate-pulse rounded-full bg-sapphire [animation-delay:240ms]" />
+                          <span className="h-2 w-1 animate-pulse rounded-full bg-sapphire [animation-delay:360ms]" />
                         </span>
                         {copy.listening} · {copy.speakingAnimation}
                       </p>
@@ -791,8 +827,9 @@ export function AudioDramaPlayer({
                       <p role="alert" className="text-xs font-semibold text-red-700">{speechPractice.message}</p>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'result' && comparison ? (
-                      <div role="status" aria-live="polite" className="space-y-1.5 text-xs text-ink">
-                        <p className="font-extrabold text-sapphire">
+                      <div role="status" aria-live="polite" className="space-y-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs text-ink">
+                        <p className="flex items-center gap-2 font-extrabold text-sapphire">
+                          <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-emerald-500/15 text-emerald-700">✓</span>
                           {copy.wordMatch}: {comparison.accuracy}%
                         </p>
                         <p>

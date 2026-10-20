@@ -86,6 +86,21 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('গল্প শুরু হলো।');
   });
 
+  it('renders the refreshed speaking practice cards and listening prompt', () => {
+    const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
+      content: '[Narrator]: The story begins.',
+      practiceContent: '[Narrator]: The story begins.',
+      startInPracticeMode: true,
+      lang: 'en',
+    }));
+
+    expect(markup).toContain('Listen · Speak · Grow');
+    expect(markup).toContain('Practice speaking story lines');
+    expect(markup).toContain('Line 1');
+    expect(markup).toContain('Read and check');
+    expect(markup).toContain('0/3');
+  });
+
   it('does not offer English pronunciation practice for Bengali-only daily stories', () => {
     const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
       content: '[Narrator]: গল্প শুরু হলো।',
