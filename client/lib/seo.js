@@ -138,6 +138,11 @@ export function privateMetadata(title) {
   return {
     metadataBase: new URL(SITE_URL),
     title: titleWith(title),
+    icons: {
+      icon: [{ url: '/brand-logo.png', type: 'image/png', sizes: '512x512' }],
+      shortcut: '/brand-logo.png',
+      apple: [{ url: '/brand-logo.png', sizes: '512x512', type: 'image/png' }],
+    },
     robots: {
       index: false,
       follow: false,

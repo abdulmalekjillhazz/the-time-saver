@@ -13,8 +13,9 @@ export const metadata = {
   applicationName: BRAND,
   manifest: '/manifest.webmanifest',
   icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
-    shortcut: '/icon.svg',
+    icon: [{ url: '/brand-logo.png', type: 'image/png', sizes: '512x512' }],
+    shortcut: '/brand-logo.png',
+    apple: [{ url: '/brand-logo.png', sizes: '512x512', type: 'image/png' }],
   },
 };
 
@@ -41,7 +42,7 @@ export default async function PublicLayout(props) {
       '@type': 'Organization',
       name: BRAND,
       url: SITE_URL,
-      logo: `${SITE_URL}/icon.svg`,
+      logo: `${SITE_URL}/brand-logo.png`,
     },
   };
 

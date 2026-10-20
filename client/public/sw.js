@@ -1,5 +1,5 @@
 const CACHE_NAME = 'smart-routine-pwa-v3';
-const PRECACHE_URLS = ['/app', '/icon.svg'];
+const PRECACHE_URLS = ['/app', '/brand-logo.png'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -62,8 +62,8 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(self.registration.showNotification(payload.title || 'Smart Routine', {
     body: payload.body || '',
-    icon: '/icon.svg',
-    badge: '/icon.svg',
+    icon: '/brand-logo.png',
+    badge: '/brand-logo.png',
     tag: payload.tag || 'smart-routine-notification',
     requireInteraction: payload.requireInteraction === true || isAlarm,
     renotify: isAlarm,

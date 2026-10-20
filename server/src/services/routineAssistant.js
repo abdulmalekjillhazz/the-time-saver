@@ -79,23 +79,38 @@ export async function generateRoutineDraft({ intent, lang, config }) {
 
   const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
   const clean = drafts
-    .filter((d) => d && typeof d.title === 'string' && timePattern.test(d.startTime) && timePattern.test(d.endTime))
+    .filter((d) => (
+      d
+      && typeof d.title === 'string'
+      && d.title.trim()
+      && timePattern.test(d.startTime)
+      && timePattern.test(d.endTime)
+      && d.endTime > d.startTime
+    ))
     .slice(0, 8)
     .map((d) => ({
-      title: String(d.title).slice(0, 120),
+      title: d.title.trim().slice(0, 120),
       startTime: d.startTime,
       endTime: d.endTime,
       priority: ['high', 'medium', 'low'].includes(d.priority) ? d.priority : 'medium',
       isFrog: Boolean(d.isFrog),
-      category: typeof d.category === 'string' ? d.category.slice(0, 40) : 'general',
+      category: typeof d.category === 'string' && d.category.trim()
+        ? d.category.trim().slice(0, 40)
+        : 'general',
     }));
 
   if (!clean.length) throw failed();
+  clean.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  for (let index = 1; index < clean.length; index += 1) {
+    if (clean[index - 1].endTime > clean[index].startTime) throw failed();
+  }
+
   let frogSeen = false;
   for (const item of clean) {
     if (item.isFrog && frogSeen) item.isFrog = false;
     if (item.isFrog) frogSeen = true;
   }
+  if (!frogSeen) clean[0].isFrog = true;
   return clean;
 }
 

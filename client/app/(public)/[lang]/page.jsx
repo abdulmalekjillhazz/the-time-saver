@@ -133,7 +133,7 @@ export default async function HomePage(props) {
       '@type': 'Organization',
       name: BRAND,
       url: SITE_URL,
-      logo: `${SITE_URL}/icon.svg`,
+      logo: `${SITE_URL}/brand-logo.png`,
     },
     {
       '@context': 'https://schema.org',
