@@ -23,7 +23,16 @@ function characterIcon(role) {
   return '🎙️';
 }
 
-export function spokenTextParts(text, fraction, completed, onWordClick, selectedWordState = null, lineIndex = 0) {
+export function spokenTextParts(
+  text,
+  fraction,
+  completed,
+  onWordClick,
+  selectedWordState = null,
+  lineIndex = 0,
+  onSpeakWord,
+  pronunciationLabel = 'Hear pronunciation',
+) {
   const parts = String(text || '').split(/(\s+)/);
   const wordCount = parts.filter((part) => /\S/.test(part)).length;
   const revealedWords = completed
@@ -79,6 +88,21 @@ export function spokenTextParts(text, fraction, completed, onWordClick, selected
                 { className: 'min-w-0 flex-1' },
                 React.createElement('strong', { className: 'block text-gold-soft' }, selectedWordState.term),
                 React.createElement('span', { className: 'mt-0.5 block leading-snug text-ink' }, selectedWordState.meaning),
+                onSpeakWord
+                  ? React.createElement(
+                      'button',
+                      {
+                        type: 'button',
+                        'aria-label': `${pronunciationLabel}: ${selectedWordState.term}`,
+                        onClick: (event) => {
+                          event.stopPropagation();
+                          onSpeakWord(selectedWordState.term);
+                        },
+                        className: 'mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-sapphire/25 bg-sapphire/10 px-2.5 py-1 text-[11px] font-bold text-sapphire hover:bg-sapphire/20',
+                      },
+                      `🔊 ${pronunciationLabel}`,
+                    )
+                  : null,
               ),
             ),
           )
@@ -131,6 +155,7 @@ export function AudioDramaPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [position, setPosition] = useState(0);
+  const [readingChunkIndex, setReadingChunkIndex] = useState(0);
   const [error, setError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedWord, setSelectedWord] = useState(null);
@@ -169,6 +194,7 @@ export function AudioDramaPlayer({
   const recognitionRef = useRef(null);
   const activeRecognitionRef = useRef(false);
   const recognizedTextRef = useRef('');
+  const pronunciationRef = useRef(null);
 
   const copy = {
     title: isBn ? 'গল্পের মাধ্যমে ইংরেজি শিখুন' : 'Learn English by Story',
@@ -211,6 +237,11 @@ export function AudioDramaPlayer({
     attemptsLimit: isBn ? 'এই লাইনে ৩টি চেষ্টা শেষ। পরের লাইনে যান।' : 'All 3 tries used for this line. Move to the next line.',
     nextLine: isBn ? 'পরের লাইন →' : 'Next line →',
     speakingAnimation: isBn ? 'মাইক্রোফোন শুনছে' : 'Microphone listening',
+    pronunciationUnavailable: isBn ? 'এই ডিভাইসে ইংরেজি উচ্চারণ শোনা যাচ্ছে না।' : 'English pronunciation is unavailable on this device.',
+    pronunciationLabel: isBn ? 'শব্দটি শুনুন' : 'Hear pronunciation',
+    previousChunk: isBn ? '← আগের অংশ' : '← Previous chunk',
+    nextChunk: isBn ? 'পরের অংশ →' : 'Next chunk →',
+    chunkProgress: (current, total) => isBn ? `অংশ ${current} / ${total}` : `Chunk ${current} / ${total}`,
   };
 
   useEffect(() => {
@@ -255,6 +286,24 @@ export function AudioDramaPlayer({
         isOffline: false,
       });
     }
+  };
+
+  const handleSpeakWord = (word) => {
+    const speechSynthesis = globalThis.window?.speechSynthesis;
+    const Utterance = globalThis.SpeechSynthesisUtterance;
+    if (!speechSynthesis || typeof Utterance !== 'function') {
+      setError(copy.pronunciationUnavailable);
+      return;
+    }
+    speechSynthesis.cancel();
+    const utterance = new Utterance(word);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.78;
+    utterance.pitch = 1;
+    utterance.onerror = () => setError(copy.pronunciationUnavailable);
+    pronunciationRef.current = utterance;
+    setError('');
+    speechSynthesis.speak(utterance);
   };
 
   const saveAudioOffline = async () => {
@@ -305,18 +354,21 @@ export function AudioDramaPlayer({
     setIsPlaying(true);
     setIsPaused(false);
     setIsFullscreen(true);
+    setReadingChunkIndex(Math.max(0, Math.min(lines.length - 1, Math.floor(startAt))));
 
     controllerRef.current = playDrama(
       lines,
       (progress) => {
         positionRef.current = progress.index + progress.fraction;
         setPosition(positionRef.current);
+        setReadingChunkIndex(progress.index);
       },
       () => {
         isPlayingRef.current = false;
         pausedRef.current = false;
         positionRef.current = 0;
         setPosition(0);
+        setReadingChunkIndex(0);
         setIsPlaying(false);
         setIsPaused(false);
       },
@@ -375,11 +427,12 @@ export function AudioDramaPlayer({
     activeRecognitionRef.current = false;
     recognitionRef.current?.abort();
     recognitionRef.current = null;
+    globalThis.window?.speechSynthesis?.cancel();
   }, []);
 
   const handlePlayPause = () => {
     if (!controllerRef.current || (!isPlaying && !isPaused)) {
-      startPlayback(position);
+      startPlayback(isPaused ? position : readingChunkIndex);
       return;
     }
     if (isPaused) {
@@ -399,6 +452,7 @@ export function AudioDramaPlayer({
     pausedRef.current = false;
     positionRef.current = 0;
     setPosition(0);
+    setReadingChunkIndex(0);
     setIsPlaying(false);
     setIsPaused(false);
     setIsFullscreen(false);
@@ -408,6 +462,7 @@ export function AudioDramaPlayer({
     const nextPosition = Number(value);
     positionRef.current = nextPosition;
     setPosition(nextPosition);
+    setReadingChunkIndex(Math.max(0, Math.min(lines.length - 1, Math.floor(nextPosition))));
     controllerRef.current?.seek(nextPosition);
   };
 
@@ -790,7 +845,7 @@ export function AudioDramaPlayer({
                       </div>
                     </div>
                     <p className="text-base font-bold leading-relaxed text-ink sm:text-lg">
-                      {spokenTextParts(line.text, 0, false, handleWordLookup, selectedWord, `practice-${lineIndex}`)}
+                      {spokenTextParts(line.text, 0, false, handleWordLookup, selectedWord, `practice-${lineIndex}`, handleSpeakWord, copy.pronunciationLabel)}
                     </p>
                     <div className="flex flex-wrap items-center gap-3">
                       <button
@@ -893,12 +948,13 @@ export function AudioDramaPlayer({
           tabIndex={0}
           className="w-full space-y-3"
         >
-          {(chunkMode && (isPlaying || position > 0)
-            ? lines.slice(0, Math.min(lines.length, currentLineIndex + 1))
-            : lines).map((line, lineIndex) => {
-            const isCurrentLine = lineIndex === currentLineIndex;
-            const isCompletedLine = lineIndex < currentLineIndex;
-            const fraction = isCurrentLine ? currentLineFraction : 0;
+          {(chunkMode
+            ? lines.slice(readingChunkIndex, readingChunkIndex + 1)
+            : lines).map((line, visibleIndex) => {
+            const lineIndex = chunkMode ? readingChunkIndex : visibleIndex;
+            const isCurrentLine = lineIndex === readingChunkIndex;
+            const isCompletedLine = lineIndex < readingChunkIndex;
+            const fraction = isPlaying && isCurrentLine ? currentLineFraction : 0;
             return (
               <div
                 key={`${lineIndex}-${line.character}`}
@@ -927,7 +983,7 @@ export function AudioDramaPlayer({
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-gold-soft">{line.character}</p>
                   <p className="mt-1 text-base leading-relaxed">
-                    {spokenTextParts(line.text, fraction, isCompletedLine, handleWordLookup, selectedWord, lineIndex)}
+                    {spokenTextParts(line.text, fraction, isCompletedLine, handleWordLookup, selectedWord, lineIndex, handleSpeakWord, copy.pronunciationLabel)}
                   </p>
                 </div>
               </div>
@@ -935,6 +991,30 @@ export function AudioDramaPlayer({
           })}
           {!lines.length ? <p className="min-h-10 text-sm leading-relaxed opacity-80">{copy.loading}</p> : null}
         </div>
+
+        {chunkMode && lines.length > 1 ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-gold/20 bg-paper/60 px-3 py-2">
+            <button
+              type="button"
+              disabled={readingChunkIndex === 0 || isPlaying}
+              onClick={() => setReadingChunkIndex((current) => Math.max(0, current - 1))}
+              className="min-h-10 rounded-lg border border-sapphire/25 bg-sapphire/10 px-3 py-2 text-xs font-bold text-sapphire transition hover:bg-sapphire/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {copy.previousChunk}
+            </button>
+            <span className="text-xs font-bold text-ink/65">
+              {copy.chunkProgress(readingChunkIndex + 1, lines.length)}
+            </span>
+            <button
+              type="button"
+              disabled={readingChunkIndex >= lines.length - 1 || isPlaying}
+              onClick={() => setReadingChunkIndex((current) => Math.min(lines.length - 1, current + 1))}
+              className="min-h-10 rounded-lg border border-sapphire/25 bg-sapphire/10 px-3 py-2 text-xs font-bold text-sapphire transition hover:bg-sapphire/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {copy.nextChunk}
+            </button>
+          </div>
+        ) : null}
 
         {error ? <p role="alert" className="text-sm font-medium text-red-400">{error}</p> : null}
       </div>

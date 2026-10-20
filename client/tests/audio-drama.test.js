@@ -51,7 +51,26 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('তিন');
   });
 
-  it('renders the full story as dialogue bubbles with character icons', () => {
+  it('offers a dedicated pronunciation action when a word meaning is open', () => {
+    const markup = renderToStaticMarkup(createElement(
+      'p',
+      null,
+      spokenTextParts(
+        'Hello world',
+        0,
+        false,
+        () => {},
+        { keyId: 'line-0', term: 'Hello', meaning: 'হ্যালো' },
+        'line',
+        () => {},
+      ),
+    ));
+
+    expect(markup).toContain('aria-label="Hear pronunciation: Hello"');
+    expect(markup).toContain('Hear pronunciation');
+  });
+
+  it('shows story dialogue one chunk at a time with chunk navigation', () => {
     const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
       content: '[Storyteller]: The story starts.\n[Rahim - Father]: Let us begin.',
       slug: 'test-story',
@@ -60,9 +79,11 @@ describe('Cloudinary audio drama', () => {
 
     expect(markup).toContain('aria-label="Story dialogue"');
     expect(markup).toContain('🎙️');
-    expect(markup).toContain('👨');
+    expect(markup).toContain('Storyteller');
     expect(markup).toContain('The story starts.');
-    expect(markup).toContain('Let us begin.');
+    expect(markup).not.toContain('Let us begin.');
+    expect(markup).toContain('Chunk 1 / 2');
+    expect(markup).toContain('Next chunk →');
     expect(markup).toContain('aria-current="step"');
     expect(markup).toContain('aria-label="Seek through the story"');
     expect(markup).toContain('Learn English by Story');

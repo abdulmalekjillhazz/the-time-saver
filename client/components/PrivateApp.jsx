@@ -55,6 +55,7 @@ const GoalToRoutine = dynamic(() => import('./GoalToRoutine.jsx').then((m) => m.
 const TemplatePicker = dynamic(() => import('./TemplatePicker.jsx').then((m) => m.TemplatePicker), { ssr: false });
 const AudioDramaPlayer = dynamic(() => import('./AudioDramaPlayer.jsx').then((m) => m.AudioDramaPlayer), { ssr: false });
 const DailyLessonCard = dynamic(() => import('./DailyLessonCard.jsx').then((m) => m.DailyLessonCard), { ssr: false });
+const SentenceBuilder = dynamic(() => import('./SentenceBuilder.jsx').then((m) => m.SentenceBuilder), { ssr: false });
 import { ProfileAvatar, ProfileAvatarPicker } from './ProfileAvatar.jsx';
 import { TodayProgressCard } from './TodayProgressCard.jsx';
 import { StoryReader } from './StoryReader.jsx';
@@ -486,6 +487,22 @@ export function PrivateApp() {
     : narratedLessons[0]?.slug || '';
   const [offlineSavedLessons, setOfflineSavedLessons] = useState([]);
   const [dailyLesson, setDailyLesson] = useState(null);
+  const grammarStorySources = useMemo(() => {
+    const sources = [
+      ...lessons,
+      ...(dailyLesson ? [{
+        ...dailyLesson,
+        body: dailyLesson.body || dailyLesson.content,
+      }] : []),
+    ];
+    return sources.map((story) => ({
+      slug: story.slug,
+      title: localized(story.title, 'en'),
+      body: localized(story.body, 'en'),
+      category: story.category,
+      storyType: story.storyType,
+    }));
+  }, [dailyLesson, lessons]);
   const [dailyQuiz, setDailyQuiz] = useState(null);
   const [lesson, setLesson] = useState(null);
   const [storyAward, setStoryAward] = useState(null);
@@ -2029,6 +2046,16 @@ export function PrivateApp() {
           <div className="app-hero-heading-row">
             <div className="app-header-controls">
               <Button
+                variant={tab === 'focus' ? 'primary' : 'secondary'}
+                className={`app-header-focus ${tab === 'focus' ? 'app-header-focus-active' : ''}`}
+                aria-label={lang === 'bn' ? 'ফোকাস ও অ্যালার্ম' : 'Focus and alarms'}
+                title={lang === 'bn' ? 'ফোকাস ও অ্যালার্ম' : 'Focus and alarms'}
+                aria-current={tab === 'focus' ? 'page' : undefined}
+                onClick={() => setTab('focus')}
+              >
+                <span aria-hidden="true">⏱️</span>
+              </Button>
+              <Button
                 variant="secondary"
                 className="app-header-language"
                 aria-label={copy.languageToggle}
@@ -2103,13 +2130,12 @@ export function PrivateApp() {
         {[
           ['today', '🌤️', copy.today, lang === 'bn' ? 'আজ' : 'Today'],
           ['plan', '🗓️', lang === 'bn' ? 'পরিকল্পনা' : 'Plan', lang === 'bn' ? 'পরিকল্পনা' : 'Plan'],
-          ['focus', '⏱️', lang === 'bn' ? 'ফোকাস' : 'Focus', lang === 'bn' ? 'ফোকাস' : 'Focus'],
-          ['dashboard', '📊', lang === 'bn' ? 'পরিসংখ্যান ও ঝুঁকি' : 'Progress & insights', lang === 'bn' ? 'প্রগতি' : 'Stats'],
           ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
           ['speaking', '🎙️', lang === 'bn' ? 'কথা বলা শিখুন' : 'Learn to speak', lang === 'bn' ? 'কথা' : 'Speak'],
+          ['grammar', '🧩', lang === 'bn' ? 'ইংরেজি Grammar' : 'English grammar', lang === 'bn' ? 'গ্রামার' : 'Grammar'],
           ['settings', '⚙️', copy.settings, lang === 'bn' ? 'সেটিংস' : 'Settings'],
         ].map(([key, icon, label, shortLabel]) => (
-          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
+          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${key === 'settings' ? 'tab-button-settings' : ''} ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
             <span className={`tab-icon tab-icon-${key}`} aria-hidden="true">
               {icon}
             </span>
@@ -2206,8 +2232,9 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'dashboard' ? (
+      {tab === 'settings' ? (
         <section className="space-y-4">
+          <h2 className="section-heading">{lang === 'bn' ? 'পরিসংখ্যান ও অগ্রগতি' : 'Statistics and progress'}</h2>
           <GamificationBar lang={lang} userId={user.id} />
           <RoutineDashboard lang={lang} userId={user.id} />
           <BadgesShowcase lang={lang} />
@@ -2215,6 +2242,8 @@ export function PrivateApp() {
           <HabitCirclesCard lang={lang} />
         </section>
       ) : null}
+
+      {tab === 'grammar' ? <SentenceBuilder lang={lang} stories={grammarStorySources} /> : null}
 
       {tab === 'today' ? (
         <section className="space-y-4">
@@ -2658,7 +2687,7 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'dashboard' ? (
+      {tab === 'settings' ? (
         <Card className="surface-card space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gold/20 pb-3">
             <div>
