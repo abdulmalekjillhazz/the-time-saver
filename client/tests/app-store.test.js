@@ -40,9 +40,21 @@ describe('persisted interface state', () => {
   });
 
   it('persists the chosen alarm sound on this device', () => {
-    useAppStore.getState().setAlarmSoundId('ocean');
-    expect(useAppStore.getState().alarmSoundId).toBe('ocean');
-    expect(persistedValues.get('smart-routine-ui')).toContain('"alarmSoundId":"ocean"');
+    useAppStore.getState().setAlarmSoundId('aurora');
+    expect(useAppStore.getState().alarmSoundId).toBe('aurora');
+    expect(persistedValues.get('smart-routine-ui')).toContain('"alarmSoundId":"aurora"');
+  });
+
+  it('migrates saved ambient sounds to the new alarm melody collection', async () => {
+    persistedValues.set('smart-routine-ui', JSON.stringify({
+      state: { alarmSoundId: 'birds', theme: 'light', alarms: [] },
+      version: 1,
+    }));
+
+    await useAppStore.persist.rehydrate();
+
+    expect(useAppStore.getState().alarmSoundId).toBe('dawn');
+    expect(useAppStore.getState().theme).toBe('light');
   });
 
   it('schedules, marks, and removes alarms', () => {

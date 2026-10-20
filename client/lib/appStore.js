@@ -63,7 +63,8 @@ export const useAppStore = create(persist(
   }),
   {
     name: 'smart-routine-ui',
-    version: 1,
+    version: 2,
+    migrate: (persistedState) => ({ ...persistedState, alarmSoundId: 'dawn' }),
     storage: createJSONStorage(() => (typeof globalThis.window === 'undefined' ? undefined : globalThis.window.localStorage)),
     skipHydration: true,
     partialize: (state) => ({

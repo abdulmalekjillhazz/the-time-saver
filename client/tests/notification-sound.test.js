@@ -35,16 +35,15 @@ describe('alarm sound lifecycle', () => {
     expect(nextSound.play).toHaveBeenCalledOnce();
   });
 
-  it('offers twenty named sounds and plays the selected sound', () => {
-    expect(ALARM_SOUNDS).toHaveLength(20);
-    expect(ALARM_SOUNDS.map(({ id }) => id)).toContain('ocean');
-    expect(ALARM_SOUNDS.map(({ id }) => id)).toContain('river');
-    expect(ALARM_SOUNDS.map(({ id }) => id)).toContain('pond');
-    expect(ALARM_SOUNDS.map(({ id }) => id)).toContain('crowd');
+  it('offers eight original melodic alarms and plays the selected melody', () => {
+    expect(ALARM_SOUNDS).toHaveLength(8);
+    expect(ALARM_SOUNDS.map(({ id }) => id)).toEqual([
+      'dawn', 'momentum', 'sunrise', 'aurora', 'horizon', 'spark', 'clarity', 'triumph',
+    ]);
 
     const sound = { play: vi.fn(), stop: vi.fn(), unload: vi.fn() };
     HowlMock.mockReturnValue(sound);
-    playAlarmSound('ocean');
+    playAlarmSound('momentum');
 
     const options = HowlMock.mock.calls[0][0];
     expect(options.src[0]).toMatch(/^data:audio\/wav;base64,/);
@@ -52,14 +51,26 @@ describe('alarm sound lifecycle', () => {
   });
 
   it('exports a bounded WAV data URI for native Android alarm playback', () => {
-    const dataUri = getAlarmSoundDataUri('ocean');
+    const dataUri = getAlarmSoundDataUri('momentum');
     const wav = Buffer.from(dataUri.slice('data:audio/wav;base64,'.length), 'base64');
 
     expect(dataUri).toMatch(/^data:audio\/wav;base64,/);
     expect(dataUri.length).toBeLessThan(250_000);
+    expect(wav.length).toBeLessThan(180_000);
     expect(wav.subarray(0, 4).toString('ascii')).toBe('RIFF');
     expect(wav.subarray(8, 12).toString('ascii')).toBe('WAVE');
-    expect(dataUri).not.toBe(getAlarmSoundDataUri('birds'));
+    expect(dataUri).not.toBe(getAlarmSoundDataUri('dawn'));
+    expect(dataUri).not.toBe(getAlarmSoundDataUri('invalid-sound-id'));
+  });
+
+  it('creates a distinct playable melody for every alarm choice', () => {
+    const sounds = ALARM_SOUNDS.map(({ id }) => getAlarmSoundDataUri(id));
+    expect(new Set(sounds).size).toBe(ALARM_SOUNDS.length);
+    for (const dataUri of sounds) {
+      const wav = Buffer.from(dataUri.slice('data:audio/wav;base64,'.length), 'base64');
+      expect(wav.length).toBeLessThan(180_000);
+      expect(wav.readUInt32LE(24)).toBe(22050);
+    }
   });
 
   it('unloads the old preview before switching to a different selection', () => {
@@ -67,8 +78,8 @@ describe('alarm sound lifecycle', () => {
     const second = { play: vi.fn(), stop: vi.fn(), unload: vi.fn() };
     HowlMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
 
-    playAlarmSound('birds');
-    playAlarmSound('cafe');
+    playAlarmSound('dawn');
+    playAlarmSound('aurora');
 
     expect(first.stop).toHaveBeenCalledOnce();
     expect(first.unload).toHaveBeenCalledOnce();

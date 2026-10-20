@@ -1,183 +1,96 @@
 import { Howl } from 'howler';
 
 export const ALARM_SOUNDS = [
-  { id: 'birds', category: 'nature', en: 'Morning birds', bn: 'সকালের পাখির ডাক' },
-  { id: 'forest-birds', category: 'nature', en: 'Forest birds', bn: 'বনের পাখির ডাক' },
-  { id: 'ocean', category: 'nature', en: 'Ocean waves', bn: 'সমুদ্রের ঢেউ' },
-  { id: 'river', category: 'nature', en: 'Flowing river', bn: 'বয়ে চলা নদী' },
-  { id: 'pond', category: 'nature', en: 'Pond & frogs', bn: 'পুকুর ও ব্যাঙের ডাক' },
-  { id: 'forest', category: 'nature', en: 'Forest breeze', bn: 'বনের বাতাস' },
-  { id: 'rain', category: 'weather', en: 'Gentle rain', bn: 'হালকা বৃষ্টি' },
-  { id: 'downpour', category: 'weather', en: 'Steady rainfall', bn: 'একটানা বৃষ্টি' },
-  { id: 'wind', category: 'weather', en: 'Soft wind', bn: 'মৃদু বাতাস' },
-  { id: 'thunder', category: 'weather', en: 'Distant thunder', bn: 'দূরের বজ্রধ্বনি' },
-  { id: 'fire', category: 'nature', en: 'Fire crackle', bn: 'আগুনের মৃদু শব্দ' },
-  { id: 'cafe', category: 'people', en: 'Café murmur', bn: 'ক্যাফের মানুষের গুঞ্জন' },
-  { id: 'crowd', category: 'people', en: 'People talking', bn: 'মানুষের কথাবার্তার গুঞ্জন' },
-  { id: 'keyboard', category: 'people', en: 'Keyboard typing', bn: 'কিবোর্ডে টাইপের শব্দ' },
-  { id: 'fan', category: 'focus', en: 'Quiet fan', bn: 'ফ্যানের মৃদু শব্দ' },
-  { id: 'white-noise', category: 'focus', en: 'White noise', bn: 'হোয়াইট নয়েজ' },
-  { id: 'pink-noise', category: 'focus', en: 'Pink noise', bn: 'পিংক নয়েজ' },
-  { id: 'brown-noise', category: 'focus', en: 'Brown noise', bn: 'ব্রাউন নয়েজ' },
-  { id: 'heartbeat', category: 'focus', en: 'Calm heartbeat', bn: 'শান্ত হৃদস্পন্দন' },
-  { id: 'chimes', category: 'focus', en: 'Soft chimes', bn: 'মৃদু ঘণ্টাধ্বনি' },
+  { id: 'dawn', category: 'melodic', en: 'Dawn Chorus', bn: 'ভোরের সুর' },
+  { id: 'momentum', category: 'melodic', en: 'Momentum', bn: 'উদ্যম' },
+  { id: 'sunrise', category: 'melodic', en: 'First Light', bn: 'নতুন আলোর সুর' },
+  { id: 'aurora', category: 'melodic', en: 'Aurora', bn: 'মেরুজ্যোতি' },
+  { id: 'horizon', category: 'melodic', en: 'Horizon', bn: 'দিগন্ত' },
+  { id: 'spark', category: 'melodic', en: 'Spark', bn: 'নতুন উদ্দীপনা' },
+  { id: 'clarity', category: 'melodic', en: 'Clarity', bn: 'স্বচ্ছ সুর' },
+  { id: 'triumph', category: 'melodic', en: 'Triumph', bn: 'জয়ের সুর' },
 ];
 
 const SAMPLE_RATE = 22050;
 const DURATION_SECONDS = 3.2;
+const soundUriCache = new Map();
+const ALARM_PHRASES = {
+  dawn: [[0.08, 659.25], [0.48, 783.99], [0.98, 987.77], [1.6, 783.99], [2.05, 880], [2.58, 1318.51]],
+  momentum: [[0.08, 523.25], [0.34, 659.25], [0.62, 783.99], [0.94, 1046.5], [1.48, 783.99], [1.78, 1046.5], [2.16, 1318.51], [2.62, 1567.98]],
+  sunrise: [[0.08, 587.33], [0.58, 698.46], [1.08, 880], [1.72, 1046.5], [2.35, 880], [2.72, 1174.66]],
+  aurora: [[0.08, 783.99], [0.54, 987.77], [1.02, 1174.66], [1.62, 1567.98], [2.15, 1174.66], [2.62, 1975.53]],
+  horizon: [[0.08, 440], [0.62, 554.37], [1.18, 659.25], [1.78, 880], [2.35, 659.25], [2.72, 987.77]],
+  spark: [[0.08, 880], [0.34, 1174.66], [0.64, 987.77], [1.08, 1318.51], [1.55, 1046.5], [1.9, 1567.98], [2.42, 1318.51], [2.7, 1760]],
+  clarity: [[0.08, 698.46], [0.58, 880], [1.16, 1046.5], [1.78, 1396.91], [2.36, 1046.5], [2.72, 1396.91]],
+  triumph: [[0.08, 523.25], [0.42, 659.25], [0.78, 783.99], [1.18, 1046.5], [1.62, 1318.51], [2.04, 1046.5], [2.38, 1318.51], [2.7, 1567.98]],
+};
 
 function writeAscii(view, offset, text) {
   for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
 }
 
-function makeSoundDataUri(soundId) {
-  const selected = ALARM_SOUNDS.find((sound) => sound.id === soundId) || ALARM_SOUNDS[0];
+function synthesizeAlarmSound(soundId) {
   const sampleCount = Math.floor(SAMPLE_RATE * DURATION_SECONDS);
   const buffer = new ArrayBuffer(44 + sampleCount * 2);
   const view = new DataView(buffer);
+
+  // WAV Header (44 bytes standard PCM RIFF/WAVE)
   writeAscii(view, 0, 'RIFF');
   view.setUint32(4, 36 + sampleCount * 2, true);
   writeAscii(view, 8, 'WAVE');
   writeAscii(view, 12, 'fmt ');
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, 1, true); // Mono
   view.setUint32(24, SAMPLE_RATE, true);
-  view.setUint32(28, SAMPLE_RATE * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
+  view.setUint32(28, SAMPLE_RATE * 2, true); // Byte rate
+  view.setUint16(32, 2, true); // Block align
+  view.setUint16(34, 16, true); // Bits per sample
   writeAscii(view, 36, 'data');
   view.setUint32(40, sampleCount * 2, true);
 
-  const seed = selected.id.split('').reduce((value, char) => (value * 31 + char.charCodeAt(0)) >>> 0, 7) || 1;
-  let randomState = seed;
-  let lowNoise = 0;
-  let brownNoise = 0;
-  const random = () => {
-    randomState ^= randomState << 13;
-    randomState ^= randomState >>> 17;
-    randomState ^= randomState << 5;
-    return (randomState >>> 0) / 0xffffffff * 2 - 1;
-  };
+  const phrase = ALARM_PHRASES[soundId] || ALARM_PHRASES.dawn;
 
   for (let i = 0; i < sampleCount; i += 1) {
-    const time = i / SAMPLE_RATE;
-    const white = random();
-    lowNoise += (white - lowNoise) * 0.035;
-    brownNoise = (brownNoise + 0.018 * white) / 1.018;
-    const slowWave = 0.5 + 0.5 * Math.sin(2 * Math.PI * 0.22 * time);
-    const midWave = 0.55 + 0.45 * Math.sin(2 * Math.PI * 0.65 * time);
-    const rumble = Math.sin(2 * Math.PI * 54 * time) * 0.18
-      + Math.sin(2 * Math.PI * 81 * time) * 0.1;
-    const chirpWindow = (time % 1.25) / 1.25;
-    const chirpEnvelope = chirpWindow < 0.34 ? Math.sin(Math.PI * chirpWindow / 0.34) ** 2 : 0;
-    const birdChirp = chirpEnvelope * (
-      Math.sin(2 * Math.PI * (1750 + 780 * chirpWindow) * time)
-      + Math.sin(2 * Math.PI * (2470 - 430 * chirpWindow) * time) * 0.45
-    ) * 0.24;
-    const frogPulse = Math.max(0, Math.sin(2 * Math.PI * 1.7 * time)) ** 8;
-    const frogCroak = frogPulse * (Math.sin(2 * Math.PI * 190 * time) + Math.sin(2 * Math.PI * 225 * time) * 0.5) * 0.3;
-    const voiceLfo = 0.55 + 0.45 * Math.sin(2 * Math.PI * (1.3 + seed % 5 * 0.13) * time);
-    const voice = (
-      Math.sin(2 * Math.PI * 118 * time)
-      + Math.sin(2 * Math.PI * 176 * time) * 0.5
-      + Math.sin(2 * Math.PI * 354 * time) * 0.22
-      + Math.sin(2 * Math.PI * 510 * time) * 0.12
-    ) * voiceLfo * 0.14;
-    const drop = white > 0.995 ? white * 0.45 : 0;
-    const crackle = white > 0.997 ? white * 0.72 : 0;
-    const heartbeatPhase = (time % 1.15);
-    const heartbeat = heartbeatPhase < 0.16
-      ? Math.sin(2 * Math.PI * 72 * heartbeatPhase) * Math.sin(Math.PI * heartbeatPhase / 0.16)
-      : heartbeatPhase > 0.2 && heartbeatPhase < 0.34
-        ? Math.sin(2 * Math.PI * 65 * (heartbeatPhase - 0.2)) * Math.sin(Math.PI * (heartbeatPhase - 0.2) / 0.14) * 0.75
-        : 0;
-    const chimePhase = time % 1.1;
-    const chime = chimePhase < 0.72
-      ? (Math.sin(2 * Math.PI * 880 * chimePhase) + Math.sin(2 * Math.PI * 1320 * chimePhase) * 0.35)
-        * Math.exp(-chimePhase * 4) * 0.22
-      : 0;
-
-    let sample;
-    switch (selected.id) {
-      case 'birds':
-      case 'forest-birds':
-        sample = lowNoise * 0.18 + birdChirp * (selected.id === 'forest-birds' ? 0.8 : 1);
-        break;
-      case 'ocean':
-        sample = (brownNoise * 1.8 + lowNoise * 0.3) * (0.18 + slowWave * 0.48);
-        break;
-      case 'river':
-        sample = (white * 0.28 + (white - lowNoise) * 0.35) * (0.7 + midWave * 0.3);
-        break;
-      case 'pond':
-        sample = lowNoise * 0.15 + frogCroak + birdChirp * 0.18;
-        break;
-      case 'forest':
-        sample = lowNoise * 0.32 + white * 0.08 + birdChirp * 0.3;
-        break;
-      case 'rain':
-        sample = (white * 0.2 + (white - lowNoise) * 0.25) * (0.55 + slowWave * 0.22) + drop;
-        break;
-      case 'downpour':
-        sample = (white * 0.3 + (white - lowNoise) * 0.3) * 0.8 + drop * 0.35;
-        break;
-      case 'wind':
-        sample = (lowNoise * 1.2 + brownNoise) * (0.08 + slowWave * 0.36);
-        break;
-      case 'thunder':
-        sample = (brownNoise * 2.5 + rumble) * (0.16 + slowWave * 0.3) + white * 0.04;
-        break;
-      case 'fire':
-        sample = lowNoise * 0.14 + crackle * 0.4 + white * 0.035;
-        break;
-      case 'cafe':
-        sample = voice * 0.65 + lowNoise * 0.1 + white * 0.035;
-        break;
-      case 'crowd':
-        sample = voice + Math.sin(2 * Math.PI * 137 * time) * voiceLfo * 0.07 + lowNoise * 0.08;
-        break;
-      case 'keyboard':
-        sample = (white > 0.991 ? white * (0.35 + random() * 0.35) : 0) + lowNoise * 0.025;
-        break;
-      case 'fan':
-        sample = rumble * 0.75 + lowNoise * 0.28;
-        break;
-      case 'white-noise':
-        sample = white * 0.34;
-        break;
-      case 'pink-noise':
-        sample = (lowNoise * 2.8 + white * 0.1) * 0.32;
-        break;
-      case 'brown-noise':
-        sample = brownNoise * 8;
-        break;
-      case 'heartbeat':
-        sample = heartbeat * 0.6 + brownNoise * 0.2;
-        break;
-      case 'chimes':
-        sample = chime + birdChirp * 0.13;
-        break;
-      default:
-        sample = birdChirp;
+    const t = i / SAMPLE_RATE;
+    let sample = 0;
+    for (const [noteStart, frequency] of phrase) {
+      const age = t - noteStart;
+      if (age < 0 || age > 0.58) continue;
+      const attack = Math.min(1, age / 0.012);
+      const decay = Math.exp(-age * 5.1);
+      const envelope = attack * decay;
+      const fundamental = Math.sin(2 * Math.PI * frequency * age);
+      const secondHarmonic = Math.sin(2 * Math.PI * frequency * 2.756 * age) * 0.24;
+      const thirdHarmonic = Math.sin(2 * Math.PI * frequency * 5.404 * age) * 0.08;
+      const warmth = Math.sin(2 * Math.PI * frequency * 0.5 * age) * 0.16;
+      sample += envelope * (fundamental * 0.56 + secondHarmonic + thirdHarmonic + warmth);
     }
 
-    const fadeLength = Math.floor(SAMPLE_RATE * 0.06);
-    const fade = Math.min(1, i / fadeLength, (sampleCount - i - 1) / fadeLength);
-    view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, sample * fade * 0.48)) * 32767, true);
+    const loopFadeSeconds = 0.05;
+    const fadeIn = Math.min(1, t / loopFadeSeconds);
+    const fadeOut = Math.min(1, (DURATION_SECONDS - t) / loopFadeSeconds);
+    const fade = Math.sin((fadeIn * Math.PI) / 2) * Math.sin((fadeOut * Math.PI) / 2);
+    const intSample = Math.max(-32767, Math.min(32767, Math.round(sample * fade * 0.48 * 32767)));
+    view.setInt16(44 + i * 2, intSample, true);
   }
 
+  // Convert binary buffer to base64
   let binary = '';
-  const data = new Uint8Array(buffer);
-  for (let start = 0; start < data.length; start += 0x8000) {
-    binary += String.fromCharCode(...data.subarray(start, start + 0x8000));
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  for (let c = 0; c < bytes.length; c += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(c, c + chunk));
   }
   return `data:audio/wav;base64,${btoa(binary)}`;
 }
 
 export function getAlarmSoundDataUri(soundId = ALARM_SOUNDS[0].id) {
   const sound = ALARM_SOUNDS.some((option) => option.id === soundId) ? soundId : ALARM_SOUNDS[0].id;
-  return makeSoundDataUri(sound);
+  if (!soundUriCache.has(sound)) {
+    soundUriCache.set(sound, synthesizeAlarmSound(sound));
+  }
+  return soundUriCache.get(sound);
 }
 
 let alarmSound;
@@ -187,7 +100,13 @@ export function playAlarmSound(soundId = ALARM_SOUNDS[0].id) {
   const sound = ALARM_SOUNDS.some((option) => option.id === soundId) ? soundId : ALARM_SOUNDS[0].id;
   if (alarmSound && activeSoundId !== sound) stopAlarmSound();
   if (!alarmSound) {
-    alarmSound = new Howl({ src: [makeSoundDataUri(sound)], format: ['wav'], html5: true, loop: true, volume: 0.42 });
+    alarmSound = new Howl({
+      src: [getAlarmSoundDataUri(sound)],
+      format: ['wav'],
+      html5: true,
+      loop: true,
+      volume: 0.55,
+    });
     activeSoundId = sound;
   }
   alarmSound.play();
