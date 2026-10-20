@@ -232,7 +232,7 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
           <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gold/15 text-3xl shadow-inner">📖</span>
           <div>
             <h2 className="text-xl font-black tracking-tight text-ink sm:text-2xl">
-              {isBn ? 'ইংরেজি Grammar — ধাপে ধাপে' : 'English Grammar, step by step'}
+              {isBn ? 'Building — ইংরেজি বাক্য অনুশীলন' : 'Building — English practice'}
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-ink/75">
               {isBn

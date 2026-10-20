@@ -12,6 +12,7 @@ import { DailyLesson } from '../models/DailyLesson.js';
 import { DailyLessonRead } from '../models/DailyLessonRead.js';
 import { DailyQuizScore } from '../models/DailyQuizScore.js';
 import { LearningActivity } from '../models/LearningActivity.js';
+import { Lesson } from '../models/Lesson.js';
 import { Routine } from '../models/Routine.js';
 import { StreakFreeze } from '../models/StreakFreeze.js';
 import { User } from '../models/User.js';
@@ -22,6 +23,82 @@ import { isEnabledFor } from './flags.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const STORY_POINTS = 50;
 const QUIZ_POINTS = 30;
+const GRAMMAR_SENTENCES_FOR_REWARD = 10;
+const GRAMMAR_SENTENCE_REWARD = 30;
+
+function sentenceIsInStory(body, requestedSentence) {
+  const normalizedRequested = requestedSentence.trim().replace(/\s+/g, ' ').toLowerCase();
+  const cleanBody = body
+    .replace(/^\s*\[[^\]]+\]\s*:?\s*/gm, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ');
+  const sentences = cleanBody.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+  return sentences.some((sentence) => sentence.trim().replace(/\s+/g, ' ').toLowerCase() === normalizedRequested);
+}
+
+async function isPublishedGrammarSentence(sourceSlug, sentence) {
+  const [dailyLesson, publishedLesson] = await Promise.all([
+    DailyLesson.findOne({ slug: sourceSlug }).select('content').lean(),
+    Lesson.findOne({ slug: sourceSlug, status: 'published' }).select('body.en').lean(),
+  ]);
+  return Boolean(
+    (typeof dailyLesson?.content === 'string' && sentenceIsInStory(dailyLesson.content, sentence))
+    || (typeof publishedLesson?.body?.en === 'string' && sentenceIsInStory(publishedLesson.body.en, sentence))
+  );
+}
+
+export async function getGrammarSentenceProgress(userId) {
+  return LearningActivity.countDocuments({
+    userId,
+    activityType: 'grammar',
+    contentId: /^sentence:/,
+  });
+}
+
+export async function recordGrammarSentenceCompletion({ userId, sourceSlug, sentence, timezone }) {
+  if (!(await isPublishedGrammarSentence(sourceSlug, sentence))) {
+    throw new AppError(404, 'NOT_FOUND', {
+      en: 'That sentence is not available in a published English story.',
+      bn: 'প্রকাশিত ইংরেজি গল্পে এই বাক্যটি পাওয়া যায়নি।',
+    });
+  }
+
+  const contentId = `sentence:${sourceSlug}:${sentence.trim().replace(/\s+/g, ' ').toLowerCase()}`;
+  let recorded = false;
+  try {
+    await LearningActivity.create({
+      userId,
+      activityType: 'grammar',
+      contentId,
+      points: 0,
+      activeDate: todayInZone(timezone || 'Asia/Dhaka'),
+    });
+    recorded = true;
+  } catch (err) {
+    if (err.code !== 11000 || !(await LearningActivity.exists({ userId, activityType: 'grammar', contentId }))) {
+      throw err;
+    }
+  }
+  await recordLearningDay(userId, 'grammar', todayInZone(timezone || 'Asia/Dhaka'));
+
+  const completedSentences = await getGrammarSentenceProgress(userId);
+  const reward = completedSentences >= GRAMMAR_SENTENCES_FOR_REWARD
+    ? await recordLearningActivity({
+      userId,
+      activityType: 'grammar',
+      contentId: 'milestone:ten-sentences',
+      points: GRAMMAR_SENTENCE_REWARD,
+      timezone,
+    })
+    : { earnedPoints: 0 };
+
+  return {
+    completedSentences,
+    recorded,
+    earnedPoints: reward.earnedPoints,
+    milestoneReached: completedSentences >= GRAMMAR_SENTENCES_FOR_REWARD,
+  };
+}
 
 export function getQuizLearningPoints(score, total) {
   return total > 0 ? Math.round((QUIZ_POINTS * score) / total) : 0;

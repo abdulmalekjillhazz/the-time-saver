@@ -1,14 +1,26 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { validate } from '../middleware/validate.js';
 import { AppError } from '../lib/AppError.js';
 import { Completion } from '../models/Completion.js';
 import { EveningReflection } from '../models/EveningReflection.js';
-import { getLearningLeaderboard } from '../services/gamification.js';
+import {
+  getGrammarSentenceProgress,
+  getLearningLeaderboard,
+  recordGrammarSentenceCompletion,
+} from '../services/gamification.js';
 import { calculateGamificationStats } from '../services/gamificationStats.js';
 import { todayInZone } from '@smart-routine/shared';
 
 const MINUTE = 60 * 1000;
+const grammarSentenceSchema = z.object({
+  sourceSlug: z.string().trim().min(1).max(80),
+  sentence: z.string().trim().min(1).max(400)
+    .refine((value) => (value.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []).length >= 3)
+    .refine((value) => !/[\u0980-\u09ff]/.test(value)),
+}).strict();
 
 export function gamificationRouter() {
   const r = Router();
@@ -30,6 +42,28 @@ export function gamificationRouter() {
       const reflectionsCount = await EveningReflection.countDocuments({ userId: req.userId });
       
       res.json(calculateGamificationStats({ totalDone, reflectionsCount }));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  r.get('/grammar-sentences', async (req, res, next) => {
+    try {
+      res.json({ completedSentences: await getGrammarSentenceProgress(req.userId) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  r.post('/grammar-sentences', validate({ body: grammarSentenceSchema }), async (req, res, next) => {
+    try {
+      const result = await recordGrammarSentenceCompletion({
+        userId: req.userId,
+        sourceSlug: req.body.sourceSlug,
+        sentence: req.body.sentence,
+        timezone: req.user.timezone,
+      });
+      res.status(result.earnedPoints > 0 ? 201 : 200).json(result);
     } catch (err) {
       next(err);
     }

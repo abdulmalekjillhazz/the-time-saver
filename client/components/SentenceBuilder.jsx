@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { apiRequest } from '../lib/apiClient.js';
+import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { Card } from './ui/Card.jsx';
 
 const LEVELS = ['basic', 'intermediate', 'advanced'];
@@ -109,6 +111,21 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const [selected, setSelected] = useState([]);
   const [result, setResult] = useState('');
   const [completedLevels, setCompletedLevels] = useState({ basic: 0, intermediate: 0, advanced: 0 });
+  const [completedSentenceCount, setCompletedSentenceCount] = useState(0);
+  const [completionBusy, setCompletionBusy] = useState(false);
+  const [completionError, setCompletionError] = useState('');
+  const [milestoneNotice, setMilestoneNotice] = useState('');
+  useEffect(() => {
+    let active = true;
+    apiRequest('/api/gamification/grammar-sentences')
+      .then(({ completedSentences }) => {
+        if (active) setCompletedSentenceCount(completedSentences);
+      })
+      .catch((error) => {
+        if (active) setCompletionError(error.message);
+      });
+    return () => { active = false; };
+  }, []);
   const availableStories = useMemo(() => {
     const uniqueStories = new Map();
     for (const exercise of exercises) uniqueStories.set(exercise.slug, exercise.sourceTitle);
@@ -143,6 +160,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     setExerciseIndex(0);
     setSelected([]);
     setResult('');
+    setMilestoneNotice('');
   };
 
   const chooseStory = (nextStory) => {
@@ -150,6 +168,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     setExerciseIndex(0);
     setSelected([]);
     setResult('');
+    setMilestoneNotice('');
   };
 
   const chooseWord = (wordIndex) => {
@@ -159,25 +178,47 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   };
 
   const checkSentence = () => {
-    if (correct) {
-      if (result !== 'correct') {
+    if (!correct) {
+      setResult('try-again');
+      return;
+    }
+    if (!exercise || completionBusy || result === 'correct') return;
+    setCompletionBusy(true);
+    setCompletionError('');
+    apiRequest('/api/gamification/grammar-sentences', {
+      method: 'POST',
+      body: { sourceSlug: exercise.slug, sentence: exercise.sentence },
+      locale: lang,
+    }).then((completion) => {
+      setCompletedSentenceCount(completion.completedSentences);
+      if (completion.recorded) {
         setCompletedLevels((current) => ({ ...current, [level]: current[level] + 1 }));
       }
+      if (completion.earnedPoints > 0) {
+        setMilestoneNotice(isBn
+          ? 'অভিনন্দন! ১০টি বাক্য শেষ করে ৩০ পয়েন্ট পেয়েছ!'
+          : 'Congratulations! You completed 10 sentences and earned 30 points!');
+        announceLearningActivity(completion.earnedPoints);
+      } else {
+        setMilestoneNotice('');
+      }
       setResult('correct');
-    } else {
-      setResult('try-again');
-    }
+    }).catch((error) => {
+      setCompletionError(error.message || (isBn ? 'বাক্য সংরক্ষণ করা যায়নি।' : 'Could not save the completed sentence.'));
+    }).finally(() => setCompletionBusy(false));
   };
 
   const nextExercise = () => {
     setExerciseIndex((current) => (current + 1) % filteredExercises.length);
     setSelected([]);
     setResult('');
+    setMilestoneNotice('');
   };
 
   const resetSentence = () => {
     setSelected([]);
     setResult('');
+    setMilestoneNotice('');
   };
 
   return (
@@ -202,6 +243,11 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
 
         {exercises.length ? (
           <>
+            <p className="rounded-xl border border-gold/25 bg-gold/10 px-3 py-2 text-sm font-extrabold text-ink">
+              {isBn
+                ? `সম্পন্ন বাক্য: ${Math.min(completedSentenceCount, 10)} / 10 · ১০টি শেষ করলে ৩০ পয়েন্ট`
+                : `Sentences completed: ${Math.min(completedSentenceCount, 10)} / 10 · Earn 30 points at 10`}
+            </p>
             <div className="grid gap-2 sm:grid-cols-3" aria-label={isBn ? 'বাক্যের স্তর' : 'Sentence level'}>
               {LEVELS.map((item, levelIndex) => {
                 const unlocked = unlockedLevels.has(item);
@@ -293,8 +339,10 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <button type="button" onClick={checkSentence} disabled={!selected.length || result === 'correct'} className="min-h-11 rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-5 py-2 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">
-                    {isBn ? 'বাক্য যাচাই' : 'Check sentence'}
+                  <button type="button" onClick={checkSentence} disabled={!selected.length || result === 'correct' || completionBusy} className="min-h-11 rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-5 py-2 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">
+                    {completionBusy
+                      ? (isBn ? 'সংরক্ষণ হচ্ছে…' : 'Saving…')
+                      : (isBn ? 'বাক্য যাচাই' : 'Check sentence')}
                   </button>
                   <button type="button" onClick={resetSentence} disabled={!selected.length} className="min-h-11 rounded-xl border border-sapphire/25 bg-paper/70 px-4 py-2 text-sm font-bold text-ink transition hover:bg-sapphire/10 disabled:cursor-not-allowed disabled:opacity-50">
                     {isBn ? 'আবার সাজাও' : 'Start over'}
@@ -313,6 +361,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                         ? (isBn ? 'দারুণ! গল্পের বাক্যটি ঠিকভাবে সাজিয়েছ।' : 'Excellent! You rebuilt the story sentence correctly.')
                         : (isBn ? 'আরেকবার চেষ্টা করো—কর্তা দিয়ে শুরু করে ক্রিয়াটি খুঁজে দেখো।' : 'Try again. Look for the subject first, then find the verb.')}
                     </p>
+                    {milestoneNotice ? <p className="font-extrabold text-gold-soft">{milestoneNotice}</p> : null}
                     {result === 'correct' ? (
                       <>
                         <p className="font-extrabold text-ink">{exercise.sentence}</p>
@@ -321,6 +370,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     ) : null}
                   </div>
                 ) : null}
+                {completionError ? <p role="alert" className="text-sm font-bold text-rose-700">{completionError}</p> : null}
               </div>
             ) : (
               <p role="status" className="rounded-2xl border border-gold/25 bg-gold/5 p-4 text-sm leading-relaxed text-ink/75">

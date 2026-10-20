@@ -1723,14 +1723,14 @@ select:disabled {
   }
 
   :root[data-theme="light"] .app-tabs .tab-button:not(.tab-button-active) .tab-icon {
-    filter: drop-shadow(0 5px 3px rgb(0 0 0 / 0.68))
-      drop-shadow(0 1px 1px rgb(0 0 0 / 0.4));
+    filter: drop-shadow(0 6px 3px rgb(0 0 0 / 0.8))
+      drop-shadow(0 2px 1px rgb(0 0 0 / 0.55));
   }
 
   :root[data-theme="light"] .app-tabs .tab-button-active .tab-icon {
-    filter: drop-shadow(0 5px 4px rgb(0 0 0 / 0.72))
-      drop-shadow(0 1px 1px rgb(0 0 0 / 0.45))
-      drop-shadow(0 0 4px rgb(var(--c-gold) / 0.42));
+    filter: drop-shadow(0 6px 4px rgb(0 0 0 / 0.84))
+      drop-shadow(0 2px 1px rgb(0 0 0 / 0.55))
+      drop-shadow(0 0 4px rgb(var(--c-gold) / 0.35));
   }
 
   .app-tabs .tab-button-active .tab-label-mobile {

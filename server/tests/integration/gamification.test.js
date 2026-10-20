@@ -9,6 +9,7 @@ import { createSession } from '../../src/services/session.js';
 import { Routine } from '../../src/models/Routine.js';
 import { Completion } from '../../src/models/Completion.js';
 import { LearningActivity } from '../../src/models/LearningActivity.js';
+import { Lesson } from '../../src/models/Lesson.js';
 import { StreakFreeze } from '../../src/models/StreakFreeze.js';
 import { getGamificationSummary, recordLearningActivity } from '../../src/services/gamification.js';
 
@@ -24,6 +25,7 @@ const app = createApp({ config });
 describe.skipIf(!uri)('Gamification and activity analytics', () => {
   let cookie;
   let csrf;
+  let userId;
 
   beforeAll(async () => {
     await mongoose.connect(uri);
@@ -36,6 +38,7 @@ describe.skipIf(!uri)('Gamification and activity analytics', () => {
       locale: 'en',
       timezone: 'Asia/Dhaka',
     });
+    userId = user._id;
     const session = await createSession(user._id);
     cookie = `sr_session=${session.token}; sr_csrf=${session.csrf}`;
     csrf = session.csrf;
@@ -71,6 +74,64 @@ describe.skipIf(!uri)('Gamification and activity analytics', () => {
     expect(stats.status).toBe(200);
     expect(stats.body.xp).toBe(30);
   });
+
+  it('awards 30 points once after ten distinct sentences from a published story', async () => {
+    const sentences = [
+      'Mina walks to school.',
+      'Rafi reads a book.',
+      'The small dog sleeps.',
+      'We eat lunch together.',
+      'They play outside after school.',
+      'My sister likes funny stories.',
+      'The teacher opens the window.',
+      'Our family cooks dinner at home.',
+      'A bright kite flies above the park.',
+      'The children share their snacks with friends.',
+    ];
+    await Lesson.create({
+      slug: 'grammar-score-story',
+      status: 'published',
+      title: { bn: 'Grammar score story', en: 'Grammar score story' },
+      body: { bn: sentences.join(' '), en: sentences.join(' ') },
+      createdBy: userId,
+    });
+
+    let finalResult;
+    for (const sentence of sentences) {
+      finalResult = await request(app)
+        .post('/api/gamification/grammar-sentences')
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', csrf)
+        .send({ sourceSlug: 'grammar-score-story', sentence });
+      expect(finalResult.status).toBe(sentence === sentences[9] ? 201 : 200);
+    }
+
+    expect(finalResult.body).toMatchObject({
+      completedSentences: 10,
+      recorded: true,
+      earnedPoints: 30,
+      milestoneReached: true,
+    });
+
+    const duplicate = await request(app)
+      .post('/api/gamification/grammar-sentences')
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({ sourceSlug: 'grammar-score-story', sentence: sentences[0] });
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.body).toMatchObject({
+      completedSentences: 10,
+      recorded: false,
+      earnedPoints: 0,
+    });
+
+    const invalid = await request(app)
+      .post('/api/gamification/grammar-sentences')
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({ sourceSlug: 'grammar-score-story', sentence: 'Mina walk to school.' });
+    expect(invalid.status).toBe(404);
+  }, 30_000);
 
   it('stores paired microfallback settings and records fallback completion', async () => {
     const created = await request(app)

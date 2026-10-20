@@ -5,7 +5,7 @@ const { Schema } = mongoose;
 const learningActivitySchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    activityType: { type: String, enum: ['story', 'quiz'], required: true },
+    activityType: { type: String, enum: ['story', 'quiz', 'grammar'], required: true },
     contentId: { type: String, required: true },
     points: { type: Number, required: true, min: 0 },
     activeDate: { type: String, required: true },

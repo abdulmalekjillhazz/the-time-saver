@@ -2132,7 +2132,7 @@ export function PrivateApp() {
           ['plan', '🗓️', lang === 'bn' ? 'পরিকল্পনা' : 'Plan', lang === 'bn' ? 'পরিকল্পনা' : 'Plan'],
           ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
           ['speaking', '🎙️', lang === 'bn' ? 'কথা বলা শিখুন' : 'Learn to speak', lang === 'bn' ? 'কথা' : 'Speak'],
-          ['grammar', '🧩', lang === 'bn' ? 'ইংরেজি Grammar' : 'English grammar', lang === 'bn' ? 'গ্রামার' : 'Grammar'],
+          ['grammar', '🧩', lang === 'bn' ? 'Building · ইংরেজি বাক্য অনুশীলন' : 'Building · English practice', 'Building'],
           ['settings', '⚙️', copy.settings, lang === 'bn' ? 'সেটিংস' : 'Settings'],
         ].map(([key, icon, label, shortLabel]) => (
           <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${key === 'settings' ? 'tab-button-settings' : ''} ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
