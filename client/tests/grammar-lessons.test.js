@@ -27,6 +27,20 @@ describe('progressive grammar lessons', () => {
     ))).toBe(true);
   });
 
+  it('uses complete, grammatically correct sentences in every answer choice', () => {
+    const lessons = GRAMMAR_LEVELS.flatMap(({ lessons: levelLessons }) => levelLessons);
+    for (const lesson of lessons) {
+      expect(lesson.answer).toBeGreaterThanOrEqual(0);
+      expect(lesson.answer).toBeLessThan(lesson.choices.length);
+      expect(lesson.choices[lesson.answer]).toMatch(/[.!?]$/);
+      expect(lesson.choices.every((choice) => /[.!?]$/.test(choice))).toBe(true);
+      expect(lesson.choices).not.toContain('She walk to school every day.');
+      expect(lesson.choices).not.toContain('We are visit our friend yesterday.');
+    }
+    expect(lessons.find(({ id }) => id === 'be-verbs').choices[1]).toBe('They are ready for class.');
+    expect(lessons.find(({ id }) => id === 'present-simple').choices[0]).toBe('She walks to school every day.');
+  });
+
   it('renders a bilingual lesson with a natural-voice listen control', () => {
     const markup = renderToStaticMarkup(createElement(GrammarLessons, {
       lang: 'bn',
