@@ -2046,6 +2046,16 @@ export function PrivateApp() {
           <div className="app-hero-heading-row">
             <div className="app-header-controls">
               <Button
+                variant={tab === 'settings' ? 'primary' : 'secondary'}
+                className={`app-header-settings ${tab === 'settings' ? 'app-header-settings-active' : ''}`}
+                aria-label={copy.settings}
+                title={copy.settings}
+                aria-current={tab === 'settings' ? 'page' : undefined}
+                onClick={() => setTab('settings')}
+              >
+                <span aria-hidden="true">⚙️</span>
+              </Button>
+              <Button
                 variant={tab === 'focus' ? 'primary' : 'secondary'}
                 className={`app-header-focus ${tab === 'focus' ? 'app-header-focus-active' : ''}`}
                 aria-label={lang === 'bn' ? 'ফোকাস ও অ্যালার্ম' : 'Focus and alarms'}
@@ -2133,9 +2143,8 @@ export function PrivateApp() {
           ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
           ['speaking', '🎙️', lang === 'bn' ? 'কথা বলা শিখুন' : 'Learn to speak', lang === 'bn' ? 'কথা' : 'Speak'],
           ['grammar', '🧩', lang === 'bn' ? 'Building · ইংরেজি বাক্য অনুশীলন' : 'Building · English practice', 'Building'],
-          ['settings', '⚙️', copy.settings, lang === 'bn' ? 'সেটিংস' : 'Settings'],
         ].map(([key, icon, label, shortLabel]) => (
-          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${key === 'settings' ? 'tab-button-settings' : ''} ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
+          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
             <span className={`tab-icon tab-icon-${key}`} aria-hidden="true">
               {icon}
             </span>
@@ -2597,8 +2606,10 @@ export function PrivateApp() {
               <Card id="published-lesson-story" className={`surface-card scroll-mt-6 space-y-5 rounded-2xl border border-gold/30 p-4 shadow-md sm:p-6 ${lesson || lessonLoadingSlug ? 'lesson-reader-overlay-open' : ''}`}>
                 {lesson || lessonLoadingSlug ? (
                   <header className="lesson-reader-header">
-                    <Button type="button" variant="secondary" disabled={Boolean(lessonLoadingSlug)} onClick={() => setLesson(null)}>
-                      ← {copy.closeLesson}
+                    <Button type="button" variant="secondary" className="reader-back-button" disabled={Boolean(lessonLoadingSlug)} onClick={() => setLesson(null)} aria-label={copy.closeLesson} title={copy.closeLesson}>
+                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 12H5m7 7-7-7 7-7" />
+                      </svg>
                     </Button>
                     <p className="min-w-0 truncate font-bold text-ink">
                       {lesson ? localized(lesson.title, 'en') : localized(lessons.find((item) => item.slug === lessonLoadingSlug)?.title || '', 'en')}

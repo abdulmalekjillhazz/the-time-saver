@@ -232,8 +232,10 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
           {storyAward?.lessonId === String(dailyLesson._id) && storyAward.earnedPoints > 0 ? (
             <span className="shrink-0 text-xs font-extrabold text-sapphire">+{storyAward.earnedPoints} ⭐</span>
           ) : null}
-          <Button type="button" variant="secondary" onClick={() => setExpanded(false)} aria-label={copy.closeLesson}>
-            {copy.closeLesson}
+          <Button type="button" variant="secondary" className="reader-back-button" onClick={() => setExpanded(false)} aria-label={copy.closeLesson} title={copy.closeLesson}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5m7 7-7-7 7-7" />
+            </svg>
           </Button>
         </header>
       ) : null}
