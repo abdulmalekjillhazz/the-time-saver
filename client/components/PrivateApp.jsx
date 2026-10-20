@@ -59,6 +59,7 @@ import { StoryReader } from './StoryReader.jsx';
 import { PrayerAnchorSelector } from './PrayerAnchorSelector.jsx';
 import { AddRoutineBuilderCard } from './AddRoutineBuilderCard.jsx';
 import { LeaderboardPanel } from './LeaderboardPanel.jsx';
+import { GamificationBar } from './GamificationBar.jsx';
 import { formatNaturalTime } from '../lib/prayerAnchors.js';
 
 const COPY = {
@@ -118,6 +119,7 @@ const COPY = {
     voiceAlarmNote: 'When an alarm rings, your Google voice speaks the alarm name and your next routine, and a notification is sent with the same message. Alarms ring while this app is open.', nativeAlarmNote: 'Android uses your selected alarm sound and keeps alarms ringing when Smart Routine is closed. Allow the Android alarm permissions below.', alarmVoiceUnavailable: 'The voice alarm could not play in this browser. The notification was still sent.',
     alarmPushOn: 'Closed-app alerts are on for this device — alarms ring even with the app closed.', alarmPushOff: 'Turn on closed-app alerts so alarms ring even with the app closed.',
     enableClosedAppAlerts: '🔔 Enable closed-app alerts', pushUnavailable: 'Closed-app alerts are unavailable in this browser.',
+    pushServiceUnavailable: 'This browser could not connect to its push service. Try again with internet access or use the Android app; alarms still ring while this page is open.',
     enableNativeAlarm: '📞 Enable Android call-style alarms', nativeAlarmEnabled: 'Android alarms can ring when Smart Routine is closed.', nativeAlarmPermissionMissing: 'Allow notifications, exact alarms, and full-screen alarms in Android settings, then tap enable again.',
     missedAlarms: 'Missed alarms', acknowledgeAlarm: 'Got it', alarmSnoozed: 'Snoozed for 5 minutes.',
     alarmPermissionDenied: 'Browser notifications are blocked. The in-app alarm will still ring while this page is open.',
@@ -189,6 +191,7 @@ const COPY = {
     voiceAlarmNote: 'অ্যালার্ম বাজলে Google ভয়েসে অ্যালার্মের নাম ও পরের রুটিন শোনা যাবে, আর একই বার্তায় নোটিফিকেশন আসবে। অ্যাপ খোলা থাকলে অ্যালার্ম বাজবে।', nativeAlarmNote: 'Android-এ আপনার বেছে নেওয়া অ্যালার্মের শব্দ বাজবে এবং Smart Routine বন্ধ থাকলেও অ্যালার্ম চলবে। নিচের Android alarm অনুমতিগুলো দিন।', alarmVoiceUnavailable: 'এই browser-এ ভয়েস অ্যালার্ম চালানো যায়নি। নোটিফিকেশন পাঠানো হয়েছে।',
     alarmPushOn: 'এই ডিভাইসে বন্ধ-অ্যাপ অ্যালার্ট চালু আছে — অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।', alarmPushOff: 'বন্ধ-অ্যাপ অ্যালার্ট চালু করুন, তাহলে অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।',
     enableClosedAppAlerts: '🔔 বন্ধ-অ্যাপ অ্যালার্ট চালু করুন', pushUnavailable: 'এই browser-এ বন্ধ-অ্যাপ অ্যালার্ট সমর্থিত নয়।',
+    pushServiceUnavailable: 'এই browser-এর push service-এ সংযোগ করা যায়নি। ইন্টারনেট চালু রেখে আবার চেষ্টা করুন, অথবা Android app ব্যবহার করুন; এই পেজ খোলা থাকলে অ্যালার্ম বাজবে।',
     enableNativeAlarm: '📞 Android কলের মতো অ্যালার্ম চালু করুন', nativeAlarmEnabled: 'Smart Routine বন্ধ থাকলেও Android অ্যালার্ম বাজতে পারবে।', nativeAlarmPermissionMissing: 'Android সেটিংসে notification, exact alarm ও full-screen alarm অনুমতি দিন, তারপর আবার চালু করুন।',
     missedAlarms: 'মিস হওয়া অ্যালার্ম', acknowledgeAlarm: 'বুঝেছি', alarmSnoozed: '৫ মিনিটের জন্য স্নুজ করা হয়েছে।',
     alarmPermissionDenied: 'ব্রাউজার নোটিফিকেশন বন্ধ আছে। পেজ খোলা থাকলে অ্যাপের ভেতর অ্যালার্ম বাজবে।',
@@ -344,6 +347,23 @@ function formatStopwatch(milliseconds) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+// Keep the one-second tick local to the stopwatch readout. Updating clock state
+// in PrivateApp rerendered this entire, feature-heavy screen every second.
+function StopwatchReadout({ className = '', as: Element = 'span' }) {
+  const elapsedMs = useAppStore((state) => state.stopwatchElapsedMs);
+  const startedAt = useAppStore((state) => state.stopwatchStartedAt);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (startedAt === null) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+
+  const elapsed = elapsedMs + (startedAt === null ? 0 : Math.max(0, now - startedAt));
+  return <Element className={className} role="timer" aria-live="off">{formatStopwatch(elapsed)}</Element>;
+}
+
 function GoogleSignInButton({ clientId, lang, disabled, onCredential }) {
   const buttonRef = useRef(null);
   const wrapperRef = useRef(null);
@@ -467,12 +487,10 @@ export function PrivateApp() {
   const removeAlarm = useAppStore((state) => state.removeAlarm);
   const snoozeAlarm = useAppStore((state) => state.snoozeAlarm);
   const markAlarmFired = useAppStore((state) => state.markAlarmFired);
-  const stopwatchElapsedMs = useAppStore((state) => state.stopwatchElapsedMs);
   const stopwatchStartedAt = useAppStore((state) => state.stopwatchStartedAt);
   const startStopwatch = useAppStore((state) => state.startStopwatch);
   const stopStopwatch = useAppStore((state) => state.stopStopwatch);
   const resetStopwatch = useAppStore((state) => state.resetStopwatch);
-  const [clockNow, setClockNow] = useState(() => Date.now());
   const [alarmName, setAlarmName] = useState('');
   const [alarmTime, setAlarmTime] = useState('');
   const [isAlarmSoundPreviewing, setIsAlarmSoundPreviewing] = useState(false);
@@ -495,8 +513,6 @@ export function PrivateApp() {
   const snoozeLinkHandledRef = useRef(false);
   const copy = COPY[lang];
   const nativeAndroid = isAndroidNativeApp();
-  const stopwatchElapsed = stopwatchElapsedMs
-    + (stopwatchStartedAt === null ? 0 : Math.max(0, clockNow - stopwatchStartedAt));
 
   const reportError = useCallback((err) => {
     setError(messageFrom(err, lang));
@@ -527,8 +543,28 @@ export function PrivateApp() {
 
   const loadRoutines = useCallback(async (activeUser = user) => {
     if (!activeUser) return;
-    const result = await request(`/api/routines?date=${encodeURIComponent(todayInZone(activeUser.timezone))}`);
-    setRoutines(result.routines);
+    const date = todayInZone(activeUser.timezone);
+    const cacheKey = `smart-routine:routines:${activeUser.id}:${date}`;
+    try {
+      const result = await request(`/api/routines?date=${encodeURIComponent(date)}`);
+      setRoutines(result.routines);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(cacheKey, JSON.stringify(result.routines));
+      }
+    } catch (networkError) {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const cached = window.localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            setRoutines(JSON.parse(cached));
+            return;
+          } catch {
+            // fallback
+          }
+        }
+      }
+      reportError(networkError);
+    }
   }, [user]);
 
   const loadLessons = useCallback(async () => {
@@ -558,9 +594,25 @@ export function PrivateApp() {
       setDailyLesson(dailyResult.value.dailyLesson || null);
       setDailyQuiz(dailyResult.value.quiz || null);
     } else {
-      setDailyLesson(null);
-      setDailyQuiz(null);
-      reportError(dailyResult.reason);
+      try {
+        const cachedLessons = getOfflineCacheConsent() === true
+          ? await listOfflineLessons()
+          : [];
+        const cachedDailyLesson = cachedLessons.find((savedLesson) => savedLesson.isDailyStory);
+        if (cachedDailyLesson) {
+          setDailyLesson({ ...cachedDailyLesson, isOffline: true });
+          setDailyQuiz(cachedDailyLesson.quiz || null);
+          setNotice('ইন্টারনেট সংযোগ নেই। এই ডিভাইসে আগে সংরক্ষিত আজকের গল্প দেখানো হচ্ছে।');
+        } else {
+          setDailyLesson(null);
+          setDailyQuiz(null);
+          reportError(dailyResult.reason);
+        }
+      } catch (cacheError) {
+        setDailyLesson(null);
+        setDailyQuiz(null);
+        reportError(cacheError);
+      }
     }
   }, [reportError]);
 
@@ -747,6 +799,21 @@ export function PrivateApp() {
     }
     return () => { active = false; };
   }, [uiReady, offlineCacheAllowed, reportError]);
+
+  useEffect(() => {
+    if (!offlineCacheAllowed || !dailyLesson?.slug || dailyLesson.isOffline) return;
+    const cachedStory = {
+      ...dailyLesson,
+      body: dailyLesson.content,
+      quiz: dailyQuiz,
+      isDailyStory: true,
+    };
+    cacheOfflineLesson(cachedStory, request)
+      .then(async ({ lessonSaved }) => {
+        if (lessonSaved) setOfflineSavedLessons(await listOfflineLessons());
+      })
+      .catch(reportError);
+  }, [dailyLesson, dailyQuiz, offlineCacheAllowed, reportError]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -937,11 +1004,6 @@ export function PrivateApp() {
   }, [theme]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     if (!nativeAndroid) return undefined;
     let active = true;
     let nativeListener = null;
@@ -990,7 +1052,19 @@ export function PrivateApp() {
       setPushAlarmReady(enabled);
       if (!enabled) return;
       const pendingAlarms = alarms.filter((alarm) => !alarm.firedAt && alarm.at > Date.now());
-      await Promise.all(pendingAlarms.map((alarm) => scheduleNativeAlarm(alarm)));
+      const now = new Date();
+      const routineAlarms = routines
+        .filter((r) => !r.completionStatus && r.startTime && /^\d{2}:\d{2}$/.test(r.startTime))
+        .map((r) => {
+          const [hours, minutes] = r.startTime.split(':').map(Number);
+          const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+          return target.getTime() > Date.now() ? { id: `routine-${r.id}`, at: target.getTime(), label: r.title } : null;
+        })
+        .filter(Boolean);
+      await Promise.all([
+        ...pendingAlarms.map((alarm) => scheduleNativeAlarm(alarm)),
+        ...routineAlarms.map((alarm) => scheduleNativeAlarm(alarm)),
+      ]);
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') void syncPermissionsAndAlarms().catch(reportError);
@@ -1001,7 +1075,7 @@ export function PrivateApp() {
       active = false;
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [nativeAndroid, alarms, pushAlarmReady, reportError]);
+  }, [nativeAndroid, alarms, routines, pushAlarmReady, reportError]);
 
   useEffect(() => {
     if (nativeAndroid) return undefined;
@@ -1217,7 +1291,9 @@ export function PrivateApp() {
         }
       } catch {}
     } catch (err) {
-      const msg = messageFrom(err, lang);
+      const msg = err?.message === 'push-service-unavailable'
+        ? copy.pushServiceUnavailable
+        : messageFrom(err, lang);
       setError(msg.startsWith('❌') ? msg : `❌ ${msg}`);
     }
   }
@@ -1530,11 +1606,17 @@ export function PrivateApp() {
     setError('');
     setNotice('');
     try {
+      if (nativeAndroid && (status === 'done' || status === 'skipped')) {
+        void cancelNativeAlarm(`routine-${routineId}`).catch(() => {});
+      }
       const result = await enqueueAndFlush(user.id, {
         type: 'completion.set',
         data: { routineId, date: todayInZone(user.timezone), status },
       });
       await loadRoutines(user);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('smart-routine:sync', { detail: { userId: user.id } }));
+      }
       if (result.operationStatus === 'failed') setError(copy.completionRejected);
       else if (result.operationStatus === 'pending' || result.retryable || result.busy) setNotice(copy.completionPending);
       else setNotice(copy.completionSaved);
@@ -1867,10 +1949,35 @@ export function PrivateApp() {
                 </div>
                 <AudioDramaPlayer
                   title={localized(offlineLessonPreview.title, 'en')}
+                  slug={offlineLessonPreview.slug}
                   content={localized(offlineLessonPreview.body, 'en')}
                   vocabulary={offlineLessonPreview.vocabulary || []}
                   lang={lang}
                 />
+                {offlineLessonPreview.quiz?.questions?.length ? (
+                  <section aria-label={lang === 'bn' ? 'অফলাইন কুইজ প্রশ্ন' : 'Offline quiz questions'} className="space-y-3">
+                    <h4 className="font-bold text-ink">{lang === 'bn' ? 'অফলাইন কুইজ' : 'Offline quiz'}</h4>
+                    <p className="text-sm text-ink/70">
+                      {lang === 'bn'
+                        ? 'প্রশ্নগুলো অফলাইনে পড়তে পারবেন; উত্তর জমা দিতে ইন্টারনেট লাগবে।'
+                        : 'Read the questions offline; an internet connection is needed to submit answers.'}
+                    </p>
+                    <ol className="space-y-3">
+                      {offlineLessonPreview.quiz.questions.map((question, index) => (
+                        <li key={`${offlineLessonPreview.slug}-quiz-${index}`} className="rounded-xl border border-sapphire/20 bg-paper/70 p-3">
+                          <p className="font-semibold text-ink">{index + 1}. {localized(question.text, 'en')}</p>
+                          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-ink/80">
+                            {question.options?.map((option, optionIndex) => (
+                              <li key={`${offlineLessonPreview.slug}-quiz-${index}-option-${optionIndex}`}>
+                                {localized(option.text, 'en')}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                ) : null}
               </div>
             ) : null}
           </Card>
@@ -1980,6 +2087,7 @@ export function PrivateApp() {
 
       {tab === 'dashboard' ? (
         <section className="space-y-4">
+          <GamificationBar lang={lang} userId={user.id} />
           <RoutineDashboard lang={lang} userId={user.id} />
           <BadgesShowcase lang={lang} />
           <HeatmapGrid lang={lang} />
@@ -2173,8 +2281,8 @@ export function PrivateApp() {
           <Card className="surface-card p-4">
             <h2 className="section-heading"><span aria-hidden="true">💡</span> {lang === 'bn' ? 'ধাপ ৩ · ধারণা ও টেমপ্লেট' : 'STEP 3 · IDEAS & TEMPLATES'}</h2>
             <div className="mt-4 space-y-4 pt-3 border-t border-sapphire/15">
-              <GoalToRoutine lang={lang} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
-              <TemplatePicker lang={lang} onRoutineAdded={() => loadRoutines(user).catch(reportError)} />
+              <GoalToRoutine lang={lang} userId={user.id} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
+              <TemplatePicker lang={lang} userId={user.id} onRoutineAdded={() => loadRoutines(user).catch(reportError)} />
             </div>
           </Card>
         </section>
@@ -2185,9 +2293,7 @@ export function PrivateApp() {
             <Card className="surface-card space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="section-heading"><span aria-hidden="true">⏱️</span> {copy.stopwatch}</h2>
-                <span className="stopwatch-display" role="timer" aria-live="off">
-                  {formatStopwatch(stopwatchElapsed)}
-                </span>
+                <StopwatchReadout className="stopwatch-display" />
               </div>
               <p className="opacity-75">{copy.focus}</p>
               <div className="flex flex-wrap gap-2">
@@ -2204,7 +2310,7 @@ export function PrivateApp() {
             <Card className="surface-card space-y-4">
               <h2 className="section-heading"><span aria-hidden="true">🔔</span> {copy.alarmTitle}</h2>
               <form className="grid gap-3 sm:grid-cols-2" onSubmit={scheduleAlarm}>
-                <label className="block">{copy.alarmTime}<input type="datetime-local" value={alarmTime} min={localDateTimeValue(new Date(clockNow + 60_000))} onChange={(event) => setAlarmTime(event.target.value)} required className="polished-input mt-1 block w-full p-3" /></label>
+                <label className="block">{copy.alarmTime}<input type="datetime-local" value={alarmTime} min={localDateTimeValue(new Date(Date.now() + 60_000))} onChange={(event) => setAlarmTime(event.target.value)} required className="polished-input mt-1 block w-full p-3" /></label>
                 <label className="block">{copy.alarmName}<input value={alarmName} onChange={(event) => setAlarmName(event.target.value)} maxLength={60} placeholder={copy.alarmName} className="polished-input mt-1 block w-full p-3" /></label>
                 <div className="sm:col-span-2">
                   <Button type="submit" className="min-h-[52px] w-full text-lg"><span aria-hidden="true">⏰</span><span className="ml-2">{copy.addAlarm}</span></Button>
@@ -2360,6 +2466,7 @@ export function PrivateApp() {
                     </div>
                     <AudioDramaPlayer
                       title={localized(lesson.title, 'en')}
+                      slug={lesson.slug}
                       content={localized(lesson.body, 'en')}
                       audioUrl={lesson.media?.type === 'audio' ? lesson.media.url : ''}
                       vocabulary={lesson.vocabulary || []}
@@ -2611,7 +2718,10 @@ export function PrivateApp() {
         <EveningReflectionModal
           lang={lang}
           onClose={() => setReflectionModalOpen(false)}
-          onSaved={() => loadRoutines(user)}
+          onSaved={() => {
+            loadRoutines(user).catch(reportError);
+            window.dispatchEvent(new CustomEvent('smart-routine:sync', { detail: { userId: user.id } }));
+          }}
         />
       )}
       {offlineConsentOpen ? (
@@ -2662,9 +2772,7 @@ export function PrivateApp() {
           }}
         >
           <h2 className="text-lg font-bold uppercase tracking-[0.24em] text-amber-300">{copy.stopwatch}</h2>
-          <output className="whitespace-nowrap font-mono text-[clamp(3rem,18vw,10rem)] font-extrabold tabular-nums leading-none tracking-tight" role="timer" aria-live="off">
-            {formatStopwatch(stopwatchElapsed)}
-          </output>
+          <StopwatchReadout as="output" className="whitespace-nowrap font-mono text-[clamp(3rem,18vw,10rem)] font-extrabold tabular-nums leading-none tracking-tight" />
           <div className="flex flex-wrap items-center justify-center gap-3">
             {stopwatchStartedAt === null
               ? <Button type="button" className="min-h-14 min-w-32 text-lg" onClick={() => startStopwatch()}><span aria-hidden="true">▶️</span><span className="ml-2">{copy.startTimer}</span></Button>

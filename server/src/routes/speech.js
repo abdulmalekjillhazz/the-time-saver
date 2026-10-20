@@ -180,5 +180,45 @@ export function speechRouter({ config = {} } = {}) {
     }
   );
 
+  router.post(
+    '/audio-drama/offline',
+    rateLimit({ name: 'audio-drama-offline-download', limit: 5, windowMs: 15 * MINUTE }),
+    validate({ body: audioDramaRequest }),
+    async (req, res, next) => {
+      try {
+        const result = await generateAndUploadAudioDrama({
+          content: req.body.content,
+          config,
+        });
+        const response = await fetch(result.url, { signal: AbortSignal.timeout(30_000) });
+        if (!response.ok) {
+          logger.warn({ status: response.status }, 'Cloudinary story audio download failed');
+          throw new AppError(502, 'CLOUDINARY_UNAVAILABLE', {
+            en: 'The generated story audio could not be downloaded for offline use.',
+            bn: 'তৈরি করা গল্পের অডিও অফলাইনে ব্যবহারের জন্য ডাউনলোড করা যায়নি।',
+          });
+        }
+        const audio = Buffer.from(await response.arrayBuffer());
+        if (!audio.length) {
+          throw new AppError(502, 'CLOUDINARY_UNAVAILABLE', {
+            en: 'The generated story audio was empty and could not be saved offline.',
+            bn: 'তৈরি করা গল্পের অডিও খালি ছিল, তাই অফলাইনে সংরক্ষণ করা যায়নি।',
+          });
+        }
+        res.set({
+          'Cache-Control': 'private, no-store',
+          'Content-Length': String(audio.length),
+          'Content-Type': 'audio/mpeg',
+        });
+        return res.send(audio);
+      } catch (err) {
+        if (!(err instanceof AppError)) {
+          logger.warn({ errName: err.name }, 'Offline story audio download failed');
+        }
+        next(err instanceof AppError ? err : audioDramaError(err));
+      }
+    }
+  );
+
   return router;
 }

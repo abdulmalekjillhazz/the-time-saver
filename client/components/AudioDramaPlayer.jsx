@@ -1,8 +1,14 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseStoryScript, playDrama } from '../lib/audioDrama.js';
+import { apiRequestAudio } from '../lib/apiClient.js';
 import { lookupStoryWordMeaning, normalizeWord } from './StoryReader.jsx';
+import {
+  getOfflineStoryAudio,
+  saveOfflineMeanings,
+  saveOfflineStoryAudio,
+} from '../lib/offlineStoryCache.js';
 
 function characterIcon(role) {
   if (role === 'male') return '👨';
@@ -97,6 +103,7 @@ export function spokenTextParts(text, fraction, completed, onWordClick, selected
 
 export function AudioDramaPlayer({
   title = '',
+  slug = '',
   content = '',
   audioUrl = '',
   vocabulary = [],
@@ -112,6 +119,22 @@ export function AudioDramaPlayer({
   const [error, setError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedWord, setSelectedWord] = useState(null);
+  const [chunkMode, setChunkMode] = useState(true);
+  const [offlineAudio, setOfflineAudio] = useState(null);
+  const [offlineAudioSaving, setOfflineAudioSaving] = useState(false);
+  const [offlineAudioStatus, setOfflineAudioStatus] = useState('');
+  const [offlineAudioError, setOfflineAudioError] = useState('');
+
+  useEffect(() => {
+    if (vocabulary?.length) {
+      const vocabList = vocabulary.map((v) => {
+        const raw = v.definition || v.meaning || "";
+        const meaning = typeof raw === "string" ? raw : (raw?.bn || raw?.en || "");
+        return { term: normalizeWord(v.term || v.word), meaning };
+      }).filter((v) => v.term && v.meaning);
+      saveOfflineMeanings(vocabList, lang).catch(() => {});
+    }
+  }, [vocabulary, lang]);
   const controllerRef = useRef(null);
   const lineRefs = useRef([]);
   const isPlayingRef = useRef(false);
@@ -130,7 +153,30 @@ export function AudioDramaPlayer({
     story: isBn ? 'গল্পের সংলাপ' : 'Story dialogue',
     loading: isBn ? 'পাঠ প্রস্তুত হচ্ছে…' : 'Preparing lesson audio…',
     friendlyError: isBn ? 'অডিও এখন চালানো যাচ্ছে না। ইন্টারনেট দেখে আবার চেষ্টা করুন।' : 'Audio cannot play right now. Check your connection and try again.',
+    saveOfflineAudio: isBn ? 'অফলাইনে অডিও রাখুন' : 'Save audio offline',
+    offlineAudioSaved: isBn ? 'এই গল্পের অডিও এই ডিভাইসে রাখা হয়েছে।' : 'Story audio is saved on this device.',
+    offlineAudioSaving: isBn ? 'ElevenLabs অডিও তৈরি ও ডাউনলোড হচ্ছে…' : 'Generating and downloading ElevenLabs audio…',
+    offlineAudioSaveFailed: isBn ? 'অফলাইনে অডিও রাখা যায়নি। আবার চেষ্টা করুন।' : 'Could not save audio offline. Please try again.',
   };
+
+  useEffect(() => {
+    let active = true;
+    setOfflineAudio(null);
+    setOfflineAudioStatus('');
+    setOfflineAudioError('');
+    if (!slug || !content || typeof globalThis.indexedDB === 'undefined') return () => { active = false; };
+    getOfflineStoryAudio(slug, content)
+      .then((audio) => {
+        if (active && audio) {
+          setOfflineAudio(audio);
+          setOfflineAudioStatus(copy.offlineAudioSaved);
+        }
+      })
+      .catch((error) => {
+        if (active) setOfflineAudioError(error.message || copy.offlineAudioSaveFailed);
+      });
+    return () => { active = false; };
+  }, [copy.offlineAudioSaveFailed, copy.offlineAudioSaved, content, slug]);
 
   const handleWordLookup = async (rawWord, keyId) => {
     const clean = normalizeWord(rawWord);
@@ -157,8 +203,44 @@ export function AudioDramaPlayer({
     }
   };
 
-  const startPlayback = (startAt = 0) => {
+  const saveAudioOffline = async () => {
+    if (!slug || !content || offlineAudioSaving) return;
+    setOfflineAudioSaving(true);
+    setOfflineAudioStatus(copy.offlineAudioSaving);
+    setOfflineAudioError('');
+    try {
+      if (globalThis.navigator?.onLine === false) {
+        throw new Error(isBn
+          ? 'অডিও ডাউনলোড করতে আগে ইন্টারনেটে যুক্ত হতে হবে।'
+          : 'Connect to the internet before downloading story audio.');
+      }
+      const buffer = await apiRequestAudio('/api/speech/audio-drama/offline', {
+        body: { content },
+        locale: lang,
+      });
+      const audio = new Blob([buffer], { type: 'audio/mpeg' });
+      await saveOfflineStoryAudio(slug, content, audio);
+      setOfflineAudio(audio);
+      setOfflineAudioStatus(copy.offlineAudioSaved);
+    } catch (saveError) {
+      setOfflineAudioStatus('');
+      setOfflineAudioError(saveError.message || copy.offlineAudioSaveFailed);
+    } finally {
+      setOfflineAudioSaving(false);
+    }
+  };
+
+  const startPlayback = useCallback(async (startAt = 0) => {
     controllerRef.current?.close();
+    let savedAudio = offlineAudio;
+    if (!savedAudio && slug && typeof globalThis.indexedDB !== 'undefined') {
+      try {
+        savedAudio = await getOfflineStoryAudio(slug, content);
+        if (savedAudio) setOfflineAudio(savedAudio);
+      } catch (cacheError) {
+        setOfflineAudioError(cacheError.message || copy.offlineAudioSaveFailed);
+      }
+    }
     setError('');
     isPlayingRef.current = true;
     pausedRef.current = false;
@@ -186,6 +268,7 @@ export function AudioDramaPlayer({
         spatial: false,
         audioUrl,
         storyContent: content,
+        offlineAudio: savedAudio,
         onError: (message) => {
           isPlayingRef.current = false;
           pausedRef.current = false;
@@ -196,14 +279,23 @@ export function AudioDramaPlayer({
       },
     );
     controllerRef.current.play(startAt);
-  };
+  }, [
+    audioUrl,
+    content,
+    copy.friendlyError,
+    copy.offlineAudioSaveFailed,
+    lang,
+    lines,
+    offlineAudio,
+    slug,
+  ]);
 
   useEffect(() => {
     if (autoPlaySignal > 0 && autoPlaySignal !== lastAutoPlayRef.current && lines.length > 0) {
       lastAutoPlayRef.current = autoPlaySignal;
       startPlayback(0);
     }
-  }, [autoPlaySignal, lines]);
+  }, [autoPlaySignal, lines, startPlayback]);
 
   useEffect(() => {
     const changed = playbackSettingsRef.current.lines !== lines
@@ -216,7 +308,7 @@ export function AudioDramaPlayer({
     controllerRef.current = null;
     setError('');
     if (restartAt !== null) startPlayback(Math.floor(restartAt));
-  }, [lines, lang, audioUrl]);
+  }, [lines, lang, audioUrl, startPlayback]);
 
   useEffect(() => () => {
     isPlayingRef.current = false;
@@ -286,6 +378,16 @@ export function AudioDramaPlayer({
             >
               {isPaused ? copy.resume : isPlaying ? copy.pause : copy.play}
             </button>
+            {slug ? (
+              <button
+                type="button"
+                onClick={saveAudioOffline}
+                disabled={offlineAudioSaving || Boolean(offlineAudio)}
+                className="secondary-button min-h-[42px] px-3 py-1.5 text-xs font-bold sm:text-sm"
+              >
+                {offlineAudioSaving ? copy.offlineAudioSaving : offlineAudio ? copy.offlineAudioSaved : copy.saveOfflineAudio}
+              </button>
+            ) : null}
             {(isPlaying || isPaused || isFullscreen) ? (
               <button
                 type="button"
@@ -323,7 +425,19 @@ export function AudioDramaPlayer({
               ✕ {isBn ? 'অর্থ লুকান' : 'Hide meaning'}
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={() => setChunkMode((prev) => !prev)}
+            className="rounded-lg border border-sapphire/40 bg-sapphire/10 px-2.5 py-1 text-xs font-bold text-sapphire"
+          >
+            {chunkMode
+              ? (isBn ? '📄 পুরো গল্প দেখুন' : '📄 Show full story')
+              : (isBn ? '🎯 ধাপে ধাপে দেখুন (Chunk)' : '🎯 Chunk mode')}
+          </button>
         </div>
+
+        {offlineAudioStatus ? <p role="status" className="text-sm text-ink/80">{offlineAudioStatus}</p> : null}
+        {offlineAudioError ? <p role="alert" className="text-sm text-red-700">{offlineAudioError}</p> : null}
 
         <div
           role="list"
@@ -331,7 +445,9 @@ export function AudioDramaPlayer({
           tabIndex={0}
           className="w-full space-y-3"
         >
-          {lines.map((line, lineIndex) => {
+          {(chunkMode && (isPlaying || position > 0)
+            ? lines.slice(0, Math.min(lines.length, currentLineIndex + 1))
+            : lines).map((line, lineIndex) => {
             const isCurrentLine = lineIndex === currentLineIndex;
             const isCompletedLine = lineIndex < currentLineIndex;
             const fraction = isCurrentLine ? currentLineFraction : 0;

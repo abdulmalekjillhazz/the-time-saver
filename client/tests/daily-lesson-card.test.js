@@ -36,4 +36,21 @@ describe('daily lesson card', () => {
     expect(markup).toContain('The lunchbox was missing.');
     expect(markup).toContain('Learn English by Story');
   });
+
+  it('shows saved quiz questions offline and disables answer submission', () => {
+    const markup = renderToStaticMarkup(createElement(DailyLessonCard, {
+      dailyLesson: { ...lesson, isOffline: true },
+      quiz: {
+        questions: [{
+          text: 'What was missing?',
+          options: [{ text: 'Lunchbox' }, { text: 'Book' }],
+        }],
+      },
+      lang: 'en',
+    }));
+
+    expect(markup).toContain('What was missing?');
+    expect(markup).toContain('disabled=""');
+    expect(markup).toContain('need internet to submit answers');
+  });
 });

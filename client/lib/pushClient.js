@@ -7,8 +7,9 @@ import { base64UrlToBytes } from './calendar.js';
 function pushSupported() {
   return typeof navigator !== 'undefined'
     && 'serviceWorker' in navigator
-    && 'PushManager' in window
-    && 'Notification' in window;
+    && typeof globalThis.window !== 'undefined'
+    && 'PushManager' in globalThis.window
+    && 'Notification' in globalThis.window;
 }
 
 // Registers the service worker, subscribes this device, and stores the
@@ -19,20 +20,24 @@ export async function ensureAlarmPushSubscription() {
   const { publicKey } = await apiRequest('/api/push/public-key').catch(() => ({}));
   if (typeof publicKey !== 'string' || !publicKey) throw new Error('unavailable');
   const registration = await navigator.serviceWorker.register('/sw.js');
-  const subscription = await registration.pushManager.getSubscription()
-    || await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: base64UrlToBytes(publicKey),
-    });
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64UrlToBytes(publicKey),
+      });
+    } catch (error) {
+      if (/push service not available/i.test(error?.message || '')) {
+        throw new Error('push-service-unavailable', { cause: error });
+      }
+      throw error;
+    }
+  }
   const data = subscription.toJSON();
   if (!data.endpoint || !data.keys?.p256dh || !data.keys?.auth) throw new Error('unavailable');
-  let existing = {};
-  try {
-    const query = new URLSearchParams({ endpoint: data.endpoint });
-    existing = await apiRequest(`/api/push/subscriptions/preferences?${query}`);
-  } catch {
-    existing = {};
-  }
+  const query = new URLSearchParams({ endpoint: data.endpoint });
+  const existing = await apiRequest(`/api/push/subscriptions/preferences?${query}`).catch(() => ({}));
   await apiRequest('/api/push/subscriptions', {
     method: 'POST',
     body: {

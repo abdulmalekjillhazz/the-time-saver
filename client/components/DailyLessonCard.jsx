@@ -51,6 +51,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
     loginRequired: isBn ? 'কুইজ জমা দিতে আগে লগইন করুন।' : 'Sign in before submitting this quiz.',
     login: isBn ? 'লগইন করুন' : 'Sign in',
     requestFailed: isBn ? 'কুইজ জমা দেওয়া যায়নি। আবার চেষ্টা করুন।' : 'Could not submit the quiz. Please try again.',
+    offlineSubmit: isBn ? 'অফলাইনে কুইজ দেখা যাবে; উত্তর জমা দিতে ইন্টারনেট লাগবে।' : 'You can read this quiz offline, but need internet to submit answers.',
     csrfFailed: isBn ? 'নিরাপত্তা যাচাই ব্যর্থ হয়েছে। পেজ রিলোড করে আবার চেষ্টা করুন।' : 'Security check failed. Reload the page and try again.',
     curatedFallback: isBn ? 'সংরক্ষিত বিকল্প গল্প' : 'Curated fallback story',
     storyPoints: isBn ? 'গল্প পড়ার জন্য +৫০ পয়েন্ট' : '+50 points for reading',
@@ -59,7 +60,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
   };
 
   useEffect(() => {
-    if (!trackLearning || !expanded || !dailyLesson?._id) return undefined;
+    if (!trackLearning || !expanded || !dailyLesson?._id || dailyLesson.isOffline) return undefined;
     setStoryTrackingError('');
     apiRequest('/api/lessons/today/read', {
       method: 'POST',
@@ -75,7 +76,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
       .catch(() => {
         setStoryTrackingError(copy.trackingError);
       });
-  }, [copy.trackingError, dailyLesson?._id, expanded, lang, trackLearning]);
+  }, [copy.trackingError, dailyLesson?._id, dailyLesson?.isOffline, expanded, lang, trackLearning]);
 
   if (!dailyLesson) return null;
 
@@ -88,6 +89,10 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
 
   const handleSubmit = async () => {
     if (!quiz || !quiz.questions || submitting) return;
+    if (dailyLesson.isOffline) {
+      setError(copy.offlineSubmit);
+      return;
+    }
     const count = quiz.questions.length;
     const answers = [];
     for (let i = 0; i < count; i += 1) {
@@ -289,6 +294,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
       <div className="w-full">
         <AudioDramaPlayer
           title={dailyLesson.title}
+          slug={dailyLesson.slug}
           content={dailyLesson.content}
           audioUrl={dailyLesson.audio?.status === 'ready' ? dailyLesson.audio.url : ''}
           vocabulary={dailyLesson.vocabulary || []}
@@ -423,9 +429,10 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
 
           {!submission ? (
             <div className="mt-6">
-              <Button onClick={handleSubmit} disabled={submitting} className="min-h-[48px] w-full text-base font-bold">
+              <Button onClick={handleSubmit} disabled={submitting || dailyLesson.isOffline} className="min-h-[48px] w-full text-base font-bold">
                 {submitting ? copy.submitting : copy.submitQuiz}
               </Button>
+              {dailyLesson.isOffline ? <p role="status" className="mt-2 text-sm text-ink/70">{copy.offlineSubmit}</p> : null}
             </div>
           ) : (
             <div className="mt-6 rounded-xl border border-sapphire/20 bg-sapphire/5 p-4 text-center">

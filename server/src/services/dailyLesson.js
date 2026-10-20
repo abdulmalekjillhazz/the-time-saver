@@ -315,7 +315,7 @@ Generate today's complete lesson and quiz pair according to the Master Prompt ru
       config,
       maxTokens: 4096,
       temperature: 0.85,
-      allowFallback: !strictAI,
+      allowFallback: true,
     });
     payload = parseAndValidateDailyLessonPayload(text);
   } catch (err) {

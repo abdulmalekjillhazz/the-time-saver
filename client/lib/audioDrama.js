@@ -1,4 +1,4 @@
-import { apiRequest, apiRequestAudio } from './apiClient.js';
+import { apiRequest } from './apiClient.js';
 
 const CHARACTERS = {
   narrator: { character: 'Narrator', pan: 0, pitch: 1, rate: 1 },
@@ -133,6 +133,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   volume = 1,
   audioUrl = '',
   storyContent = '',
+  offlineAudio = null,
   onError = () => {},
   onNotice = () => {},
 } = {}) {
@@ -144,11 +145,9 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   let audioSource = null;
   let requestAbortController = null;
   let runId = 0;
-  let googleFallbackStarted = false;
   let currentVolume = Math.max(0, Math.min(1, volume));
   let desiredStartIndex = 0;
   const content = storyContent || lines.map(({ character, text }) => `[${character}]: ${text}`).join('\n');
-  const googleFallbackContent = lines.map(({ text }) => text).join(' ');
 
   const emitProgress = (position) => {
     if (!lines.length) return;
@@ -214,47 +213,28 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     audio.onended = () => finishPlayback(id);
     audio.onerror = () => {
       if (id !== runId) return;
-      if (source === 'cloudinary') void fallbackToGoogle(id);
-      else fail(lang === 'bn'
-        ? 'Cloudinary ও Google TTS—কোনোটিই থেকে অডিও চালানো যায়নি। আবার চেষ্টা করুন।'
-        : 'Audio could not be played from Cloudinary or Google TTS. Please try again.');
+      if (source === 'cloudinary' && playOfflineAudio(id)) return;
+      fail(lang === 'bn'
+        ? source === 'offline'
+          ? 'এই ডিভাইসে রাখা গল্পের অডিও চালানো যায়নি। আবার ডাউনলোড করুন।'
+          : 'ElevenLabs-এর সংরক্ষিত গল্পের অডিও চালানো যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
+        : source === 'offline'
+          ? 'The offline story audio could not be played. Download it again.'
+          : 'The saved ElevenLabs story audio could not be played. Check your connection and try again.');
     };
     audio.src = src;
     audio.load();
   };
 
-  const fallbackToGoogle = async (id) => {
-    if (id !== runId || !isPlaying || googleFallbackStarted) return;
-    googleFallbackStarted = true;
-    cleanupAudio();
-    const abortController = new AbortController();
-    requestAbortController = abortController;
-    onNotice(lang === 'bn'
-      ? 'সংরক্ষিত গল্পের voice পাওয়া যাচ্ছে না—Google TTS দিয়ে চেষ্টা করা হচ্ছে…'
-      : 'Saved story audio is unavailable—trying Google TTS…');
-    try {
-      const buffer = await apiRequestAudio('/api/speech/audio-drama/free', {
-        body: { content: googleFallbackContent, lang },
-        locale: lang,
-        signal: abortController.signal,
-      });
-      if (id !== runId || !isPlaying) return;
-      if (typeof globalThis.URL?.createObjectURL !== 'function') {
-        throw new Error('This browser cannot play fallback audio.');
-      }
-      audioObjectUrl = globalThis.URL.createObjectURL(new Blob([buffer], { type: 'audio/mpeg' }));
-      onNotice(lang === 'bn'
-        ? 'সংরক্ষিত গল্পের voice পাওয়া যায়নি—Google TTS চালানো হচ্ছে।'
-        : 'Saved story audio was unavailable—playing Google TTS.');
-      configureAudio(id, audioObjectUrl, 'google');
-    } catch (error) {
-      if (id !== runId || error.name === 'AbortError') return;
-      fail(error.message || (lang === 'bn'
-        ? 'Cloudinary ও Google TTS থেকে অডিও চালানো যায়নি।'
-        : 'Could not play audio from Cloudinary or Google TTS.'));
-    } finally {
-      if (requestAbortController === abortController) requestAbortController = null;
+  const playOfflineAudio = (id) => {
+    if (id !== runId || !isPlaying || !offlineAudio || typeof globalThis.URL?.createObjectURL !== 'function') {
+      return false;
     }
+    cleanupAudio();
+    audioObjectUrl = globalThis.URL.createObjectURL(offlineAudio);
+    onNotice(lang === 'bn' ? 'এই ডিভাইসে রাখা অডিও চালানো হচ্ছে।' : 'Playing audio saved on this device.');
+    configureAudio(id, audioObjectUrl, 'offline');
+    return true;
   };
 
   const finishPlayback = (id) => {
@@ -271,16 +251,21 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       await audio.play();
     } catch (error) {
       if (id !== runId) return;
-      if (audioSource === 'cloudinary' && error.name !== 'NotAllowedError') {
-        void fallbackToGoogle(id);
-      } else {
-        fail(error.message);
-      }
+      if (audioSource === 'cloudinary' && error.name !== 'NotAllowedError' && playOfflineAudio(id)) return;
+      fail(error.message);
     }
   };
 
   const loadAndPlayStory = async (id) => {
     if (id !== runId || !isPlaying || !lines.length) return;
+    if (globalThis.navigator?.onLine === false) {
+      if (!playOfflineAudio(id)) {
+        fail(lang === 'bn'
+          ? 'এই গল্পের অডিও এই ডিভাইসে ডাউনলোড করা নেই। ইন্টারনেটে যুক্ত হয়ে আগে অডিও ডাউনলোড করুন।'
+          : 'This story audio is not saved on this device. Connect to the internet and download it first.');
+      }
+      return;
+    }
     const abortController = new AbortController();
     requestAbortController = abortController;
     try {
@@ -305,7 +290,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       configureAudio(id, result.audioUrl, 'cloudinary');
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
-      void fallbackToGoogle(id);
+      if (!playOfflineAudio(id)) fail(error.message);
     } finally {
       if (requestAbortController === abortController) requestAbortController = null;
     }
@@ -319,7 +304,6 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       }
       cleanupAudio();
       runId += 1;
-      googleFallbackStarted = false;
       desiredStartIndex = Math.max(0, Math.min(lines.length - 0.001, Number(startAt) || 0));
       index = Math.floor(desiredStartIndex);
       isPlaying = true;

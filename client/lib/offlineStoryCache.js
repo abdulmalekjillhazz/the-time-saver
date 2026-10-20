@@ -1,7 +1,8 @@
 const DATABASE_NAME = 'smart-routine-offline-stories';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const LESSON_STORE = 'lessons';
 const MEANING_STORE = 'meanings';
+const AUDIO_STORE = 'audio';
 const CONSENT_KEY = 'smart-routine-offline-story-cache';
 
 let databasePromise;
@@ -20,6 +21,9 @@ function openDatabase() {
       }
       if (!database.objectStoreNames.contains(MEANING_STORE)) {
         database.createObjectStore(MEANING_STORE, { keyPath: 'key' });
+      }
+      if (!database.objectStoreNames.contains(AUDIO_STORE)) {
+        database.createObjectStore(AUDIO_STORE, { keyPath: 'slug' });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -89,6 +93,37 @@ export async function getOfflineLesson(slug) {
       .get(String(slug));
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error || new Error('অফলাইনে রাখা পাঠ খুঁজে পাওয়া যায়নি।'));
+  });
+}
+
+export async function getOfflineStoryAudio(slug, content) {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(AUDIO_STORE, 'readonly')
+      .objectStore(AUDIO_STORE)
+      .get(String(slug));
+    request.onsuccess = () => {
+      const saved = request.result;
+      resolve(saved?.content === content ? saved.audio : null);
+    };
+    request.onerror = () => reject(request.error || new Error('অফলাইনে রাখা গল্পের অডিও পড়া যায়নি।'));
+  });
+}
+
+export async function saveOfflineStoryAudio(slug, content, audio) {
+  if (typeof slug !== 'string' || !slug.trim() || typeof content !== 'string' || !content.trim()) {
+    throw new Error('গল্পের পরিচিতি পাওয়া যায়নি, তাই অডিও অফলাইনে রাখা যাচ্ছে না।');
+  }
+  if (typeof globalThis.Blob !== 'function' || !(audio instanceof globalThis.Blob) || audio.size === 0) {
+    throw new Error('অডিও ফাইলটি খালি বা ব্যবহারযোগ্য নয়।');
+  }
+  await transact([AUDIO_STORE], 'readwrite', (transaction) => {
+    transaction.objectStore(AUDIO_STORE).put({
+      slug,
+      content,
+      audio,
+      cachedAt: Date.now(),
+    });
   });
 }
 
@@ -182,8 +217,9 @@ export async function cacheOfflineLesson(lesson, request) {
 }
 
 export async function clearOfflineStoryCache() {
-  await transact([LESSON_STORE, MEANING_STORE], 'readwrite', (transaction) => {
+  await transact([LESSON_STORE, MEANING_STORE, AUDIO_STORE], 'readwrite', (transaction) => {
     transaction.objectStore(LESSON_STORE).clear();
     transaction.objectStore(MEANING_STORE).clear();
+    transaction.objectStore(AUDIO_STORE).clear();
   });
 }

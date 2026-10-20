@@ -56,4 +56,19 @@ describe('closed-app alarm push subscription', () => {
     globalThis.window = {};
     await expect(ensureAlarmPushSubscription()).rejects.toThrow('unsupported');
   });
+
+  it('identifies a browser push service outage before submitting a subscription', async () => {
+    const { registration } = stubBrowser();
+    registration.pushManager.subscribe.mockRejectedValue(
+      new Error('Registration failed - push service not available'),
+    );
+    const fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ publicKey: 'AQIDBAUGBwgJ' }),
+    }));
+    vi.stubGlobal('fetch', fetch);
+
+    await expect(ensureAlarmPushSubscription()).rejects.toThrow('push-service-unavailable');
+    expect(fetch).toHaveBeenCalledOnce();
+  });
 });
