@@ -552,6 +552,7 @@ export function PrivateApp() {
   const [reflectionModalOpen, setReflectionModalOpen] = useState(false);
 
   const [replanRoutine, setReplanRoutine] = useState(null);
+  const [activeRoutineTask, setActiveRoutineTask] = useState(null);
   const alarmSpeechRef = useRef(null);
   const alarmSpeechTimer = useRef(null);
   const alarmSoundPreviewTimer = useRef(null);
@@ -561,7 +562,7 @@ export function PrivateApp() {
   const snoozeLinkHandledRef = useRef(false);
   const copy = COPY[lang];
   const nativeAndroid = isAndroidNativeApp();
-  const immersiveTab = ['focus', 'speaking', 'grammar'].includes(tab);
+  const immersiveTab = ['focus', 'speaking', 'grammar'].includes(tab) || Boolean(activeRoutineTask);
 
   const reportError = useCallback((err) => {
     setError(messageFrom(err, lang));
@@ -1665,12 +1666,21 @@ export function PrivateApp() {
       else {
         setNotice(copy.completionSaved);
         if (status === 'done' && previousStatus !== 'done') announceLearningActivity(50);
+        return true;
       }
+      return false;
     } catch (err) {
       reportError(err);
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+
+  async function finishRoutineTask(status) {
+    if (!activeRoutineTask) return;
+    const saved = await setRoutineStatus(activeRoutineTask.id, status);
+    if (saved) setActiveRoutineTask(null);
   }
 
   async function changeConsent(granted) {
@@ -2317,6 +2327,16 @@ export function PrivateApp() {
                       {routine.completionStatus ? <StatusChip lang={lang} status={routine.completionStatus} /> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        className="min-h-[42px] px-3.5 text-xs font-bold sm:text-sm"
+                        variant="primary"
+                        disabled={busy}
+                        onClick={() => setActiveRoutineTask(routine)}
+                      >
+                        <span aria-hidden="true">▶</span>
+                        <span className="ml-1.5">{lang === 'bn' ? 'শুরু করুন' : 'Start task'}</span>
+                      </Button>
                       <button
                         type="button"
                         onClick={() => setReplanRoutine(routine)}
@@ -2932,6 +2952,69 @@ export function PrivateApp() {
             </div>
           </section>
         </div>
+      ) : null}
+      {activeRoutineTask ? (
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="active-routine-task-title"
+          className="routine-task-fullscreen fixed inset-0 z-[300] flex min-h-[100dvh] flex-col overflow-y-auto bg-paper"
+        >
+          <div className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-1 flex-col px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-8">
+            <button
+              type="button"
+              onClick={() => setActiveRoutineTask(null)}
+              aria-label={lang === 'bn' ? 'রুটিনে ফিরে যান' : 'Return to routines'}
+              className="secondary-button min-h-11 self-start px-4 py-2 text-sm font-bold"
+            >
+              ← {lang === 'bn' ? 'ফিরে যান' : 'Back'}
+            </button>
+            <div className="my-auto space-y-6 py-8 text-center">
+              <span aria-hidden="true" className="mx-auto grid size-16 place-items-center rounded-2xl border border-gold/35 bg-gold/15 text-3xl">🎯</span>
+              <div className="space-y-2">
+                <p className="eyebrow">{lang === 'bn' ? 'এখনকার কাজ' : 'CURRENT TASK'}</p>
+                <h2 id="active-routine-task-title" className="text-3xl font-black tracking-tight text-ink sm:text-4xl">
+                  {activeRoutineTask.title}
+                </h2>
+                <p className="text-sm text-ink/70">
+                  {formatNaturalTime(activeRoutineTask.startTime, lang)} – {formatNaturalTime(activeRoutineTask.endTime, lang)}
+                  {' · '}{activeRoutineTask.category}
+                </p>
+                {activeRoutineTask.anchorHabit ? (
+                  <p className="text-sm text-sapphire">{activeRoutineTask.anchorHabit}</p>
+                ) : null}
+              </div>
+              <p className="mx-auto max-w-xl text-base leading-relaxed text-ink/80">
+                {lang === 'bn'
+                  ? 'এই কাজটি শেষ হলে সম্পন্ন নির্বাচন করুন। বাদ দিতে চাইলে এড়িয়ে যান—কাজের সময় নেভিগেশন লুকানো থাকবে।'
+                  : 'Focus on this task. Mark it complete when you finish, or skip it; navigation stays hidden while you work.'}
+              </p>
+              {error ? <p role="alert" className="mx-auto max-w-xl rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-800">{error}</p> : null}
+              {notice ? <p role="status" className="mx-auto max-w-xl rounded-xl border border-sapphire/30 bg-sapphire/10 px-4 py-3 text-sm font-semibold text-sapphire">{notice}</p> : null}
+              <div className="mx-auto flex w-full max-w-md flex-col gap-3 sm:flex-row">
+                <Button
+                  type="button"
+                  className="min-h-14 flex-1 text-base font-bold"
+                  disabled={busy}
+                  onClick={() => { void finishRoutineTask('done'); }}
+                >
+                  <span aria-hidden="true">✅</span>
+                  <span className="ml-2">{copy.done}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-14 flex-1 text-base font-bold"
+                  disabled={busy}
+                  onClick={() => { void finishRoutineTask('skipped'); }}
+                >
+                  <span aria-hidden="true">⏭️</span>
+                  <span className="ml-2">{copy.skipped}</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
       ) : null}
       {stopwatchFullscreen ? (
         <section

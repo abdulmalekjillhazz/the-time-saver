@@ -165,9 +165,12 @@ export function AudioDramaPlayer({
   const [offlineAudioStatus, setOfflineAudioStatus] = useState('');
   const [offlineAudioError, setOfflineAudioError] = useState('');
   const [speechPracticeOpen, setSpeechPracticeOpen] = useState(startInPracticeMode);
+  const [microphoneConsentLine, setMicrophoneConsentLine] = useState(null);
+  const [microphoneConsentAccepted, setMicrophoneConsentAccepted] = useState(false);
+  const [practiceFeedback, setPracticeFeedback] = useState('');
   const [attemptsByLine, setAttemptsByLine] = useState({});
   const [speechPractice, setSpeechPractice] = useState({
-    lineIndex: -1,
+    lineIndex: startInPracticeMode && practiceLines.length ? 0 : -1,
     status: 'idle',
     transcript: '',
     comparison: null,
@@ -216,6 +219,15 @@ export function AudioDramaPlayer({
     practiceHelp: isBn
       ? 'একটি ইংরেজি লাইন পড়ুন। ব্রাউজারের speech recognition আপনার বলা শব্দের সঙ্গে লাইনটি মেলাবে—এটি নিখুঁত phonetic score নয়। ব্রাউজারভেদে ফল বদলাতে পারে এবং অডিও অনলাইনে প্রক্রিয়াকৃত হতে পারে।'
       : 'Read an English line aloud. Browser speech recognition compares the words it hears with the story; this is an estimate, not a phonetic pronunciation score. Results vary by browser, and audio may be processed online.',
+    microphonePermissionTitle: isBn ? 'মাইক্রোফোন ব্যবহারের অনুমতি' : 'Microphone permission',
+    microphonePermissionHelp: isBn
+      ? 'আপনার বলা ইংরেজি শব্দের সঙ্গে বাক্যটি মেলাতে মাইক্রোফোন দরকার। অডিও speech recognition-এর জন্য প্রক্রিয়াকৃত হবে; চালিয়ে গেলে ডিভাইসের অনুমতি চাওয়া হবে।'
+      : 'The microphone is needed to compare your spoken words with the sentence. Audio will be processed for speech recognition; continuing will request your device permission.',
+    allowMicrophone: isBn ? 'অনুমতি দিন ও শুরু করুন' : 'Allow and start',
+    cancelMicrophone: isBn ? 'এখন নয়' : 'Not now',
+    microphonePermissionFailed: isBn
+      ? 'মাইক্রোফোন ব্যবহার করা যায়নি। অনুমতি পরীক্ষা করে আবার চেষ্টা করুন।'
+      : 'Microphone access failed. Check the permission and try again.',
     speakLine: isBn ? '🎤 পড়ে যাচাই করুন' : '🎤 Read and check',
     stopSpeaking: isBn ? '⏹ থামান' : '⏹ Stop',
     retrySpeaking: isBn ? '🔁 আবার চেষ্টা' : '🔁 Try again',
@@ -234,8 +246,12 @@ export function AudioDramaPlayer({
     speechMicMissing: isBn ? 'মাইক্রোফোন পাওয়া যায়নি।' : 'No microphone was found.',
     speechUnavailable: isBn ? 'কথা শনাক্ত করা যায়নি। আবার চেষ্টা করুন।' : 'Speech could not be recognized. Please try again.',
     attempts: isBn ? 'চেষ্টা' : 'Attempt',
-    attemptsLimit: isBn ? 'এই লাইনে ৩টি চেষ্টা শেষ। পরের লাইনে যান।' : 'All 3 tries used for this line. Move to the next line.',
-    nextLine: isBn ? 'পরের লাইন →' : 'Next line →',
+    attemptsLimit: isBn ? 'এই লাইনে ৩টি চেষ্টা শেষ। লাইনটি এড়িয়ে যান।' : 'All 3 tries used for this line. Skip the sentence.',
+    completeLine: isBn ? 'বাক্যটি সম্পন্ন' : 'Complete sentence',
+    skipLine: isBn ? 'এড়িয়ে পরের বাক্য' : 'Skip to next sentence',
+    finishPractice: isBn ? 'অনুশীলন শেষ করুন' : 'Finish practice',
+    practiceFinished: isBn ? 'অনুশীলন শেষ হয়েছে।' : 'Practice session finished.',
+    practiceFeedback: isBn ? 'চমৎকার—পরের বাক্য!' : 'Nice work—next sentence!',
     speakingAnimation: isBn ? 'মাইক্রোফোন শুনছে' : 'Microphone listening',
     pronunciationUnavailable: isBn ? 'এই ডিভাইসে ইংরেজি উচ্চারণ শোনা যাচ্ছে না।' : 'English pronunciation is unavailable on this device.',
     pronunciationLabel: isBn ? 'শব্দটি শুনুন' : 'Hear pronunciation',
@@ -495,7 +511,7 @@ export function AudioDramaPlayer({
     return true;
   };
 
-  const practiceLine = async (lineIndex) => {
+  const practiceLine = async (lineIndex, confirmed = false) => {
     if (speechPractice.status === 'listening' && speechPractice.lineIndex === lineIndex) {
       if (isAndroidNativeApp()) {
         stopEnglishSpeechRecognition().catch(() => {});
@@ -518,6 +534,11 @@ export function AudioDramaPlayer({
     }
 
     if (!canAttemptSpeechPractice(attemptsByLine[lineIndex] || 0)) return;
+
+    if (!confirmed && !microphoneConsentAccepted) {
+      setMicrophoneConsentLine(lineIndex);
+      return;
+    }
 
     const nativeSpeech = isAndroidNativeApp();
     const SpeechRecognition = globalThis.window?.SpeechRecognition
@@ -680,8 +701,69 @@ export function AudioDramaPlayer({
     }
   };
 
-  const advancePracticeLine = (lineIndex) => {
-    if (lineIndex >= practiceLines.length - 1) return;
+  const confirmMicrophonePermission = async () => {
+    const lineIndex = microphoneConsentLine;
+    if (lineIndex === null) return;
+    const nativeSpeech = isAndroidNativeApp();
+    const SpeechRecognition = globalThis.window?.SpeechRecognition
+      || globalThis.window?.webkitSpeechRecognition;
+    if (!nativeSpeech && !SpeechRecognition) {
+      setSpeechPractice({
+        lineIndex,
+        status: 'error',
+        transcript: '',
+        comparison: null,
+        message: copy.speechUnsupported,
+      });
+      setMicrophoneConsentLine(null);
+      return;
+    }
+    try {
+      if (!nativeSpeech) {
+        if (!globalThis.navigator?.mediaDevices?.getUserMedia) {
+          setSpeechPractice({
+            lineIndex,
+            status: 'error',
+            transcript: '',
+            comparison: null,
+            message: copy.speechPermission,
+          });
+          setMicrophoneConsentLine(null);
+          return;
+        }
+        const stream = await globalThis.navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      setMicrophoneConsentAccepted(true);
+      setMicrophoneConsentLine(null);
+      await practiceLine(lineIndex, true);
+    } catch {
+      setSpeechPractice({
+        lineIndex,
+        status: 'error',
+        transcript: '',
+        comparison: null,
+        message: copy.microphonePermissionFailed,
+      });
+      setMicrophoneConsentLine(null);
+    }
+  };
+
+  const advancePracticeLine = (lineIndex, completed = false) => {
+    if (lineIndex >= practiceLines.length - 1) {
+      setSpeechPractice({
+        lineIndex,
+        status: 'complete',
+        transcript: '',
+        comparison: null,
+        message: '',
+      });
+      if (completed) {
+        setPracticeFeedback(copy.practiceFeedback);
+        globalThis.window?.setTimeout(() => setPracticeFeedback(''), 1600);
+      }
+      return;
+    }
     setSpeechPractice({
       lineIndex: lineIndex + 1,
       status: 'idle',
@@ -689,10 +771,17 @@ export function AudioDramaPlayer({
       comparison: null,
       message: '',
     });
+    setMicrophoneConsentLine(null);
+    if (completed) {
+      setPracticeFeedback(copy.practiceFeedback);
+      globalThis.window?.setTimeout(() => setPracticeFeedback(''), 1600);
+    }
   };
 
   const currentLineIndex = Math.min(Math.floor(position), Math.max(lines.length - 1, 0));
   const currentLineFraction = Math.min(1, Math.max(0, position - currentLineIndex));
+  const practiceFullscreen = startInPracticeMode && speechPracticeOpen;
+  const activePracticeLineIndex = Math.max(0, speechPractice.lineIndex);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -703,12 +792,15 @@ export function AudioDramaPlayer({
     <section
       aria-label={copy.title}
       className={
-        isFullscreen
+        practiceFullscreen
+          ? 'speech-practice-fullscreen fixed inset-0 z-[100] overflow-y-auto bg-paper'
+          : isFullscreen
           ? 'fixed inset-0 z-50 overflow-y-auto bg-paper p-4 sm:p-8'
           : 'w-full'
       }
     >
-      <div className={isFullscreen ? 'mx-auto max-w-4xl space-y-4' : 'space-y-3'}>
+      <div className={practiceFullscreen ? 'mx-auto min-h-screen max-w-4xl space-y-4 p-0 sm:p-6' : isFullscreen ? 'mx-auto max-w-4xl space-y-4 p-4 sm:p-8' : 'space-y-3'}>
+        {!practiceFullscreen ? (
         <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-gold/40 bg-paper/95 p-3 shadow-lg">
           <div className="flex items-center gap-2">
             <button
@@ -784,6 +876,9 @@ export function AudioDramaPlayer({
                   setSpeechPracticeOpen(false);
                 } else {
                   setSpeechPracticeOpen(true);
+                  setSpeechPractice((current) => current.lineIndex < 0
+                    ? { ...current, lineIndex: 0 }
+                    : current);
                 }
               }}
               aria-expanded={speechPracticeOpen}
@@ -793,13 +888,28 @@ export function AudioDramaPlayer({
             </button>
           ) : null}
         </div>
+        ) : null}
 
         {speechPracticeOpen ? (
           <section
             aria-label={copy.practiceTitle}
-            className="relative isolate space-y-4 overflow-hidden rounded-[1.75rem] border border-gold/35 bg-gradient-to-br from-sapphire/15 via-paper to-gold/15 p-4 shadow-xl sm:p-6"
+            className={`relative isolate space-y-4 overflow-hidden rounded-[1.75rem] border border-gold/35 bg-gradient-to-br from-sapphire/15 via-paper to-gold/15 p-4 shadow-xl sm:p-6${practiceFullscreen ? ' min-h-[100dvh] rounded-none border-0 pt-[calc(1rem+env(safe-area-inset-top))] sm:min-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]' : ''}`}
           >
             <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 -z-10 size-40 rounded-full bg-gold/15 blur-3xl" />
+            {practiceFullscreen ? (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!cancelSpeechPractice()) return;
+                    setSpeechPracticeOpen(false);
+                  }}
+                  className="secondary-button min-h-[42px] px-4 py-2 text-sm font-bold"
+                >
+                  ← {isBn ? 'বের হন' : 'Exit practice'}
+                </button>
+              </div>
+            ) : null}
             <div className="flex items-start gap-3">
               <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl border border-gold/30 bg-gold/15 text-2xl shadow-inner sm:size-14 sm:text-3xl">🎙️</span>
               <div className="min-w-0 flex-1">
@@ -810,8 +920,19 @@ export function AudioDramaPlayer({
                 <p className="mt-1 text-xs leading-relaxed text-ink/75 sm:text-sm">{copy.practiceHelp}</p>
               </div>
             </div>
-            <div className="space-y-3">
-              {practiceLines.map((line, lineIndex) => {
+            {speechPractice.status === 'complete' ? (
+              <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center text-lg font-extrabold text-emerald-800">
+                {copy.practiceFinished}
+              </div>
+            ) : null}
+            {practiceFeedback ? (
+              <p role="status" className="practice-completion-feedback rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-center font-bold text-emerald-800">
+                {practiceFeedback}
+              </p>
+            ) : null}
+            {speechPractice.status !== 'complete' ? <div className="space-y-3">
+              {practiceLines.slice(activePracticeLineIndex, activePracticeLineIndex + 1).map((line, visiblePracticeIndex) => {
+                const lineIndex = activePracticeLineIndex + visiblePracticeIndex;
                 const isCurrentPractice = speechPractice.lineIndex === lineIndex;
                 const isListening = isCurrentPractice && speechPractice.status === 'listening';
                 const comparison = isCurrentPractice ? speechPractice.comparison : null;
@@ -910,39 +1031,57 @@ export function AudioDramaPlayer({
                           <span className="font-semibold text-emerald-900">✓ {copy.matchedWord}</span>
                           <span className="font-semibold text-red-900">✕ {copy.missedWord}</span>
                         </p>
-                        {lineIndex < practiceLines.length - 1 ? (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => advancePracticeLine(lineIndex, true)}
+                            className="primary-button min-h-[42px] px-4 py-2 text-xs font-bold"
+                          >
+                            {copy.completeLine}
+                          </button>
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex)}
-                            className="secondary-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
+                            className="secondary-button min-h-[42px] px-4 py-2 text-xs font-bold"
                           >
-                            {copy.nextLine}
+                            {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
                           </button>
-                        ) : null}
+                        </div>
                       </div>
                     ) : null}
-                    {attemptsExhausted
-                    && speechPractice.status !== 'result'
-                    && lineIndex < practiceLines.length - 1 ? (
+                    {speechPractice.status !== 'result' ? (
                       <button
                         type="button"
                         onClick={() => advancePracticeLine(lineIndex)}
-                        className="secondary-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
+                        disabled={isListening}
+                        className="secondary-button min-h-[42px] px-4 py-2 text-xs font-bold"
                       >
-                        {copy.nextLine}
+                        {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
                       </button>
                     ) : null}
                   </article>
                 );
               })}
-            </div>
+            </div> : null}
+            {microphoneConsentLine !== null ? (
+              <div className="fixed inset-0 z-[120] grid place-items-center bg-black/65 p-4" role="presentation">
+                <div role="dialog" aria-modal="true" aria-labelledby="microphone-permission-title" className="w-full max-w-md space-y-4 rounded-2xl border border-gold/40 bg-paper p-5 text-ink shadow-2xl">
+                  <h4 id="microphone-permission-title" className="text-lg font-extrabold">{copy.microphonePermissionTitle}</h4>
+                  <p className="text-sm leading-relaxed">{copy.microphonePermissionHelp}</p>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button type="button" onClick={() => setMicrophoneConsentLine(null)} className="secondary-button min-h-[42px] px-4 py-2 text-sm font-bold">{copy.cancelMicrophone}</button>
+                    <button type="button" onClick={() => { void confirmMicrophonePermission(); }} className="primary-button min-h-[42px] px-4 py-2 text-sm font-bold">{copy.allowMicrophone}</button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </section>
         ) : null}
 
-        {offlineAudioStatus ? <p role="status" className="text-sm text-ink/80">{offlineAudioStatus}</p> : null}
-        {offlineAudioError ? <p role="alert" className="text-sm text-red-700">{offlineAudioError}</p> : null}
+        {!practiceFullscreen && offlineAudioStatus ? <p role="status" className="text-sm text-ink/80">{offlineAudioStatus}</p> : null}
+        {!practiceFullscreen && offlineAudioError ? <p role="alert" className="text-sm text-red-700">{offlineAudioError}</p> : null}
 
-        <div
+        {!practiceFullscreen ? <div
           role="list"
           aria-label={copy.story}
           tabIndex={0}
@@ -990,9 +1129,9 @@ export function AudioDramaPlayer({
             );
           })}
           {!lines.length ? <p className="min-h-10 text-sm leading-relaxed opacity-80">{copy.loading}</p> : null}
-        </div>
+        </div> : null}
 
-        {chunkMode && lines.length > 1 ? (
+        {!practiceFullscreen && chunkMode && lines.length > 1 ? (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-gold/20 bg-paper/60 px-3 py-2">
             <button
               type="button"
@@ -1016,7 +1155,7 @@ export function AudioDramaPlayer({
           </div>
         ) : null}
 
-        {error ? <p role="alert" className="text-sm font-medium text-red-400">{error}</p> : null}
+        {!practiceFullscreen && error ? <p role="alert" className="text-sm font-medium text-red-400">{error}</p> : null}
       </div>
     </section>
   );

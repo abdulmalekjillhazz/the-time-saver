@@ -122,6 +122,22 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('0/3');
   });
 
+  it('shows only the current sentence in full-screen practice before asking for microphone access', () => {
+    const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
+      content: '[Narrator]: This story has two sentences.',
+      practiceContent: '[Narrator]: The first sentence is short.\n[Narrator]: The second sentence stays hidden.',
+      startInPracticeMode: true,
+      lang: 'en',
+    }));
+    const visibleText = markup.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+
+    expect(markup).toContain('class="speech-practice-fullscreen');
+    expect(visibleText).toContain('The first sentence is short.');
+    expect(visibleText).not.toContain('The second sentence stays hidden.');
+    expect(markup).not.toContain('Microphone permission');
+    expect(markup).toContain('Exit practice');
+  });
+
   it('does not offer English pronunciation practice for Bengali-only daily stories', () => {
     const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
       content: '[Narrator]: গল্প শুরু হলো।',
