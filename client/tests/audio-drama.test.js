@@ -66,11 +66,34 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('aria-current="step"');
     expect(markup).toContain('aria-label="Seek through the story"');
     expect(markup).toContain('Learn English by Story');
+    expect(markup).toContain('Practice pronunciation');
     expect(markup).toContain('Save audio offline');
     expect(markup).not.toContain('Cloudinary');
+    expect(markup).not.toContain('ElevenLabs');
     expect(markup).not.toContain('Google TTS');
     expect(markup).not.toContain('3D Audio Drama');
     expect(markup).not.toContain('3D Audio On');
+  });
+
+  it('offers English pronunciation practice for Bengali readers when English text is provided', () => {
+    const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
+      content: '[Narrator]: গল্প শুরু হলো।',
+      practiceContent: '[Narrator]: The story begins.',
+      lang: 'bn',
+    }));
+
+    expect(markup).toContain('উচ্চারণ অনুশীলন');
+    expect(markup).toContain('গল্প শুরু হলো।');
+  });
+
+  it('does not offer English pronunciation practice for Bengali-only daily stories', () => {
+    const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
+      content: '[Narrator]: গল্প শুরু হলো।',
+      practiceContent: '',
+      lang: 'bn',
+    }));
+
+    expect(markup).not.toContain('উচ্চারণ অনুশীলন');
   });
 
   it('parses speaker tags into mapped stereo and voice settings', () => {
@@ -139,7 +162,7 @@ describe('Cloudinary audio drama', () => {
     expect(JSON.parse(requestOptions.body)).toEqual({
       content: '[Storyteller]: The story begins.\n[Father]: Dad lost a shoe.',
     });
-    expect(onNotice).toHaveBeenCalledWith('Cloudinary-তে সংরক্ষিত voice চালানো হচ্ছে।');
+    expect(onNotice).toHaveBeenCalledWith('গল্পের অডিও চালানো হচ্ছে…');
 
     audio.currentTime = 3;
     audio.ontimeupdate();
@@ -182,7 +205,7 @@ describe('Cloudinary audio drama', () => {
 
     expect(FakeAudio.instances[0].src).toBe('https://res.cloudinary.com/test/daily-lesson.mp3');
     expect(globalThis.fetch).not.toHaveBeenCalled();
-    expect(onNotice).toHaveBeenCalledWith('Cloudinary-তে সংরক্ষিত voice চালানো হচ্ছে।');
+    expect(onNotice).toHaveBeenCalledWith('গল্পের অডিও চালানো হচ্ছে…');
     player.close();
   });
 

@@ -3,6 +3,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseStoryScript, playDrama } from '../lib/audioDrama.js';
 import { apiRequestAudio } from '../lib/apiClient.js';
+import {
+  canAttemptSpeechPractice,
+  compareSpeechText,
+  MAX_SPEECH_PRACTICE_ATTEMPTS,
+} from '../lib/speechPractice.js';
+import { isAndroidNativeApp, recognizeEnglishSpeech, stopEnglishSpeechRecognition } from '../lib/nativeSpeech.js';
 import { lookupStoryWordMeaning, normalizeWord } from './StoryReader.jsx';
 import {
   getOfflineStoryAudio,
@@ -105,14 +111,23 @@ export function AudioDramaPlayer({
   title = '',
   slug = '',
   content = '',
+  practiceContent,
   audioUrl = '',
   vocabulary = [],
   lang = 'bn',
   autoPlaySignal = 0,
   onClose,
+  startInPracticeMode = false,
 }) {
   const isBn = lang === 'bn';
   const lines = useMemo(() => parseStoryScript(content, isBn ? 'বর্ণনাকারী' : 'Narrator'), [content, isBn]);
+  const englishPracticeContent = practiceContent === undefined
+    ? (lang === 'en' ? content : '')
+    : practiceContent;
+  const practiceLines = useMemo(
+    () => parseStoryScript(englishPracticeContent, 'Narrator'),
+    [englishPracticeContent],
+  );
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [position, setPosition] = useState(0);
@@ -124,6 +139,15 @@ export function AudioDramaPlayer({
   const [offlineAudioSaving, setOfflineAudioSaving] = useState(false);
   const [offlineAudioStatus, setOfflineAudioStatus] = useState('');
   const [offlineAudioError, setOfflineAudioError] = useState('');
+  const [speechPracticeOpen, setSpeechPracticeOpen] = useState(startInPracticeMode);
+  const [attemptsByLine, setAttemptsByLine] = useState({});
+  const [speechPractice, setSpeechPractice] = useState({
+    lineIndex: -1,
+    status: 'idle',
+    transcript: '',
+    comparison: null,
+    message: '',
+  });
 
   useEffect(() => {
     if (vocabulary?.length) {
@@ -142,6 +166,9 @@ export function AudioDramaPlayer({
   const pausedRef = useRef(false);
   const playbackSettingsRef = useRef({ lines, lang, audioUrl });
   const lastAutoPlayRef = useRef(0);
+  const recognitionRef = useRef(null);
+  const activeRecognitionRef = useRef(false);
+  const recognizedTextRef = useRef('');
 
   const copy = {
     title: isBn ? 'গল্পের মাধ্যমে ইংরেজি শিখুন' : 'Learn English by Story',
@@ -155,8 +182,35 @@ export function AudioDramaPlayer({
     friendlyError: isBn ? 'অডিও এখন চালানো যাচ্ছে না। ইন্টারনেট দেখে আবার চেষ্টা করুন।' : 'Audio cannot play right now. Check your connection and try again.',
     saveOfflineAudio: isBn ? 'অফলাইনে অডিও রাখুন' : 'Save audio offline',
     offlineAudioSaved: isBn ? 'এই গল্পের অডিও এই ডিভাইসে রাখা হয়েছে।' : 'Story audio is saved on this device.',
-    offlineAudioSaving: isBn ? 'ElevenLabs অডিও তৈরি ও ডাউনলোড হচ্ছে…' : 'Generating and downloading ElevenLabs audio…',
+    offlineAudioSaving: isBn ? 'অডিও এই ডিভাইসে সংরক্ষণ হচ্ছে…' : 'Saving audio on this device…',
     offlineAudioSaveFailed: isBn ? 'অফলাইনে অডিও রাখা যায়নি। আবার চেষ্টা করুন।' : 'Could not save audio offline. Please try again.',
+    practice: isBn ? '🎙 উচ্চারণ অনুশীলন' : '🎙 Practice pronunciation',
+    closePractice: isBn ? '✕ অনুশীলন বন্ধ' : '✕ Close practice',
+    practiceTitle: isBn ? 'গল্পের লাইন পড়ে উচ্চারণ অনুশীলন করুন' : 'Practice speaking story lines',
+    practiceHelp: isBn
+      ? 'একটি ইংরেজি লাইন পড়ুন। ব্রাউজারের speech recognition আপনার বলা শব্দের সঙ্গে লাইনটি মেলাবে—এটি নিখুঁত phonetic score নয়। ব্রাউজারভেদে ফল বদলাতে পারে এবং অডিও অনলাইনে প্রক্রিয়াকৃত হতে পারে।'
+      : 'Read an English line aloud. Browser speech recognition compares the words it hears with the story; this is an estimate, not a phonetic pronunciation score. Results vary by browser, and audio may be processed online.',
+    speakLine: isBn ? '🎤 পড়ে যাচাই করুন' : '🎤 Read and check',
+    stopSpeaking: isBn ? '⏹ থামান' : '⏹ Stop',
+    retrySpeaking: isBn ? '🔁 আবার চেষ্টা' : '🔁 Try again',
+    listening: isBn ? 'শুনছি—এখন লাইনটি পড়ুন…' : 'Listening—read the line aloud…',
+    recognized: isBn ? 'আপনার বলা কথা' : 'What we heard',
+    wordMatch: isBn ? 'শব্দের মিল' : 'Word match',
+    matchedWord: isBn ? 'মেলা শব্দ' : 'Recognized word',
+    missedWord: isBn ? 'না-মেলা শব্দ' : 'Unmatched word',
+    speechUnsupported: isBn
+      ? 'এই ব্রাউজারে speech recognition সমর্থিত নয়। Chrome বা Edge-এ চেষ্টা করুন।'
+      : 'Speech recognition is not supported in this browser. Try Chrome or Edge.',
+    speechPermission: isBn
+      ? 'মাইক্রোফোন ব্যবহারের অনুমতি দিন, তারপর আবার চেষ্টা করুন।'
+      : 'Allow microphone access, then try again.',
+    speechNoAudio: isBn ? 'কোনো কথা শোনা যায়নি। আবার চেষ্টা করুন।' : 'No speech was heard. Please try again.',
+    speechMicMissing: isBn ? 'মাইক্রোফোন পাওয়া যায়নি।' : 'No microphone was found.',
+    speechUnavailable: isBn ? 'কথা শনাক্ত করা যায়নি। আবার চেষ্টা করুন।' : 'Speech could not be recognized. Please try again.',
+    attempts: isBn ? 'চেষ্টা' : 'Attempt',
+    attemptsLimit: isBn ? 'এই লাইনে ৩টি চেষ্টা শেষ। পরের লাইনে যান।' : 'All 3 tries used for this line. Move to the next line.',
+    nextLine: isBn ? 'পরের লাইন →' : 'Next line →',
+    speakingAnimation: isBn ? 'মাইক্রোফোন শুনছে' : 'Microphone listening',
   };
 
   useEffect(() => {
@@ -224,7 +278,11 @@ export function AudioDramaPlayer({
       setOfflineAudioStatus(copy.offlineAudioSaved);
     } catch (saveError) {
       setOfflineAudioStatus('');
-      setOfflineAudioError(saveError.message || copy.offlineAudioSaveFailed);
+      setOfflineAudioError(globalThis.navigator?.onLine === false
+        ? (isBn
+          ? 'অডিও সংরক্ষণ করতে ইন্টারনেটে যুক্ত হন।'
+          : 'Connect to the internet to save audio.')
+        : copy.offlineAudioSaveFailed);
     } finally {
       setOfflineAudioSaving(false);
     }
@@ -314,6 +372,9 @@ export function AudioDramaPlayer({
     isPlayingRef.current = false;
     controllerRef.current?.close();
     controllerRef.current = null;
+    activeRecognitionRef.current = false;
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
   }, []);
 
   const handlePlayPause = () => {
@@ -348,6 +409,231 @@ export function AudioDramaPlayer({
     positionRef.current = nextPosition;
     setPosition(nextPosition);
     controllerRef.current?.seek(nextPosition);
+  };
+
+  const cancelSpeechPractice = () => {
+    activeRecognitionRef.current = false;
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (isAndroidNativeApp()) {
+      stopEnglishSpeechRecognition().catch(() => {});
+    }
+    try {
+      recognition?.abort();
+    } catch {
+      setSpeechPractice({
+        lineIndex: speechPractice.lineIndex,
+        status: 'error',
+        transcript: recognizedTextRef.current,
+        comparison: null,
+        message: copy.speechUnavailable,
+      });
+      return false;
+    }
+    setSpeechPractice({
+      lineIndex: -1,
+      status: 'idle',
+      transcript: '',
+      comparison: null,
+      message: '',
+    });
+    return true;
+  };
+
+  const practiceLine = async (lineIndex) => {
+    if (speechPractice.status === 'listening' && speechPractice.lineIndex === lineIndex) {
+      if (isAndroidNativeApp()) {
+        stopEnglishSpeechRecognition().catch(() => {});
+        activeRecognitionRef.current = false;
+        setSpeechPractice((current) => ({ ...current, status: 'idle' }));
+        return;
+      }
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        activeRecognitionRef.current = false;
+        recognitionRef.current = null;
+        setSpeechPractice((current) => ({
+          ...current,
+          status: 'error',
+          message: copy.speechUnavailable,
+        }));
+      }
+      return;
+    }
+
+    if (!canAttemptSpeechPractice(attemptsByLine[lineIndex] || 0)) return;
+
+    const nativeSpeech = isAndroidNativeApp();
+    const SpeechRecognition = globalThis.window?.SpeechRecognition
+      || globalThis.window?.webkitSpeechRecognition;
+    if (!nativeSpeech && !SpeechRecognition) {
+      setSpeechPractice({
+        lineIndex,
+        status: 'error',
+        transcript: '',
+        comparison: null,
+        message: copy.speechUnsupported,
+      });
+      return;
+    }
+
+    const previousRecognition = recognitionRef.current;
+    activeRecognitionRef.current = false;
+    recognitionRef.current = null;
+    try {
+      previousRecognition?.abort();
+    } catch {
+      setSpeechPractice({
+        lineIndex: speechPractice.lineIndex,
+        status: 'error',
+        transcript: recognizedTextRef.current,
+        comparison: null,
+        message: copy.speechUnavailable,
+      });
+      return;
+    }
+
+    activeRecognitionRef.current = true;
+    recognizedTextRef.current = '';
+    setSpeechPractice({
+      lineIndex,
+      status: 'listening',
+      transcript: '',
+      comparison: null,
+      message: '',
+    });
+    setAttemptsByLine((previous) => ({
+      ...previous,
+      [lineIndex]: (previous[lineIndex] || 0) + 1,
+    }));
+
+    if (isPlaying || isPaused) {
+      controllerRef.current?.pause();
+      isPlayingRef.current = false;
+      pausedRef.current = false;
+      setIsPlaying(false);
+      setIsPaused(false);
+    }
+
+    if (nativeSpeech) {
+      try {
+        const transcript = await recognizeEnglishSpeech();
+        if (!activeRecognitionRef.current) return;
+        activeRecognitionRef.current = false;
+        setSpeechPractice({
+          lineIndex,
+          status: 'result',
+          transcript,
+          comparison: compareSpeechText(practiceLines[lineIndex]?.text, transcript),
+          message: '',
+        });
+      } catch (recognitionError) {
+        if (!activeRecognitionRef.current) return;
+        activeRecognitionRef.current = false;
+        const message = recognitionError?.code === 'PERMISSION_DENIED'
+          ? copy.speechPermission
+          : recognitionError?.code === 'NO_MATCH'
+            ? copy.speechNoAudio
+            : copy.speechUnavailable;
+        setSpeechPractice({
+          lineIndex,
+          status: 'error',
+          transcript: '',
+          comparison: null,
+          message,
+        });
+      }
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (event) => {
+      if (recognitionRef.current !== recognition) return;
+      const transcript = Array.from(event.results)
+        .map((result) => result[0]?.transcript || '')
+        .join(' ')
+        .trim();
+      recognizedTextRef.current = transcript;
+      setSpeechPractice((current) => (
+        current.lineIndex === lineIndex ? { ...current, transcript } : current
+      ));
+    };
+
+    recognition.onerror = (event) => {
+      if (recognitionRef.current !== recognition) return;
+      activeRecognitionRef.current = false;
+      recognitionRef.current = null;
+      const message = event.error === 'not-allowed' || event.error === 'service-not-allowed'
+        ? copy.speechPermission
+        : event.error === 'no-speech'
+          ? copy.speechNoAudio
+          : event.error === 'audio-capture'
+            ? copy.speechMicMissing
+            : copy.speechUnavailable;
+      setSpeechPractice({
+        lineIndex,
+        status: 'error',
+        transcript: recognizedTextRef.current,
+        comparison: null,
+        message,
+      });
+    };
+
+    recognition.onend = () => {
+      if (recognitionRef.current !== recognition || !activeRecognitionRef.current) return;
+      activeRecognitionRef.current = false;
+      recognitionRef.current = null;
+      const transcript = recognizedTextRef.current;
+      if (!transcript) {
+        setSpeechPractice({
+          lineIndex,
+          status: 'error',
+          transcript: '',
+          comparison: null,
+          message: copy.speechNoAudio,
+        });
+        return;
+      }
+      setSpeechPractice({
+        lineIndex,
+        status: 'result',
+        transcript,
+        comparison: compareSpeechText(practiceLines[lineIndex]?.text, transcript),
+        message: '',
+      });
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      activeRecognitionRef.current = false;
+      recognitionRef.current = null;
+      setSpeechPractice({
+        lineIndex,
+        status: 'error',
+        transcript: '',
+        comparison: null,
+        message: copy.speechUnavailable,
+      });
+    }
+  };
+
+  const advancePracticeLine = (lineIndex) => {
+    if (lineIndex >= practiceLines.length - 1) return;
+    setSpeechPractice({
+      lineIndex: lineIndex + 1,
+      status: 'idle',
+      transcript: '',
+      comparison: null,
+      message: '',
+    });
   };
 
   const currentLineIndex = Math.min(Math.floor(position), Math.max(lines.length - 1, 0));
@@ -434,7 +720,132 @@ export function AudioDramaPlayer({
               ? (isBn ? '📄 পুরো গল্প দেখুন' : '📄 Show full story')
               : (isBn ? '🎯 ধাপে ধাপে দেখুন (Chunk)' : '🎯 Chunk mode')}
           </button>
+          {practiceLines.length ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (speechPracticeOpen) {
+                  if (!cancelSpeechPractice()) return;
+                  setSpeechPracticeOpen(false);
+                } else {
+                  setSpeechPracticeOpen(true);
+                }
+              }}
+              aria-expanded={speechPracticeOpen}
+              className="rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-soft"
+            >
+              {speechPracticeOpen ? copy.closePractice : copy.practice}
+            </button>
+          ) : null}
         </div>
+
+        {speechPracticeOpen ? (
+          <section
+            aria-label={copy.practiceTitle}
+            className="space-y-3 rounded-2xl border border-gold/35 bg-gold/5 p-4"
+          >
+            <div>
+              <h3 className="font-extrabold text-gold-soft">{copy.practiceTitle}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-ink/75">{copy.practiceHelp}</p>
+            </div>
+            <div className="space-y-2">
+              {practiceLines.map((line, lineIndex) => {
+                const isCurrentPractice = speechPractice.lineIndex === lineIndex;
+                const isListening = isCurrentPractice && speechPractice.status === 'listening';
+                const comparison = isCurrentPractice ? speechPractice.comparison : null;
+                const attempts = attemptsByLine[lineIndex] || 0;
+                const attemptsExhausted = !canAttemptSpeechPractice(attempts);
+                return (
+                  <article
+                    key={`practice-${lineIndex}-${line.character}`}
+                    className="space-y-2 rounded-xl border border-gold/20 bg-paper/80 p-3"
+                  >
+                    <p className="text-sm font-semibold leading-relaxed text-ink">
+                      <span className="mr-1 text-xs font-bold text-gold-soft">{line.character}:</span>
+                      {spokenTextParts(line.text, 0, false, handleWordLookup, selectedWord, `practice-${lineIndex}`)}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { void practiceLine(lineIndex); }}
+                      aria-pressed={isListening}
+                      disabled={attemptsExhausted && !isListening}
+                      className={`secondary-button relative min-h-[44px] px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${isListening ? 'animate-pulse border-red-500 bg-red-100 text-red-900' : ''}`}
+                    >
+                      {isListening
+                        ? copy.stopSpeaking
+                        : isCurrentPractice && speechPractice.status === 'result'
+                          ? attemptsExhausted ? copy.attemptsLimit : copy.retrySpeaking
+                          : attemptsExhausted ? copy.attemptsLimit : copy.speakLine}
+                      <span className="ml-2 text-[10px] font-semibold opacity-75">{copy.attempts}: {attempts}/{MAX_SPEECH_PRACTICE_ATTEMPTS}</span>
+                    </button>
+                    {isListening ? (
+                      <p role="status" className="flex items-center gap-2 text-xs font-semibold text-sapphire">
+                        <span className="relative inline-flex h-3 w-3" aria-hidden="true">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                          <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
+                        </span>
+                        {copy.listening} · {copy.speakingAnimation}
+                      </p>
+                    ) : null}
+                    {isCurrentPractice && speechPractice.status === 'error' ? (
+                      <p role="alert" className="text-xs font-semibold text-red-700">{speechPractice.message}</p>
+                    ) : null}
+                    {isCurrentPractice && speechPractice.status === 'result' && comparison ? (
+                      <div role="status" aria-live="polite" className="space-y-1.5 text-xs text-ink">
+                        <p className="font-extrabold text-sapphire">
+                          {copy.wordMatch}: {comparison.accuracy}%
+                        </p>
+                        <p>
+                          <span className="font-bold">{copy.recognized}: </span>
+                          {speechPractice.transcript}
+                        </p>
+                        <p className="flex flex-wrap gap-1" aria-label={`${copy.wordMatch}: ${comparison.accuracy}%`}>
+                          {comparison.targetWords.map((word, wordIndex) => (
+                            <span
+                              key={`${word}-${wordIndex}`}
+                              aria-label={comparison.matchedWords[wordIndex] ? copy.matchedWord : copy.missedWord}
+                              className={`rounded px-1.5 py-0.5 font-semibold ${
+                                comparison.matchedWords[wordIndex]
+                                  ? 'bg-emerald-100 text-emerald-900'
+                                  : 'bg-red-100 text-red-900'
+                              }`}
+                            >
+                              {word}
+                            </span>
+                          ))}
+                        </p>
+                        <p className="flex flex-wrap gap-x-3 gap-y-1">
+                          <span className="font-semibold text-emerald-900">✓ {copy.matchedWord}</span>
+                          <span className="font-semibold text-red-900">✕ {copy.missedWord}</span>
+                        </p>
+                        {lineIndex < practiceLines.length - 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => advancePracticeLine(lineIndex)}
+                            className="secondary-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
+                          >
+                            {copy.nextLine}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {attemptsExhausted
+                    && speechPractice.status !== 'result'
+                    && lineIndex < practiceLines.length - 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => advancePracticeLine(lineIndex)}
+                        className="secondary-button min-h-[40px] px-3 py-1.5 text-xs font-bold"
+                      >
+                        {copy.nextLine}
+                      </button>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
 
         {offlineAudioStatus ? <p role="status" className="text-sm text-ink/80">{offlineAudioStatus}</p> : null}
         {offlineAudioError ? <p role="alert" className="text-sm text-red-700">{offlineAudioError}</p> : null}

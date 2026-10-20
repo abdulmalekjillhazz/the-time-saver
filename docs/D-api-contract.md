@@ -38,7 +38,6 @@ Common codes: VALIDATION_FAILED (400), UNAUTHENTICATED (401), FORBIDDEN (403), C
 | GET /api/lessons | None | locale, cursor | { lessons } published, no answers | none | IP 120 per min |
 | GET /api/lessons/:slug | None | none | { lesson } without answers | NOT_FOUND | IP 120 per min |
 | POST /api/lessons/:id/attempts | Session | answers | { score, total, feedback } | NOT_FOUND, VALIDATION_FAILED | User 10 per min |
-| POST /api/assistant/questions | Session | question (max 500) | { answer, remaining, disclaimer } | RATE_LIMITED, AI_UNAVAILABLE | User 20 per day; IP 60 per hour; global cap |
 | POST /api/push/subscriptions | Session | endpoint, keys | { ok } | VALIDATION_FAILED | User 10 per min |
 | DELETE /api/push/subscriptions | Session | endpoint | { ok } | NOT_FOUND | User 10 per min |
 | GET /api/model/current | None | none | version, features, coefficients, metrics, sha256 | NOT_FOUND | IP 60 per min; CDN cached |

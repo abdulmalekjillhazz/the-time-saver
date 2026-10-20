@@ -2,11 +2,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Script from 'next/script';
-import { predictMissProbability, routineFeatures, TRAINING_CONSENT_VERSION, todayInZone } from '@smart-routine/shared';
+import { createUuidV4, predictMissProbability, routineFeatures, TRAINING_CONSENT_VERSION, todayInZone } from '@smart-routine/shared';
 import { enqueueAndFlush } from '../lib/outboxClient.js';
+import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { useAppStore } from '../lib/appStore.js';
-import { answerWithLocalModel } from '../lib/localAssistant.js';
 import { apiRequest } from '../lib/apiClient.js';
+import { signInWithGoogleNative } from '../lib/nativeGoogleAuth.js';
 import {
   cacheOfflineLesson,
   clearOfflineStoryCache,
@@ -17,7 +18,7 @@ import {
 } from '../lib/offlineStoryCache.js';
 import { base64UrlToBytes, bengaliCalendarMonthRange, buildCalendarDays } from '../lib/calendar.js';
 import { getRoutineMood } from '../lib/routineMood.js';
-import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
+import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithGoogleTts, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
 import { syncAlarmCreate, syncAlarmDelete, syncAlarmUpdate, reportAlarmFired, fetchServerAlarms, fetchMissedAlarms, acknowledgeAlarm } from '../lib/alarmsSync.js';
 import { ensureAlarmPushSubscription } from '../lib/pushClient.js';
 import { ALARM_SOUNDS, getAlarmSoundDataUri, playAlarmSound, stopAlarmSound } from '../lib/notificationSound.js';
@@ -39,6 +40,7 @@ import { Button } from './ui/Button.jsx';
 import { Card } from './ui/Card.jsx';
 import { StatusChip } from './ui/StatusChip.jsx';
 import { SyncStatus } from './SyncStatus.jsx';
+import { PointsAwardToast } from './PointsAwardToast.jsx';
 
 const TelegramSettingsCard = dynamic(() => import('./TelegramSettingsCard.jsx').then((m) => m.TelegramSettingsCard), { ssr: false });
 const HabitCirclesCard = dynamic(() => import('./HabitCirclesCard.jsx').then((m) => m.HabitCirclesCard), { ssr: false });
@@ -86,7 +88,7 @@ const COPY = {
     reminder: 'Starting soon', consent: 'Allow my data to help train future routine models',
     export: 'Export my data', deleteAccount: 'Delete my account', confirmPassword: 'Confirm with your password',
     exportNow: 'Download export', deleteNow: 'Permanently delete account', cancel: 'Cancel',
-    noLessons: 'No published lessons are available yet.', read: 'Open lesson', quiz: 'Take quiz', closeLesson: 'Back to lessons', loadingLesson: 'Loading lesson…', lessonPrefetchWarning: 'Some lessons could not be preloaded and will load when opened.', storyPoints: 'points for reading', quizPoints: 'leaderboard points', submit: 'Submit answers',
+    noLessons: 'No published lessons are available yet.', read: 'Open lesson', quiz: 'Take quiz', closeLesson: 'Back to lessons', loadingLesson: 'Loading lesson…', lessonPrefetchWarning: 'Some lessons could not be preloaded and will load when opened.', storyPoints: 'points for reading', quizPoints: 'leaderboard points', completeStory: 'Mark story complete', storyCompleted: 'Story completed', submit: 'Submit answers',
     risk: 'Estimated miss risk', noModel: 'No validated real-data model is active. The model file currently included is synthetic and is intentionally not used to estimate your personal risk.',
     routineSaved: 'Routine queued for sync.', routineDeleted: 'Routine queued for deletion.',
     completionSaved: 'Routine status saved.', completionPending: 'Routine status is still waiting to sync. The app will retry automatically.',
@@ -95,13 +97,9 @@ const COPY = {
     exportDone: 'Your data export has been downloaded.', accountDeleted: 'Your account was deleted.',
     noQuiz: 'This lesson has no quiz.', useAccount: 'Sign in or create an account to use your private routine.',
     select: 'Select', saveStatus: 'Save status', description: 'Build steady habits with a routine that fits your day.',
-    assistant: "AM's Routine Assistant", assistantQuestion: "Ask AM's Routine Assistant", assistantUnavailable: 'I can answer common questions about Smart Routine.',
-    languageToggle: 'Switch to Bengali', assistantIntro: 'Ask anything about your routines, time blocks, and habit consistency to receive tailored coaching.',
-    assistantNoModel: '',
-    localAnswer: 'Answered by local assistant', localOnlyReply: 'I can answer common questions about Smart Routine, but not general questions outside the app.',
+    languageToggle: 'Switch to Bengali',
     localModel: 'Local model', modelVersion: 'Version', modelAuc: 'Holdout AUC', modelBrier: 'Brier score',
     modelCalibration: 'Calibration slope', modelHoldout: 'Holdout examples', modelUnavailable: 'No validated local model is active. Risk predictions need a validated local model.', modelDemoWarning: 'Local synthetic demo only. These risk percentages are illustrative, not validated, and must not be used as personal predictions.',
-    assistantSend: 'Ask assistant', assistantDisclaimer: '⚠️ AM’s Routine Assistant can make mistakes. Double-check important advice.',
     themeDark: 'Switch to dark mode', themeLight: 'Switch to light mode', alarmTitle: 'Alarms',
     alarmTime: 'Alarm time', alarmName: 'Alarm name', addAlarm: 'Set alarm', noAlarms: 'No alarms set yet.',
     alarmSound: 'Alarm sound', previewAlarmSound: 'Preview sound', stopAlarmSound: 'Stop preview',
@@ -158,7 +156,7 @@ const COPY = {
     reminder: 'শুরু হতে যাচ্ছে', consent: 'ভবিষ্যতের রুটিন মডেল প্রশিক্ষণে আমার তথ্য ব্যবহারের অনুমতি দিন',
     export: 'আমার তথ্য এক্সপোর্ট', deleteAccount: 'আমার অ্যাকাউন্ট মুছুন', confirmPassword: 'পাসওয়ার্ড দিয়ে নিশ্চিত করুন',
     exportNow: 'এক্সপোর্ট ডাউনলোড', deleteNow: 'স্থায়ীভাবে অ্যাকাউন্ট মুছুন', cancel: 'বাতিল',
-    noLessons: 'এখনো কোনো প্রকাশিত পাঠ নেই।', read: 'পাঠ খুলুন', quiz: 'কুইজ দিন', closeLesson: 'পাঠের তালিকায় ফিরুন', loadingLesson: 'পাঠ লোড হচ্ছে…', lessonPrefetchWarning: 'কিছু পাঠ আগে থেকে লোড করা যায়নি; খুললে তখন লোড হবে।', storyPoints: 'গল্প পড়ার পয়েন্ট', quizPoints: 'লিডারবোর্ড পয়েন্ট', submit: 'উত্তর জমা দিন',
+    noLessons: 'এখনো কোনো প্রকাশিত পাঠ নেই।',     read: 'পাঠ খুলুন', quiz: 'কুইজ দিন', closeLesson: 'পাঠের তালিকায় ফিরুন', loadingLesson: 'পাঠ লোড হচ্ছে…', lessonPrefetchWarning: 'কিছু পাঠ আগে থেকে লোড করা যায়নি; খুললে তখন লোড হবে।', storyPoints: 'গল্প পড়ার পয়েন্ট', quizPoints: 'লিডারবোর্ড পয়েন্ট', completeStory: 'গল্প পড়া শেষ করেছি', storyCompleted: 'গল্প সম্পন্ন', submit: 'উত্তর জমা দিন',
     risk: 'মিস হওয়ার আনুমানিক ঝুঁকি', noModel: 'যাচাইকৃত বাস্তব-তথ্যের কোনো মডেল চালু নেই। বর্তমানে থাকা মডেল ফাইলটি কৃত্রিম তথ্যের, তাই আপনার ব্যক্তিগত ঝুঁকি অনুমানে এটি ব্যবহার করা হয় না।',
     routineSaved: 'রুটিনটি সিঙ্কের জন্য রাখা হয়েছে।', routineDeleted: 'রুটিন মোছার অনুরোধ সিঙ্কের জন্য রাখা হয়েছে।',
     completionSaved: 'রুটিনের অবস্থা সংরক্ষিত হয়েছে।', completionPending: 'রুটিনের অবস্থা এখনো সিঙ্ক হয়নি। অ্যাপটি স্বয়ংক্রিয়ভাবে আবার চেষ্টা করবে।',
@@ -167,13 +165,9 @@ const COPY = {
     exportDone: 'আপনার তথ্য ডাউনলোড হয়েছে।', accountDeleted: 'আপনার অ্যাকাউন্ট মুছে ফেলা হয়েছে।',
     noQuiz: 'এই পাঠে কোনো কুইজ নেই।', useAccount: 'ব্যক্তিগত রুটিন ব্যবহার করতে সাইন ইন করুন বা অ্যাকাউন্ট তৈরি করুন।',
     select: 'বেছে নিন', saveStatus: 'অবস্থা সংরক্ষণ', description: 'আপনার দিনের সঙ্গে মানানসই রুটিনে অভ্যাস গড়ুন।',
-    assistant: "AM's রুটিন সহকারী", assistantQuestion: "AM's রুটিন সহকারীকে জিজ্ঞাসা করুন", assistantUnavailable: 'Smart Routine সম্পর্কে সাধারণ প্রশ্নের উত্তর দিতে পারি।',
-    languageToggle: 'ইংরেজিতে পরিবর্তন করুন', assistantIntro: 'আপনার রুটিন, সময় ব্যবস্থাপনা ও অভ্যাস গঠনের যেকোনো প্রশ্ন করুন—আপনার রুটিন অনুযায়ী তাৎক্ষণিক পরামর্শ পাবেন।',
-    assistantNoModel: '',
-    localAnswer: 'স্থানীয় সহকারীর উত্তর', localOnlyReply: 'Smart Routine সম্পর্কে সাধারণ প্রশ্নের উত্তর দিতে পারি, তবে অ্যাপের বাইরের সব প্রশ্নের নয়।',
+    languageToggle: 'ইংরেজিতে পরিবর্তন করুন',
     localModel: 'স্থানীয় মডেল', modelVersion: 'সংস্করণ', modelAuc: 'Holdout AUC', modelBrier: 'Brier score',
     modelCalibration: 'Calibration slope', modelHoldout: 'Holdout উদাহরণ', modelUnavailable: 'যাচাইকৃত স্থানীয় মডেল চালু নেই। ঝুঁকির অনুমানের জন্য যাচাইকৃত স্থানীয় মডেল প্রয়োজন।', modelDemoWarning: 'শুধু স্থানীয় কৃত্রিম ডেমো। ঝুঁকির শতাংশ যাচাইকৃত নয়; ব্যক্তিগত পূর্বাভাস হিসেবে ব্যবহার করবেন না।',
-    assistantSend: 'সহকারীকে জিজ্ঞাসা করুন', assistantDisclaimer: '⚠️ AM’s রুটিন সহকারী ভুল করতে পারে। গুরুত্বপূর্ণ পরামর্শ যাচাই করে নিন।',
     themeDark: 'ডার্ক মোড চালু করুন', themeLight: 'লাইট মোড চালু করুন', alarmTitle: 'অ্যালার্ম',
     alarmTime: 'অ্যালার্মের সময়', alarmName: 'অ্যালার্মের নাম', addAlarm: 'অ্যালার্ম সেট করুন', noAlarms: 'এখনো কোনো অ্যালার্ম সেট করা নেই।',
     alarmSound: 'অ্যালার্মের শব্দ', previewAlarmSound: 'শব্দ শুনুন', stopAlarmSound: 'শোনা বন্ধ করুন',
@@ -364,14 +358,16 @@ function StopwatchReadout({ className = '', as: Element = 'span' }) {
   return <Element className={className} role="timer" aria-live="off">{formatStopwatch(elapsed)}</Element>;
 }
 
-function GoogleSignInButton({ clientId, lang, disabled, onCredential }) {
+function GoogleSignInButton({ clientId, lang, disabled, nativeAndroid, onCredential, onError }) {
   const buttonRef = useRef(null);
   const wrapperRef = useRef(null);
   const credentialHandler = useRef(onCredential);
   const lastRenderKeyRef = useRef('');
+  const [nativeLoginPending, setNativeLoginPending] = useState(false);
   credentialHandler.current = onCredential;
 
   const renderGoogleButton = useCallback(() => {
+    if (nativeAndroid) return;
     const googleAccounts = globalThis.google?.accounts?.id;
     if (!googleAccounts || !buttonRef.current) return;
     const availableWidth = wrapperRef.current?.clientWidth || 320;
@@ -397,12 +393,41 @@ function GoogleSignInButton({ clientId, lang, disabled, onCredential }) {
       locale: lang,
       width: buttonWidth,
     });
-  }, [clientId, lang]);
+  }, [clientId, lang, nativeAndroid]);
 
   useEffect(() => {
+    if (nativeAndroid) return undefined;
     lastRenderKeyRef.current = '';
     renderGoogleButton();
+    return undefined;
   }, [renderGoogleButton]);
+
+  async function handleNativeSignIn() {
+    setNativeLoginPending(true);
+    try {
+      const credential = await signInWithGoogleNative(clientId);
+      await credentialHandler.current(credential);
+    } catch (err) {
+      onError(err);
+    } finally {
+      setNativeLoginPending(false);
+    }
+  }
+
+  if (nativeAndroid) {
+    return (
+      <button
+        type="button"
+        disabled={disabled || nativeLoginPending}
+        onClick={handleNativeSignIn}
+        className="mx-auto flex min-h-[48px] w-full max-w-[380px] items-center justify-center gap-3 rounded-lg border border-ink/25 bg-white px-4 font-semibold text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+        aria-label={lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}
+      >
+        <span aria-hidden="true" className="text-xl font-bold text-blue-600">G</span>
+        {lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}
+      </button>
+    );
+  }
 
   return (
     <>
@@ -451,11 +476,20 @@ export function PrivateApp() {
   const [holidayNotificationsEnabled, setHolidayNotificationsEnabled] = useState(false);
   const [holidayPushBusy, setHolidayPushBusy] = useState(false);
   const [lessons, setLessons] = useState([]);
+  const [practiceStorySlug, setPracticeStorySlug] = useState('');
+  const narratedLessons = lessons.filter((item) => {
+    const englishTitle = localized(item.title, 'en').trim();
+    return item.audioUrl && englishTitle && !/[\u0980-\u09ff]/.test(englishTitle);
+  });
+  const selectedPracticeStorySlug = narratedLessons.some((item) => item.slug === practiceStorySlug)
+    ? practiceStorySlug
+    : narratedLessons[0]?.slug || '';
   const [offlineSavedLessons, setOfflineSavedLessons] = useState([]);
   const [dailyLesson, setDailyLesson] = useState(null);
   const [dailyQuiz, setDailyQuiz] = useState(null);
   const [lesson, setLesson] = useState(null);
   const [storyAward, setStoryAward] = useState(null);
+  const [storyCompletionBusy, setStoryCompletionBusy] = useState(false);
   const [lessonLoadingSlug, setLessonLoadingSlug] = useState('');
   const lessonDetailsRef = useRef(new Map());
   const lessonRequestsRef = useRef(new Map());
@@ -473,9 +507,6 @@ export function PrivateApp() {
   const [passwordAction, setPasswordAction] = useState('');
   const [actionPassword, setActionPassword] = useState('');
   const [reminderTime, setReminderTime] = useState(0);
-  const [assistantQuestion, setAssistantQuestion] = useState('');
-  const [assistantAnswer, setAssistantAnswer] = useState('');
-  const [assistantAnswerSource, setAssistantAnswerSource] = useState('');
   const theme = useAppStore((state) => state.theme);
   const setTheme = useAppStore((state) => state.setTheme);
   const showPrayerTimes = useAppStore((state) => state.showPrayerTimes);
@@ -1030,6 +1061,25 @@ export function PrivateApp() {
       if (!id) return;
       const localAlarm = useAppStore.getState().alarms.find((alarm) => alarm.id === id);
       if (localAlarm && !localAlarm.firedAt) markAlarmFired(id);
+      if (localAlarm) {
+        setFiringAlarm(localAlarm);
+        firingAlarmRef.current = localAlarm;
+        const announcement = buildAlarmAnnouncement({
+          alarmName: localAlarm.label,
+          lang,
+          nextRoutineTitle: getNextRoutineTitle(routines, new Date().getHours()),
+        });
+        try {
+          alarmSpeechRef.current?.stop();
+          alarmSpeechRef.current = speakWithGoogleTts(announcement.text, {
+            lang,
+            locale: lang,
+            onError: reportError,
+          });
+        } catch (err) {
+          reportError(err);
+        }
+      }
       void reportAlarmFired(user, id);
     }).then((listener) => {
       if (!active) listener?.remove();
@@ -1040,7 +1090,7 @@ export function PrivateApp() {
       document.removeEventListener('visibilitychange', onVisible);
       nativeListener?.remove();
     };
-  }, [nativeAndroid, user, markAlarmFired, snoozeAlarm, reportError]);
+  }, [nativeAndroid, user, lang, routines, markAlarmFired, snoozeAlarm, reportError]);
 
   useEffect(() => {
     if (!nativeAndroid) return undefined;
@@ -1062,8 +1112,8 @@ export function PrivateApp() {
         })
         .filter(Boolean);
       await Promise.all([
-        ...pendingAlarms.map((alarm) => scheduleNativeAlarm(alarm)),
-        ...routineAlarms.map((alarm) => scheduleNativeAlarm(alarm)),
+        ...pendingAlarms.map((alarm) => scheduleNativeAlarm(alarm, lang)),
+        ...routineAlarms.map((alarm) => scheduleNativeAlarm(alarm, lang)),
       ]);
     };
     const onVisible = () => {
@@ -1105,8 +1155,9 @@ export function PrivateApp() {
       const speakOnce = () => {
         try {
           alarmSpeechRef.current?.stop();
-          alarmSpeechRef.current = speakWithVoice(announcement.text, {
-            lang: lang === 'bn' ? 'bn-BD' : 'en-US',
+          alarmSpeechRef.current = speakWithGoogleTts(announcement.text, {
+            lang,
+            locale: lang,
             onError: () => setError(copy.alarmVoiceUnavailable),
           });
         } catch (err) {
@@ -1215,7 +1266,7 @@ export function PrivateApp() {
         reportError(err);
       }
     }
-    const created = { id: crypto.randomUUID(), at, label: alarmName.trim(), firedAt: null };
+    const created = { id: createUuidV4(), at, label: alarmName.trim(), firedAt: null };
     if (nativeAndroid) {
       try {
         const permissions = await getNativeAlarmPermissions();
@@ -1223,7 +1274,7 @@ export function PrivateApp() {
           setError(copy.nativeAlarmPermissionMissing);
           return;
         }
-        await scheduleNativeAlarm(created);
+        await scheduleNativeAlarm(created, lang);
       } catch (err) {
         reportError(err);
         return;
@@ -1428,7 +1479,7 @@ export function PrivateApp() {
     snoozeAlarm(id, at);
     if (nativeAndroid) {
       const alarm = useAppStore.getState().alarms.find((row) => row.id === id);
-      if (alarm) void scheduleNativeAlarm({ ...alarm, at }).catch(reportError);
+      if (alarm) void scheduleNativeAlarm({ ...alarm, at }, lang).catch(reportError);
     }
     void syncAlarmUpdate(user, id, { at });
     setNotice(copy.alarmSnoozed);
@@ -1539,7 +1590,7 @@ export function PrivateApp() {
       note: '',
       anchorHabit: String(form.get('anchorHabit') || '').trim(),
       isFrog: form.get('isFrog') === 'on',
-      clientId: crypto.randomUUID(),
+      clientId: createUuidV4(),
     };
     setBusy(true);
     setError('');
@@ -1555,33 +1606,6 @@ export function PrivateApp() {
       setAnchorHabitInput('');
     } catch (err) {
       reportError(err);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function askRoutineAssistant(event) {
-    event.preventDefault();
-    setBusy(true);
-    setError('');
-    setAssistantAnswer('');
-    setAssistantAnswerSource('');
-    try {
-      const routinesForContext = predictions.map((p) => ({
-        title: p.title, startTime: p.startTime, endTime: p.endTime,
-        completionStatus: p.completionStatus, probability: p.probability, isFrog: p.isFrog,
-      }));
-      const result = await apiRequest('/api/assistant/ask', {
-        method: 'POST',
-        body: { question: assistantQuestion, lang, routines: routinesForContext },
-      });
-      setAssistantAnswer(result.answer);
-      setAssistantAnswerSource('ai');
-    } catch {
-      // Offline, or the AI provider is unavailable: fall back to local keyword matching.
-      const localAnswer = answerWithLocalModel(assistantQuestion, predictions, model, lang);
-      setAssistantAnswer(localAnswer || copy.localOnlyReply);
-      setAssistantAnswerSource(localAnswer ? 'local' : 'notice');
     } finally {
       setBusy(false);
     }
@@ -1613,13 +1637,17 @@ export function PrivateApp() {
         type: 'completion.set',
         data: { routineId, date: todayInZone(user.timezone), status },
       });
+      const previousStatus = routines.find((routine) => routine.id === routineId)?.completionStatus;
       await loadRoutines(user);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('smart-routine:sync', { detail: { userId: user.id } }));
       }
       if (result.operationStatus === 'failed') setError(copy.completionRejected);
       else if (result.operationStatus === 'pending' || result.retryable || result.busy) setNotice(copy.completionPending);
-      else setNotice(copy.completionSaved);
+      else {
+        setNotice(copy.completionSaved);
+        if (status === 'done' && previousStatus !== 'done') announceLearningActivity(50);
+      }
     } catch (err) {
       reportError(err);
     } finally {
@@ -1657,17 +1685,6 @@ export function PrivateApp() {
       setAnswers([]);
       setQuizResult(null);
       setOfflineCacheStatus('');
-      request(`/api/lessons/${encodeURIComponent(loadedLesson.id)}/read`, {
-        method: 'POST',
-        body: {},
-      })
-        .then(({ earnedPoints, awardedBadges }) => {
-          setStoryAward({ lessonId: loadedLesson.id, earnedPoints });
-          if (earnedPoints > 0 || awardedBadges?.length) {
-            window.dispatchEvent(new Event('smart-routine:learning-activity'));
-          }
-        })
-        .catch(reportError);
       if (getOfflineCacheConsent() === true) {
         setOfflineCacheStatus('গল্প ও শব্দার্থ অফলাইনে সংরক্ষণ করা হচ্ছে…');
         cacheOfflineLesson(loadedLesson, request)
@@ -1738,13 +1755,29 @@ export function PrivateApp() {
     try {
       const result = await request(`/api/lessons/${lesson.id}/attempts`, { method: 'POST', body: { answers } });
       setQuizResult(result);
-      if (result.earnedPoints > 0 || result.awardedBadges?.length) {
-        window.dispatchEvent(new Event('smart-routine:learning-activity'));
-      }
+      announceLearningActivity(result.earnedPoints);
     } catch (err) {
       reportError(err);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function markPublishedLessonComplete() {
+    if (!lesson || lesson.isOffline || storyCompletionBusy) return;
+    setStoryCompletionBusy(true);
+    setError('');
+    try {
+      const result = await request(`/api/lessons/${encodeURIComponent(lesson.id)}/read`, {
+        method: 'POST',
+        body: {},
+      });
+      setStoryAward({ lessonId: lesson.id, earnedPoints: result.earnedPoints || 0 });
+      announceLearningActivity(result.earnedPoints);
+    } catch (err) {
+      reportError(err);
+    } finally {
+      setStoryCompletionBusy(false);
     }
   }
 
@@ -1911,7 +1944,9 @@ export function PrivateApp() {
                 clientId={googleClientId}
                 lang={lang}
                 disabled={busy}
+                nativeAndroid={nativeAndroid}
                 onCredential={authenticateWithGoogle}
+                onError={reportError}
               />
             </div>
           ) : null}
@@ -1951,6 +1986,7 @@ export function PrivateApp() {
                   title={localized(offlineLessonPreview.title, 'en')}
                   slug={offlineLessonPreview.slug}
                   content={localized(offlineLessonPreview.body, 'en')}
+                  practiceContent={localized(offlineLessonPreview.body, 'en')}
                   vocabulary={offlineLessonPreview.vocabulary || []}
                   lang={lang}
                 />
@@ -2009,10 +2045,7 @@ export function PrivateApp() {
                 title={copy.voiceBriefing}
                 onClick={() => setVoiceModalOpen(true)}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="voice-mic-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="3" width="6" height="12" rx="3" />
-                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8" />
-                </svg>
+                <span aria-hidden="true" className="text-2xl leading-none">🌹</span>
               </Button>
               <Button
                 variant="secondary"
@@ -2056,7 +2089,10 @@ export function PrivateApp() {
       ) : null}
       {firingAlarm ? (
         <Card className="alarm-banner flex flex-col gap-4" role="alert">
-          <p className="text-xl font-bold sm:text-2xl"><span aria-hidden="true">🔔</span> {copy.alarmRinging}: {firingAlarm.label || copy.alarmTime}</p>
+          <p className="text-xl font-bold sm:text-2xl">
+            <span aria-hidden="true">🔔</span> {copy.alarmRinging}:{' '}
+            <strong className="rounded-lg bg-gold/20 px-2 py-1 text-gold-soft">{firingAlarm.label || copy.alarmTime}</strong>
+          </p>
           <div className="grid gap-2 sm:grid-cols-2">
             <Button onClick={dismissAlarm} className="min-h-[52px] text-lg"><span aria-hidden="true">⏹️</span><span className="ml-2">{copy.stopAlarm}</span></Button>
             <Button variant="secondary" onClick={snoozeFiringAlarm} className="min-h-[52px] text-lg"><span aria-hidden="true">⏰</span><span className="ml-2">{copy.snoozeAlarm}</span></Button>
@@ -2070,7 +2106,7 @@ export function PrivateApp() {
           ['focus', '⏱️', lang === 'bn' ? 'ফোকাস' : 'Focus', lang === 'bn' ? 'ফোকাস' : 'Focus'],
           ['dashboard', '📊', lang === 'bn' ? 'পরিসংখ্যান ও ঝুঁকি' : 'Progress & insights', lang === 'bn' ? 'প্রগতি' : 'Stats'],
           ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
-          ['assistant', '💬', copy.assistant, lang === 'bn' ? 'সহায়ক' : 'Help'],
+          ['speaking', '🎙️', lang === 'bn' ? 'কথা বলা শিখুন' : 'Learn to speak', lang === 'bn' ? 'কথা' : 'Speak'],
           ['settings', '⚙️', copy.settings, lang === 'bn' ? 'সেটিংস' : 'Settings'],
         ].map(([key, icon, label, shortLabel]) => (
           <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
@@ -2084,6 +2120,91 @@ export function PrivateApp() {
       </nav>
 
       {tab === 'leaderboard' ? <LeaderboardPanel lang={lang} /> : null}
+
+      {tab === 'speaking' ? (
+        <section className="space-y-4">
+          <Card className="surface-card space-y-5 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/30 via-paper to-gold/10 p-5 shadow-xl sm:p-7">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gold/15 text-3xl shadow-inner">📚</span>
+                <h2 className="section-heading">
+                  {lang === 'bn' ? 'গল্পে ইংরেজি বলার অনুশীলন' : 'Practice English with stories'}
+                </h2>
+              </div>
+              <p className="text-sm leading-relaxed opacity-75">
+                {lang === 'bn'
+                  ? 'ElevenLabs অডিওসহ একটি গল্প বেছে নিন। আগে গল্পটি শুনুন, তারপর প্রতিটি ইংরেজি লাইন মাইক্রোফোনে বলুন। প্রতি লাইনে সর্বোচ্চ ৩ বার চেষ্টা করা যাবে; শব্দে ট্যাপ করলে অর্থ দেখাবে। অ্যাপ আপনার অডিও সংরক্ষণ করে না; শনাক্তকরণে Android-এর speech service ব্যবহার হতে পারে।'
+                  : 'Choose a story with ElevenLabs audio. Listen first, then say each English line into the microphone. You get up to 3 tries per line; tap a word to see its meaning. The app does not save your audio; Android speech services may process it for recognition.'}
+              </p>
+            </div>
+            {narratedLessons.length ? (
+              <div className="space-y-4">
+                <h3 className="text-sm font-extrabold uppercase tracking-wide text-ink/70">
+                  {lang === 'bn' ? 'ইংরেজি গল্প বেছে নিন' : 'Choose an English story'}
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {narratedLessons.map((item, index) => {
+                    const selected = item.slug === selectedPracticeStorySlug;
+                    const storyIcons = ['📖', '🎭', '🪴', '💡', '🎈', '🧭'];
+                    return (
+                      <button
+                        key={item.slug}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setPracticeStorySlug(item.slug)}
+                        className={`group flex min-h-28 items-center gap-4 rounded-2xl border-2 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/40 ${
+                          selected
+                            ? 'border-gold bg-gold/15 shadow-md'
+                            : 'border-sapphire/15 bg-paper/75 hover:border-gold/70'
+                        }`}
+                      >
+                        <span aria-hidden="true" className="grid size-16 shrink-0 place-items-center rounded-2xl bg-sapphire/10 text-4xl transition-transform group-hover:scale-105">
+                          {storyIcons[index % storyIcons.length]}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-xs font-bold uppercase tracking-wider text-ink/55">
+                            {lang === 'bn' ? 'ইংরেজি গল্প' : 'English story'}
+                          </span>
+                          <span className="mt-1 block text-base font-extrabold leading-snug text-ink sm:text-lg">
+                            {localized(item.title, 'en')}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-[48px] w-full rounded-2xl font-extrabold sm:w-auto sm:px-8"
+                  disabled={busy}
+                  onClick={() => loadLesson(selectedPracticeStorySlug, 'story')}
+                >
+                  {lang === 'bn' ? 'গল্প খোলো' : 'Open story'}
+                </Button>
+              </div>
+            ) : (
+              <p className="rounded-2xl border border-sapphire/15 bg-paper/70 p-4 text-sm leading-relaxed opacity-75">
+                {lang === 'bn' ? 'এখনো ElevenLabs অডিওসহ কোনো গল্প নেই। পরে আবার দেখুন।' : 'No stories with ElevenLabs audio are available yet. Please check again later.'}
+              </p>
+            )}
+            {lessonLoadingSlug ? <p role="status" className="text-sm">{copy.loadingLesson}</p> : null}
+            {tab === 'speaking' && lesson?.media?.type === 'audio' && !lessonLoadingSlug ? (
+              <AudioDramaPlayer
+                key={`speaking-practice-${lesson.slug}`}
+                title={localized(lesson.title, 'en')}
+                slug={lesson.slug}
+                content={localized(lesson.body, 'en')}
+                practiceContent={localized(lesson.body, 'en')}
+                audioUrl={lesson.media.url}
+                vocabulary={lesson.vocabulary || []}
+                lang={lang}
+                startInPracticeMode
+              />
+            ) : null}
+          </Card>
+        </section>
+      ) : null}
 
       {tab === 'dashboard' ? (
         <section className="space-y-4">
@@ -2281,7 +2402,15 @@ export function PrivateApp() {
           <Card className="surface-card p-4">
             <h2 className="section-heading"><span aria-hidden="true">💡</span> {lang === 'bn' ? 'ধাপ ৩ · ধারণা ও টেমপ্লেট' : 'STEP 3 · IDEAS & TEMPLATES'}</h2>
             <div className="mt-4 space-y-4 pt-3 border-t border-sapphire/15">
-              <GoalToRoutine lang={lang} userId={user.id} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full justify-between text-left"
+                onClick={() => setTab('speaking')}
+              >
+                <span>{lang === 'bn' ? '🎙️ গল্পে কথা বলার অনুশীলন' : '🎙️ Practice speaking with stories'}</span>
+                <span aria-hidden="true">→</span>
+              </Button>
               <TemplatePicker lang={lang} userId={user.id} onRoutineAdded={() => loadRoutines(user).catch(reportError)} />
             </div>
           </Card>
@@ -2468,10 +2597,30 @@ export function PrivateApp() {
                       title={localized(lesson.title, 'en')}
                       slug={lesson.slug}
                       content={localized(lesson.body, 'en')}
+                      practiceContent={localized(lesson.body, 'en')}
                       audioUrl={lesson.media?.type === 'audio' ? lesson.media.url : ''}
                       vocabulary={lesson.vocabulary || []}
                       lang={lang}
                     />
+                    {!lesson.isOffline ? (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={storyCompletionBusy || storyAward?.lessonId === lesson.id}
+                          onClick={markPublishedLessonComplete}
+                        >
+                          {storyCompletionBusy
+                            ? (lang === 'bn' ? 'সংরক্ষণ হচ্ছে…' : 'Saving…')
+                            : storyAward?.lessonId === lesson.id
+                              ? `✓ ${copy.storyCompleted}`
+                              : copy.completeStory}
+                        </Button>
+                        {storyAward?.lessonId === lesson.id && storyAward.earnedPoints > 0 ? (
+                          <span className="text-sm font-bold text-sapphire">+{storyAward.earnedPoints} ⭐</span>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {lesson.quiz?.length ? (
                       <div id="published-lesson-quiz" className="scroll-mt-6 space-y-4">
                         <h3 className="text-xl font-semibold">{copy.quiz}</h3>
@@ -2554,39 +2703,6 @@ export function PrivateApp() {
         </Card>
       ) : null}
 
-      {tab === 'assistant' ? (
-        <section className="space-y-4">
-          <Card className="surface-card space-y-3">
-            <div className="flex items-center gap-3">
-              <h2 className="section-heading">💬 {copy.assistant}</h2>
-            </div>
-            <p>{copy.assistantIntro}</p>
-            <form className="space-y-3" onSubmit={askRoutineAssistant}>
-              <label className="block">
-                {copy.assistantQuestion}
-                <textarea
-                  value={assistantQuestion}
-                  onChange={(event) => setAssistantQuestion(event.target.value)}
-                  maxLength={2000}
-                  required
-                  rows={4}
-                  className="mt-1 block w-full rounded border bg-paper p-3 text-ink"
-                />
-              </label>
-              <Button type="submit" disabled={busy}><span>{copy.assistantSend}</span></Button>
-              <p className="text-xs opacity-70">{copy.assistantDisclaimer}</p>
-            </form>
-          </Card>
-          {assistantAnswer ? (
-            <Card aria-live="polite" className={`surface-card whitespace-pre-wrap ${assistantAnswerSource === 'notice' ? 'border-gold' : ''}`}>
-              {assistantAnswerSource === 'local' ? <p className="eyebrow mb-2">{copy.localAnswer}</p> : null}
-              {assistantAnswer}
-              <p className="mt-3 border-t border-gold/20 pt-2 text-xs opacity-70">{copy.assistantDisclaimer}</p>
-            </Card>
-          ) : null}
-        </section>
-      ) : null}
-
       <section className={tab === 'settings' ? 'space-y-4' : 'hidden'} aria-label={copy.settings}>
           <Card className="surface-card space-y-3 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2658,6 +2774,7 @@ export function PrivateApp() {
               </Button>
             </div>
           </Card>
+          <GoalToRoutine lang={lang} userId={user.id} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
           <PrayerTimesCard lang={lang} />
           <Card className="space-y-3">
             <h2 className="text-2xl font-semibold">{copy.settings}</h2>
@@ -2714,11 +2831,13 @@ export function PrivateApp() {
           onClose={() => setVoiceModalOpen(false)}
         />
       )}
+      <PointsAwardToast lang={lang} />
       {reflectionModalOpen && (
         <EveningReflectionModal
           lang={lang}
           onClose={() => setReflectionModalOpen(false)}
-          onSaved={() => {
+          onSaved={(result) => {
+            announceLearningActivity(result.earnedXP);
             loadRoutines(user).catch(reportError);
             window.dispatchEvent(new CustomEvent('smart-routine:sync', { detail: { userId: user.id } }));
           }}

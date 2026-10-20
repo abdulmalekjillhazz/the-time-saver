@@ -1,19 +1,17 @@
-# Gemini routine assistant unavailable or over quota
+# Server AI features unavailable or over quota
 
-Submitting a question sends it and up to 30 routine summaries (titles, times, completion status, estimated risk, and the most-important-task marker) to the authenticated server. The server tries Gemini first, then Groq when configured. If both providers fail, the client falls back to local keyword matching. The current route has no separate AI-provider consent gate and does not persist assistant prompts in the app database; avoid entering sensitive information.
-
-## Detect
-- The assistant returns "unavailable", or the per-user request limit is reached.
-- Google Cloud billing shows a sudden increase.
+Server-side AI is used by routine suggestions, adaptive replanning, generated lessons, voice briefings, and other configured coaching features. Most requests using the shared provider try Gemini first and Groq as a fallback when both are configured; some generation paths require Gemini directly.
 
 ## First steps
-1. Check Google Cloud billing and quota. Look for a spike in requests.
-2. Check that the server-side `GEMINI_API_KEY` is configured and valid. Never put it in client environment variables or source control.
-3. Check for abuse: many requests from one user or one IP. Block that user with a role change or a session revoke, not by deleting data.
+1. Check Google Cloud billing and Gemini quota. Check Groq usage too if the fallback provider is enabled.
+2. Verify `GEMINI_API_KEY` and, when used, `GROQ_API_KEY` in `server/.env` or the deployment environment. Keep keys server-side and out of source control.
+3. Review server logs for the route and provider error. Do not log or share API keys.
+4. Confirm whether the affected feature uses the shared Gemini/Groq provider or a Gemini-only endpoint before changing configuration.
 
 ## Confirm it is fixed
-- The assistant answers a test request. The per-user rate limit still applies.
-- The monthly spend is under the cap.
+- Retry the affected feature and verify it returns a usable response.
+- Confirm provider usage stays within the configured budget and quotas.
 
 ## Do not
-- Do not raise the cap without knowing the cause of the spike.
+- Do not raise provider limits or add another key until the cause of the quota spike is understood.
+- Do not put provider keys in client-side environment variables or source code.

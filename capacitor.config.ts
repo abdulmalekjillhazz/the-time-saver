@@ -3,9 +3,21 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.madeyourdreambigger.smartroutine',
   appName: 'Smart Routine',
-  webDir: 'client/public',
+  includePlugins: ['@capgo/capacitor-social-login'],
+  plugins: {
+    SocialLogin: {
+      providers: {
+        google: true,
+        facebook: false,
+        apple: false,
+        twitter: false,
+      },
+      logLevel: 1,
+    },
+  },
+  webDir: 'android-web',
   server: {
-    url: process.env.CAPACITOR_SERVER_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://made-your-dream-bigger.vercel.app',
+    url: process.env.CAPACITOR_SERVER_URL || 'https://made-your-dream-bigger.vercel.app',
     cleartext: false,
   },
 };

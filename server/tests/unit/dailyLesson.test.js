@@ -5,6 +5,7 @@ import {
   getStoryTypeForDate,
   getThemeForDate,
   formatDailyLessonForLearner,
+  MASTER_PROMPT,
   parseAndValidateDailyLessonPayload,
   formatQuizForLearner,
 } from '../../src/services/dailyLesson.js';
@@ -16,6 +17,14 @@ import { dailyLessonPayloadSchema, routineCreateSchema } from '@smart-routine/sh
 afterEach(() => vi.restoreAllMocks());
 
 describe('Daily Lesson: pure utilities and validation', () => {
+  it('instructs the daily story generator to write short, funny beginner stories', () => {
+    expect(MASTER_PROMPT).toContain('90-120 spoken words');
+    expect(MASTER_PROMPT).toContain('common beginner-level words and short sentences');
+    expect(MASTER_PROMPT).toContain('genuinely amusing and warm');
+    expect(MASTER_PROMPT).toContain('keep every event, reaction, and solution plausible');
+    expect(MASTER_PROMPT).toContain('clear, fair multiple-choice questions');
+  });
+
   it('serves an existing saved audio URL even when it uses an older voice config', () => {
     const lesson = {
       audio: {

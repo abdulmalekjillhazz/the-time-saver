@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { AppError, MSG } from '../lib/AppError.js';
-import { answerQuestion, generateRoutineDraft, generatePersonalBriefing } from '../services/routineAssistant.js';
+import { generateRoutineDraft, generatePersonalBriefing } from '../services/routineAssistant.js';
 import { generateAdaptiveReplan, completeMicroRoutine } from '../services/adaptiveReplan.js';
 import { generateHybridPredictions } from '../services/hybridPrediction.js';
 
@@ -42,19 +42,6 @@ export function assistantRouter(config) {
         config,
       });
       res.json({ briefingText, source: 'coach' });
-    } catch (err) {
-      next(err);
-    }
-  });
-
-  r.post('/ask', async (req, res, next) => {
-    try {
-      const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
-      if (!question) throw new AppError(400, 'VALIDATION_FAILED', MSG.invalid);
-      const lang = req.body?.lang === 'bn' ? 'bn' : 'en';
-      const routines = Array.isArray(req.body?.routines) ? req.body.routines : [];
-      const answer = await answerQuestion({ question, lang, routines, config });
-      res.json({ answer });
     } catch (err) {
       next(err);
     }

@@ -217,10 +217,10 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       fail(lang === 'bn'
         ? source === 'offline'
           ? 'এই ডিভাইসে রাখা গল্পের অডিও চালানো যায়নি। আবার ডাউনলোড করুন।'
-          : 'ElevenLabs-এর সংরক্ষিত গল্পের অডিও চালানো যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
+          : 'গল্পের অডিও চালানো যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
         : source === 'offline'
           ? 'The offline story audio could not be played. Download it again.'
-          : 'The saved ElevenLabs story audio could not be played. Check your connection and try again.');
+          : 'The story audio could not be played. Check your connection and try again.');
     };
     audio.src = src;
     audio.load();
@@ -280,17 +280,19 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       if (id !== runId || !isPlaying) return;
       if (typeof result.audioUrl !== 'string' || !result.audioUrl) {
         throw new Error(lang === 'bn'
-          ? 'Cloudinary থেকে গল্পের অডিও লিংক পাওয়া যায়নি।'
-          : 'The saved story audio link could not be retrieved.');
+          ? 'গল্পের অডিও পাওয়া যায়নি। আবার চেষ্টা করুন।'
+          : 'Story audio is unavailable. Please try again.');
       }
 
-      onNotice(result.cached
-        ? (lang === 'bn' ? 'Cloudinary-তে সংরক্ষিত voice চালানো হচ্ছে।' : 'Playing the saved voice from Cloudinary.')
-        : (lang === 'bn' ? 'ElevenLabs voice Cloudinary-তে সংরক্ষণ করা হয়েছে।' : 'The ElevenLabs voice has been saved to Cloudinary.'));
+      onNotice(lang === 'bn' ? 'গল্পের অডিও চালানো হচ্ছে…' : 'Playing story audio…');
       configureAudio(id, result.audioUrl, 'cloudinary');
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
-      if (!playOfflineAudio(id)) fail(error.message);
+      if (!playOfflineAudio(id)) {
+        fail(lang === 'bn'
+          ? 'গল্পের অডিও চালানো যাচ্ছে না। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
+          : 'Story audio could not be played. Check your connection and try again.');
+      }
     } finally {
       if (requestAbortController === abortController) requestAbortController = null;
     }
@@ -309,7 +311,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       isPlaying = true;
       isPaused = false;
       emitProgress(desiredStartIndex);
-      onNotice(lang === 'bn' ? 'Cloudinary-তে সংরক্ষিত voice খোঁজা হচ্ছে…' : 'Checking for saved story audio…');
+      onNotice(lang === 'bn' ? 'গল্পের অডিও প্রস্তুত হচ্ছে…' : 'Preparing story audio…');
       void loadAndPlayStory(runId, index);
     },
     pause() {

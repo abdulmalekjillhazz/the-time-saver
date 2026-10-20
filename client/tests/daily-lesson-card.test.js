@@ -37,6 +37,17 @@ describe('daily lesson card', () => {
     expect(markup).toContain('Learn English by Story');
   });
 
+  it('requires an explicit completion action before tracking a private daily story', () => {
+    const markup = renderToStaticMarkup(createElement(DailyLessonCard, {
+      dailyLesson: { ...lesson, _id: 'daily-lesson-id' },
+      quiz: { questions: [] },
+      lang: 'en',
+      trackLearning: true,
+    }));
+
+    expect(markup).toContain('Mark story complete');
+  });
+
   it('shows saved quiz questions offline and disables answer submission', () => {
     const markup = renderToStaticMarkup(createElement(DailyLessonCard, {
       dailyLesson: { ...lesson, isOffline: true },

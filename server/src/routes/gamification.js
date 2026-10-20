@@ -5,6 +5,7 @@ import { AppError } from '../lib/AppError.js';
 import { Completion } from '../models/Completion.js';
 import { EveningReflection } from '../models/EveningReflection.js';
 import { getLearningLeaderboard } from '../services/gamification.js';
+import { calculateGamificationStats } from '../services/gamificationStats.js';
 import { todayInZone } from '@smart-routine/shared';
 
 const MINUTE = 60 * 1000;
@@ -28,28 +29,7 @@ export function gamificationRouter() {
       const totalDone = await Completion.countDocuments({ userId: req.userId, status: 'done' });
       const reflectionsCount = await EveningReflection.countDocuments({ userId: req.userId });
       
-      const totalXP = (totalDone * 50) + (reflectionsCount * 30);
-      const level = Math.floor(totalXP / 200) + 1;
-      const currentLevelXP = totalXP % 200;
-      const streakShields = Math.max(1, 3 - Math.floor(totalDone / 50));
-
-      const titles = [
-        { en: 'Habit Initiate', bn: 'নবাগত সাধক' },
-        { en: 'Steadfast Learner', bn: 'অটল শিক্ষার্থী' },
-        { en: 'Discipline Warrior', bn: 'সংকল্পের যোদ্ধা' },
-        { en: 'Routine Master', bn: 'অভ্যাসগুরু' },
-        { en: 'Grand Achiever', bn: 'মহাজ্ঞানী সাধক' },
-      ];
-      const title = titles[Math.min(level - 1, titles.length - 1)];
-
-      res.json({
-        xp: totalXP,
-        level,
-        currentLevelXP,
-        nextLevelXP: 200,
-        streakShields,
-        title,
-      });
+      res.json(calculateGamificationStats({ totalDone, reflectionsCount }));
     } catch (err) {
       next(err);
     }
@@ -64,13 +44,17 @@ export function gamificationRouter() {
       }
 
       const today = date || todayInZone(req.user?.timezone || 'Asia/Dhaka');
-      const reflection = await EveningReflection.findOneAndUpdate(
+      // XP is awarded once per user/day. Editing the same reflection must not
+      // claim another 30 XP when the dashboard derives XP from reflection count.
+      const result = await EveningReflection.findOneAndUpdate(
         { userId: req.userId, date: today },
-        { mood, note: note || '' },
-        { upsert: true, new: true }
+        { $set: { mood, note: note || '' } },
+        { upsert: true, new: true, includeResultMetadata: true }
       );
+      const reflection = result?.value ?? result;
+      const earnedXP = result?.lastErrorObject?.upserted ? 30 : 0;
 
-      res.status(201).json({ success: true, reflection, earnedXP: 30 });
+      res.status(earnedXP > 0 ? 201 : 200).json({ success: true, reflection, earnedXP });
     } catch (err) {
       next(err);
     }

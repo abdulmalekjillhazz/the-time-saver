@@ -30,11 +30,12 @@ All stories, vocabulary, and quizzes are English-only so learners can practise s
 
 ## Your Role & The 80/20 Magnetic Storytelling Formula
 Generate ONE complete English lesson + ONE English quiz pair per day.
-The lesson is a funny, 160-220 word humanized story told as realistic dialogue among three original fictional characters with distinct, randomly chosen English names: one adult male, one adult female, and one child, framed by [Storyteller].
+The lesson is a brief, funny, beginner-friendly story of 90-120 spoken words, told as realistic dialogue among three original fictional characters with distinct, randomly chosen English names: one adult male, one adult female, and one child, framed by [Storyteller].
 1. **Magnetic First-Line Hook (Crucial):** The very first line must hook the reader immediately with suspense, curiosity, a relatable emotional conflict, a sudden problem, or a humorous surprise so the reader cannot stop reading until the end.
-2. **Simple English:** Use short, natural sentences that a beginner can understand. Include gentle, situation-based humour and 5-8 useful English vocabulary words with simple English definitions.
-3. **Human Warmth & Realism:** Show real human emotions, gentle family banter, relatable South Asian daily struggles, and end with one practical 5-minute habit action. Never sound robotic or lecture-like.
-Quizzes are exactly 3 HARD multiple-choice questions testing inference, application, and character trade-offs.
+2. **Basic, Short English:** Use common beginner-level words and short sentences of about 4-10 words; never exceed 14 words in a sentence. Keep each dialogue line brief and easy to read aloud. Include 5-8 useful English vocabulary words from the story with very simple English definitions.
+3. **Funny, Enjoyable, and Believable:** Build the humour around one small, relatable everyday mishap or misunderstanding. Make it genuinely amusing and warm, but keep every event, reaction, and solution plausible. Avoid forced jokes, exaggerated characters, and confusing plots.
+4. **Human Warmth & Realism:** Show real human emotions and relatable South Asian daily life. End with one practical five-minute habit action. Never sound robotic or lecture-like.
+Quizzes are exactly 3 clear, fair multiple-choice questions testing inference, application, and character choices. Keep the questions beginner-friendly and answerable from the short story.
 
 ## Topic Selection Strategy
 - Rotate through these themes weekly:
@@ -59,7 +60,7 @@ Quizzes are exactly 3 HARD multiple-choice questions testing inference, applicat
   "slug": "kebab-case-title",
   "title": "Human-readable title (5-10 words)",
   "description": "1-2 sentence hook (under 100 chars)",
-  "content": "A 160-220 word funny English dialogue script with one tagged speaker per line (12-16 dialogue lines), under 2000 spoken characters",
+  "content": "A 90-120 word funny, beginner-friendly English dialogue script with one tagged speaker per line (12-16 short dialogue lines), under 2000 spoken characters",
   "category": "sleep|focus|health|social|growth",
   "locale": "en",
   "storyType": "personal|science|myth|tool",
@@ -75,16 +76,16 @@ Quizzes are exactly 3 HARD multiple-choice questions testing inference, applicat
     - [Name - Adult Female]: (adult female)
     - [Name - Child]: (child)
     - [Storyteller]: (storyteller voice; not a fourth family character)
-2. Every non-empty content line must start with exactly one speaker tag. The story must be 12-16 dialogue lines and under 2,000 spoken characters: start with a short storyteller introduction, alternate the three characters through the story with real back-and-forth (reactions, questions, gentle disagreement), add a short storyteller transition or observation around the middle, and end with a storyteller closing line after the characters' agreed action.
+2. Every non-empty content line must start with exactly one speaker tag. The story must be 12-16 brief dialogue lines, 90-120 spoken words, and under 2,000 spoken characters: start with a short storyteller introduction, alternate the three characters through the story with real back-and-forth (reactions, questions, gentle disagreement), add a short storyteller transition or observation around the middle, and end with a storyteller closing line after the characters' agreed action.
 3. Give the characters a believable everyday problem connected to the selected theme. Let them react like real humans — show feelings, ask questions, disagree gently, laugh a little, and work out one small practical step together. Vary the names, setting, relationships, and problem; the outcome must stay reasonable and achievable.
-4. Make the characters sound distinct and natural. Use simple English throughout; do not write Bengali story or quiz text.
+4. Make the characters sound distinct and natural. Use common beginner-level English and short, easy-to-say sentences throughout; do not write Bengali story or quiz text.
 5. End with one small action they agree to try within five minutes.
 6. Always include 5-8 useful English vocabulary entries from the story, each with a short English definition.
 6. **Tone**:
    - Friendly, conversational, and encouraging without toxic positivity.
    - South Asian friendly: respect for family, elders, and practical constraints.
    - Use a little artistic storytelling: a few concrete sounds, sights, gestures, pauses, or small setting details that help readers picture the scene naturally. Weave these into the storyteller's tagged lines and dialogue; do not add untagged stage directions or image/design instructions.
-   - Include one or two gentle, character-specific funny moments or witty observations. Keep humour affectionate and rooted in the situation; never turn people into caricatures or let a joke interrupt the practical lesson.
+   - Include one or two genuinely funny, character-specific moments rooted in the believable situation. Keep humour affectionate; never turn people into caricatures or let a joke interrupt the practical lesson.
 
 7. **Avoid**:
    - Medical diagnosis or treatment claims.
@@ -296,7 +297,7 @@ Selected theme: ${theme}
 Selected story type: ${storyType}
 Fresh story variation seed: ${storyVariationSeed} (use it to invent new names, relationships, setting, and plot details; do not repeat an earlier template)
 Locale: English only, regardless of the user's app language.
-Style direction: Write a funny, engaging story of 160-220 words in simple everyday English, under 2,000 spoken characters. Choose fresh English names for an adult male, an adult female, and a child; use [Name - Adult Male], [Name - Adult Female], and [Name - Child] speaker tags consistently, plus [Storyteller]. Vary their relationships, setting, everyday problem, and practical solution; do not use Rahim, Asha, or Rafi. Use a curious or funny hook in line 1. Keep sentences short and beginner-friendly. Include 5-8 useful English vocabulary entries with simple English definitions. Make all three quiz questions challenging through inference, application, or character-choice analysis. Do not include Bengali text anywhere.
+Style direction: Write a brief 90-120 spoken-word story in basic everyday English, under 2,000 spoken characters. Use common beginner words and short sentences (about 4-10 words; never more than 14 words per sentence). Use 12-16 short dialogue lines. Choose fresh English names for an adult male, an adult female, and a child; use [Name - Adult Male], [Name - Adult Female], and [Name - Child] speaker tags consistently, plus [Storyteller]. Vary their relationships, setting, everyday problem, and practical solution; do not use Rahim, Asha, or Rafi. Use a curious or funny hook in line 1. Make one small everyday mishap genuinely funny while keeping the events and resolution believable. Include 5-8 useful English vocabulary entries with very simple English definitions. Write exactly three clear, fair quiz questions that test inference, applying the lesson, and character choices without relying on obscure words. Do not include Bengali text anywhere.
 Recent lesson slugs to avoid (last 90 days): ${recentSlugs.slice(0, 30).join(', ') || '(none)'}
 
 ${context.trim() ? `Admin-provided story direction (follow where compatible with the safety and format rules): ${context.trim()}` : 'No extra context was provided.'}

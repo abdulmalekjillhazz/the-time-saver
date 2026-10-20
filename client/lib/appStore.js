@@ -53,7 +53,7 @@ export const useAppStore = create(persist(
     setPrayerNotificationsEnabled: (prayerNotificationsEnabled) => set({ prayerNotificationsEnabled }),
     setLastPrayerNotificationId: (lastPrayerNotificationId) => set({ lastPrayerNotificationId }),
 
-    // --- session-only: navigation tab (today/dashboard/lessons/assistant/...) ---
+    // --- session-only: navigation tab (today/dashboard/lessons/...) ---
     activeTab: 'today',
     setActiveTab: (activeTab) => set({ activeTab }),
 

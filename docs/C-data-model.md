@@ -13,7 +13,6 @@ Rule: a user reads and writes only documents where userId equals the session use
 | lessonScores | userId, lessonId, score, total, answers, attemptedAt | {userId, lessonId, attemptedAt} | 1 year | Owner reads; server writes |
 | pushSubscriptions | userId, endpoint (unique), p256dh, auth, userAgent, failureCount, lastSuccessAt, expiresAt | unique endpoint; userId | Removed on 410 or 90 days idle | Owner creates or deletes; server sends |
 | reminderLog | userId, routineId, date, kind, sentAt, leaseUntil | unique {userId, routineId, date, kind}; TTL 7 days | 7 days | Server only |
-| assistantUsage | userId, day (user timezone), count | unique {userId, day}; TTL 2 days | 2 days | Server only |
 | notifications | titleBn, titleEn, body, audience, status (draft, approved, sent, cancelled), createdBy, approvedBy, sentAt, stats | {status, sentAt} | 1 year | Admins; owner approves before send |
 | uploads | publicId (unique), resourceType, bytes, mime, uploadedBy, status (pending, attached, orphaned, deleted), attachedTo | unique publicId; {status, createdAt} | Deleted rows kept 90 days | Admins read; cleanup job writes |
 | auditLogs | actorId, actorRole, action, targetType, targetId, summary (no personal text), ipHash, requestId, createdAt | {actorId, createdAt}; {targetType, targetId} | 2 years; append only | Owner reads; server appends |

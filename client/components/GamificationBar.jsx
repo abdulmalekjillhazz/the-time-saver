@@ -8,20 +8,35 @@ const COPY = {
   bn: { loadError: 'গ্যামিফিকেশন পরিসংখ্যান লোড করা যায়নি।' },
 };
 
-export function GamificationBar({ lang = 'bn' }) {
+export function GamificationBar({ lang = 'bn', userId }) {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
   const isBn = lang === 'bn';
+  const progress = stats ? Math.max(0, Math.min(100, (stats.currentLevelXP / Math.max(1, stats.nextLevelXP)) * 100)) : 0;
 
   useEffect(() => {
     let active = true;
-    apiRequest('/api/gamification/stats')
-      .then((data) => { if (active) setStats(data); })
-      .catch(() => {
-        if (active) setError((COPY[lang] ?? COPY.en).loadError);
-      });
-    return () => { active = false; };
-  }, [lang]);
+    const refresh = () => {
+      apiRequest('/api/gamification/stats')
+        .then((data) => { if (active) { setStats(data); setError(''); } })
+        .catch(() => {
+          if (active) setError((COPY[lang] ?? COPY.en).loadError);
+        });
+    };
+    const onSync = (event) => {
+      if (!userId || event.detail?.userId === userId) refresh();
+    };
+    refresh();
+    window.addEventListener('smart-routine:sync', onSync);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      active = false;
+      window.removeEventListener('smart-routine:sync', onSync);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [lang, userId]);
 
   if (error) return <p role="alert" className="text-sm text-red-700">{error}</p>;
   if (!stats) return <p role="status" className="text-sm opacity-75">{isBn ? 'লোড হচ্ছে…' : 'Loading…'}</p>;
@@ -39,10 +54,10 @@ export function GamificationBar({ lang = 'bn' }) {
             </span>
           </div>
           <div className="mt-1.5 flex items-center gap-2">
-            <div className="h-2 w-32 overflow-hidden rounded-full bg-amber-200/80">
+            <div className="h-2 w-32 overflow-hidden rounded-full bg-amber-200/80" role="progressbar" aria-label={isBn ? 'পরবর্তী লেভেলের অগ্রগতি' : 'Progress to next level'} aria-valuemin={0} aria-valuemax={stats.nextLevelXP} aria-valuenow={stats.currentLevelXP}>
               <div
                 className="h-full bg-amber-500 transition-all duration-500"
-                style={{ width: `${(stats.currentLevelXP / stats.nextLevelXP) * 100}%` }}
+                style={{ width: `${progress}%` }}
               />
             </div>
             <span className="text-xs font-semibold text-gray-600">

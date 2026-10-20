@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
 import { buildDetailedRoutineBriefing, speakWithGoogleTts } from '../lib/voiceBriefing.js';
@@ -40,7 +40,7 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
       : '❌ Google voice could not play. Check the network and try again.',
   };
 
-  const startSpeech = (textToSpeak = activeText) => {
+  const startSpeech = useCallback((textToSpeak = activeText) => {
     controllerRef.current?.close();
     setSpeechError('');
     setSpeaking(true);
@@ -64,12 +64,15 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
       setPaused(false);
       setSpeechError(copy.speechUnavailable);
     }
-  };
+  }, [activeText, copy.speechUnavailable, isBn, lang]);
 
-  useEffect(() => () => {
-    controllerRef.current?.close();
-    controllerRef.current = null;
-  }, []);
+  useEffect(() => {
+    startSpeech();
+    return () => {
+      controllerRef.current?.close();
+      controllerRef.current = null;
+    };
+  }, [startSpeech]);
 
   const handleSpeech = () => {
     if (!speaking) {

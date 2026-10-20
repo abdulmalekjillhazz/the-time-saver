@@ -270,6 +270,7 @@ export default async function HomePage(props) {
                 <AudioDramaPlayer
                   title={dailyLesson.title}
                   content={dailyLesson.content}
+                  practiceContent={dailyLesson.locale === 'en' ? dailyLesson.content : ''}
                   vocabulary={dailyLesson.vocabulary || []}
                   lang={lang}
                 />

@@ -28,6 +28,11 @@ describe('computeStreak', () => {
     expect(computeStreak(dates, '2026-10-12')).toEqual({ current: 0, longest: 3 });
   });
 
+  it('starts a new one-day streak when activity resumes after a missed day', () => {
+    const dates = ['2026-10-10', '2026-10-11', '2026-10-13'];
+    expect(computeStreak(dates, '2026-10-13')).toEqual({ current: 1, longest: 2 });
+  });
+
   it('ignores duplicates and invalid dates', () => {
     const dates = ['2026-10-11', '2026-10-11', '2026-02-30', 'garbage'];
     expect(computeStreak(dates, '2026-10-11')).toEqual({ current: 1, longest: 1 });

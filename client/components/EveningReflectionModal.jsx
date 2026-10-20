@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { apiRequest } from '../lib/apiClient.js';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
 
@@ -8,14 +9,16 @@ export function EveningReflectionModal({ lang = 'bn', onClose, onSaved }) {
   const [selectedMood, setSelectedMood] = useState('happy');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const isBn = lang === 'bn';
 
   const copy = {
     title: isBn ? '🌙 ইভনিং ডিব্রিফ ও মুড ট্র্যাকার' : '🌙 Evening Debrief & Mood Tracker',
     prompt: isBn ? 'আজকের দিনটি আপনার কেমন কাটল?' : 'How did you feel about today?',
     notePlaceholder: isBn ? 'আজকের দিনের একটি ভালো দিক বা অনুভূতি লিখুন (ঐচ্ছিক)...' : 'Write a quick highlight or thought (optional)...',
-    save: isBn ? 'সংরক্ষণ করুন (+৩০ XP)' : 'Save Reflection (+30 XP)',
+    save: isBn ? 'সংরক্ষণ করুন' : 'Save Reflection',
     saving: isBn ? 'সংরক্ষণ হচ্ছে...' : 'Saving...',
+    error: isBn ? 'সংরক্ষণ করা যায়নি। ইন্টারনেট পরীক্ষা করে আবার চেষ্টা করুন।' : 'Could not save your reflection. Check your connection and try again.',
     close: isBn ? 'পরে করব' : 'Later',
     happy: isBn ? 'চনমনে' : 'Great',
     neutral: isBn ? 'স্বাভাবিক' : 'Neutral',
@@ -23,19 +26,23 @@ export function EveningReflectionModal({ lang = 'bn', onClose, onSaved }) {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     setSaving(true);
+    setError('');
     try {
-      const res = await fetch('/api/gamification/reflection', {
+      // apiRequest obtains and sends the CSRF token required by authenticated POSTs.
+      const result = await apiRequest('/api/gamification/reflection', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mood: selectedMood, note }),
+        body: { mood: selectedMood, note },
+        locale: lang,
       });
-      if (res.ok) {
-        if (onSaved) onSaved();
-        onClose();
-      }
-    } catch {}
-    setSaving(false);
+      onSaved?.(result);
+      onClose();
+    } catch (requestError) {
+      setError(requestError?.message || copy.error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -47,6 +54,7 @@ export function EveningReflectionModal({ lang = 'bn', onClose, onSaved }) {
         </div>
 
         <p className="mt-4 text-sm font-semibold text-ink/90">{copy.prompt}</p>
+        {error ? <p role="alert" className="mt-3 rounded-lg border border-red-400/50 bg-red-500/10 p-2 text-sm text-red-700">{error}</p> : null}
 
         <div className="mt-3 grid grid-cols-3 gap-2">
           {[

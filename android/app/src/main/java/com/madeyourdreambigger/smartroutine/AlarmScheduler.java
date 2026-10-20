@@ -16,12 +16,13 @@ final class AlarmScheduler {
     static final String ACTION_ALARM_FIRED = "com.madeyourdreambigger.smartroutine.ALARM_FIRED";
     static final String EXTRA_ID = "alarmId";
     static final String EXTRA_LABEL = "alarmLabel";
+    static final String EXTRA_LANGUAGE = "alarmLanguage";
     private static final String PREFS = "smart_routine_native_alarms";
     private static final String ALARMS_KEY = "alarms";
 
     private AlarmScheduler() {}
 
-    static void schedule(Context context, String id, long at, String label) throws JSONException {
+    static void schedule(Context context, String id, long at, String label, String language) throws JSONException {
         AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !manager.canScheduleExactAlarms()) {
             throw new SecurityException("Allow exact alarms in Android settings before scheduling.");
@@ -30,6 +31,7 @@ final class AlarmScheduler {
             .put("id", id)
             .put("at", at)
             .put("label", label)
+            .put("language", language)
             .put("firedAt", JSONObject.NULL);
         JSONArray alarms = getAlarms(context);
         JSONArray updated = new JSONArray();
@@ -44,7 +46,8 @@ final class AlarmScheduler {
             .setAction(ACTION_ALARM_FIRED)
             .setData(Uri.parse("smart-routine://alarm/" + Uri.encode(id)))
             .putExtra(EXTRA_ID, id)
-            .putExtra(EXTRA_LABEL, label);
+            .putExtra(EXTRA_LABEL, label)
+            .putExtra(EXTRA_LANGUAGE, language);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
             context,
             id.hashCode(),
@@ -83,6 +86,7 @@ final class AlarmScheduler {
         JSONArray updated = new JSONArray();
         long firedAt = System.currentTimeMillis();
         String label = "";
+        String language = "bn";
         for (int i = 0; i < alarms.length(); i++) {
             JSONObject item = alarms.optJSONObject(i);
             if (item == null) continue;
@@ -95,6 +99,7 @@ final class AlarmScheduler {
                     continue;
                 }
                 label = item.optString("label", "");
+                language = item.optString("language", "bn");
             }
             updated.put(item);
         }
@@ -103,6 +108,7 @@ final class AlarmScheduler {
             .setPackage(context.getPackageName())
             .putExtra(EXTRA_ID, id)
             .putExtra(EXTRA_LABEL, label)
+            .putExtra(EXTRA_LANGUAGE, language)
             .putExtra("firedAt", firedAt);
         context.sendBroadcast(fired);
     }
@@ -126,7 +132,7 @@ final class AlarmScheduler {
             String id = alarm.optString("id", "");
             if (!TextUtils.isEmpty(id) && at > System.currentTimeMillis()) {
                 try {
-                    schedule(context, id, at, alarm.optString("label", ""));
+                    schedule(context, id, at, alarm.optString("label", ""), alarm.optString("language", "bn"));
                 } catch (JSONException | SecurityException ignored) {
                     Log.e("SmartRoutineAlarm", "Could not restore an alarm after device restart.");
                 }

@@ -15,7 +15,8 @@ public class AlarmReceiver extends BroadcastReceiver {
         Intent ringing = new Intent(context, AlarmRingingService.class)
             .setAction(AlarmRingingService.ACTION_RING)
             .putExtra(AlarmScheduler.EXTRA_ID, id)
-            .putExtra(AlarmScheduler.EXTRA_LABEL, label == null ? "" : label);
+            .putExtra(AlarmScheduler.EXTRA_LABEL, label == null ? "" : label)
+            .putExtra(AlarmScheduler.EXTRA_LANGUAGE, intent.getStringExtra(AlarmScheduler.EXTRA_LANGUAGE));
         ContextCompat.startForegroundService(context, ringing);
     }
 }

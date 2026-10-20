@@ -103,6 +103,7 @@ public class NativeAlarmPlugin extends Plugin {
     public void schedule(PluginCall call) {
         String id = call.getString("id");
         String label = call.getString("label", "");
+        String language = call.getString("lang", "bn");
         Long at = call.getLong("at");
         if (id == null || id.isEmpty() || id.length() > 64 || at == null || at <= System.currentTimeMillis()) {
             call.reject("Choose a valid future alarm time.");
@@ -117,7 +118,7 @@ public class NativeAlarmPlugin extends Plugin {
             return;
         }
         try {
-            AlarmScheduler.schedule(getContext(), id, at, label);
+            AlarmScheduler.schedule(getContext(), id, at, label, language);
             call.resolve();
         } catch (JSONException | SecurityException error) {
             call.reject("Android could not schedule this exact alarm. Check alarm permission settings.", error);

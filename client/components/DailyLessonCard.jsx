@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { apiRequest } from '../lib/apiClient.js';
+import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
@@ -21,6 +22,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
   const [autoPlaySignal, setAutoPlaySignal] = useState(0);
   const [storyAward, setStoryAward] = useState(null);
   const [storyTrackingError, setStoryTrackingError] = useState('');
+  const [storyTrackingBusy, setStoryTrackingBusy] = useState(false);
 
   const isBn = lang === 'bn';
   const copy = {
@@ -55,28 +57,30 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
     csrfFailed: isBn ? 'নিরাপত্তা যাচাই ব্যর্থ হয়েছে। পেজ রিলোড করে আবার চেষ্টা করুন।' : 'Security check failed. Reload the page and try again.',
     curatedFallback: isBn ? 'সংরক্ষিত বিকল্প গল্প' : 'Curated fallback story',
     storyPoints: isBn ? 'গল্প পড়ার জন্য +৫০ পয়েন্ট' : '+50 points for reading',
-    trackingError: isBn ? 'গল্প পড়ার পয়েন্ট সংরক্ষণ করা যায়নি। আবার খুলে চেষ্টা করুন।' : 'Could not save story points. Close and reopen the lesson to retry.',
+    completeStory: isBn ? 'গল্প পড়া শেষ করেছি' : 'Mark story complete',
+    storyCompleted: isBn ? 'গল্প সম্পন্ন—শেখার দিন হিসেবে সংরক্ষিত হয়েছে' : 'Story completed and saved as a learning day',
+    trackingError: isBn ? 'গল্প সম্পন্ন হিসেবে সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।' : 'Could not save the completed story. Please try again.',
     quizPoints: isBn ? 'লিডারবোর্ডে অর্জিত পয়েন্ট' : 'Leaderboard points earned',
   };
 
-  useEffect(() => {
-    if (!trackLearning || !expanded || !dailyLesson?._id || dailyLesson.isOffline) return undefined;
+  const markStoryComplete = async () => {
+    if (!trackLearning || !dailyLesson?._id || dailyLesson.isOffline || storyTrackingBusy) return;
     setStoryTrackingError('');
-    apiRequest('/api/lessons/today/read', {
-      method: 'POST',
-      body: { dailyLessonId: dailyLesson._id },
-      locale: lang,
-    })
-      .then((result) => {
-        setStoryAward({ lessonId: String(dailyLesson._id), earnedPoints: result.earnedPoints || 0 });
-        if (result.earnedPoints > 0 || result.awardedBadges?.length) {
-          window.dispatchEvent(new Event('smart-routine:learning-activity'));
-        }
-      })
-      .catch(() => {
-        setStoryTrackingError(copy.trackingError);
+    setStoryTrackingBusy(true);
+    try {
+      const result = await apiRequest('/api/lessons/today/read', {
+        method: 'POST',
+        body: { dailyLessonId: dailyLesson._id },
+        locale: lang,
       });
-  }, [copy.trackingError, dailyLesson?._id, dailyLesson?.isOffline, expanded, lang, trackLearning]);
+      setStoryAward({ lessonId: String(dailyLesson._id), earnedPoints: result.earnedPoints || 0 });
+      announceLearningActivity(result.earnedPoints);
+    } catch {
+      setStoryTrackingError(copy.trackingError);
+    } finally {
+      setStoryTrackingBusy(false);
+    }
+  };
 
   if (!dailyLesson) return null;
 
@@ -138,9 +142,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
         );
       }
       setSubmission(data);
-      if (data.earnedPoints > 0 || data.awardedBadges?.length) {
-        window.dispatchEvent(new Event('smart-routine:learning-activity'));
-      }
+      announceLearningActivity(data.earnedPoints);
     } catch (err) {
       console.error('Daily quiz submission failed', err);
       setError(err.message || copy.requestFailed);
@@ -296,12 +298,33 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
           title={dailyLesson.title}
           slug={dailyLesson.slug}
           content={dailyLesson.content}
+          practiceContent={dailyLesson.locale === 'en' ? dailyLesson.content : ''}
           audioUrl={dailyLesson.audio?.status === 'ready' ? dailyLesson.audio.url : ''}
           vocabulary={dailyLesson.vocabulary || []}
           lang={lang}
           autoPlaySignal={autoPlaySignal}
         />
       </div>
+
+      {trackLearning && !dailyLesson.isOffline ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={storyTrackingBusy || storyAward?.lessonId === String(dailyLesson._id)}
+            onClick={markStoryComplete}
+          >
+            {storyTrackingBusy
+              ? (isBn ? 'সংরক্ষণ হচ্ছে…' : 'Saving…')
+              : storyAward?.lessonId === String(dailyLesson._id)
+                ? `✓ ${copy.storyCompleted}`
+                : copy.completeStory}
+          </Button>
+          {storyAward?.lessonId === String(dailyLesson._id) && storyAward.earnedPoints > 0 ? (
+            <span className="text-sm font-bold text-sapphire">+{storyAward.earnedPoints} ⭐</span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-sapphire/20 bg-paper/80 p-4">
         {!feedbackSent ? (

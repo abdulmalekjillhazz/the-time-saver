@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getOfflineCacheConsent,
   getOfflineMeanings,
@@ -89,6 +89,17 @@ export async function lookupStoryWordMeaning(rawWord, vocabulary, lang = 'bn') {
 export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
   const isBn = lang === 'bn';
   const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    if (vocabulary?.length) {
+      const vocabList = vocabulary.map((v) => {
+        const raw = v.definition || v.meaning || '';
+        const meaning = typeof raw === 'string' ? raw : (raw?.bn || raw?.en || '');
+        return { term: normalizeWord(v.term || v.word), meaning };
+      }).filter((v) => v.term && v.meaning);
+      saveOfflineMeanings(vocabList, lang).catch(() => {});
+    }
+  }, [vocabulary, lang]);
 
   const handleWordClick = async (word, keyId) => {
     const clean = normalizeWord(word);

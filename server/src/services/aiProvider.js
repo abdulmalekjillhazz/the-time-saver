@@ -6,13 +6,13 @@ const GEMINI_URL = (model, key) =>
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 export const unavailable = () => new AppError(503, 'UNAVAILABLE', {
-  en: 'The AI assistant is not configured on the server.',
-  bn: 'সার্ভারে AI সহকারী কনফিগার করা নেই।',
+  en: 'AI features are not configured on the server.',
+  bn: 'সার্ভারে AI ফিচার কনফিগার করা নেই।',
 });
 
 export const failed = () => new AppError(502, 'UPSTREAM_UNAVAILABLE', {
-  en: 'The assistant could not answer right now. Please try again later.',
-  bn: 'সহকারী এখন উত্তর দিতে পারছে না। পরে আবার চেষ্টা করুন।',
+  en: 'The AI service could not complete this request. Please try again later.',
+  bn: 'AI সার্ভিস এখন অনুরোধটি সম্পন্ন করতে পারেনি। পরে আবার চেষ্টা করুন।',
 });
 
 // messages: [{ role: 'system' | 'user', content: string }]

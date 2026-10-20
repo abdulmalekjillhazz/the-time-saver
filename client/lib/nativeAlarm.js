@@ -26,12 +26,13 @@ export async function setNativeStopwatchDisplay(active) {
   return NativeAlarm.setStopwatchDisplay({ active });
 }
 
-export async function scheduleNativeAlarm(alarm) {
+export async function scheduleNativeAlarm(alarm, lang = 'bn') {
   if (!isAndroidNativeApp()) return null;
   return NativeAlarm.schedule({
     id: alarm.id,
     at: alarm.at,
     label: alarm.label || '',
+    lang,
   });
 }
 

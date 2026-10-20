@@ -1173,6 +1173,7 @@ export function AdminPanel() {
                             <AudioDramaPlayer
                               title={draft.title?.[lang]}
                               content={draft.body?.[lang]}
+                              practiceContent={draft.body?.en}
                               lang={lang}
                               onClose={() => setPreviewDraftSlug('')}
                             />

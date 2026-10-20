@@ -1,6 +1,7 @@
 // Offline outbox. It keeps operations in a store until the server confirms them.
 // The store is injected: IndexedDB in the browser (added with the web app), memory in tests.
 import { syncOpSchema } from './schemas/sync.js';
+import { createUuidV4 } from './uuid.js';
 
 const LOCAL_FIELDS = ['status', 'attempts', 'lastError', 'queuedAt'];
 const DONE = ['applied', 'replayed', 'not_found'];
@@ -33,7 +34,7 @@ export function isPermanentRefusal(err) {
   return Number.isInteger(status) && status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
 
-export function createOutbox(store, { clock = () => Date.now(), makeId = () => globalThis.crypto.randomUUID() } = {}) {
+export function createOutbox(store, { clock = () => Date.now(), makeId = createUuidV4 } = {}) {
   let busy = false;
 
   function toWire(op) {

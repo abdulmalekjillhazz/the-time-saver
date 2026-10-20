@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenRouter Beta</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0e14;
+        --panel: #121722;
+        --panel-2: #1a2130;
+        --border: #263043;
+        --text: #e6ebf5;
+        --muted: #8b98ad;
+        --accent: #6d8cff;
+        --user: #1e2a44;
+        --ai: #151b27;
+        --danger: #ff6b6b;
+        --ok: #4ade80;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(1200px 600px at 80% -10%, #1b2440 0%, var(--bg) 55%);
+        color: var(--text);
+        font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px 16px;
+      }
+      .wrap { width: 100%; max-width: 860px; display: flex; flex-direction: column; gap: 14px; }
+      header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      h1 { font-size: 20px; margin: 0; letter-spacing: .2px; }
+      .status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+      .dot.ok { background: var(--ok); }
+      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; }
+      .row > * { flex: 1 1 220px; }
+      label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+      input, select, textarea, button {
+        font: inherit;
+        color: var(--text);
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        width: 100%;
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(109, 140, 255, .15);
+      }
+      textarea { resize: vertical; min-height: 90px; }
+      button {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        width: auto;
+        min-width: 120px;
+      }
+      button:disabled { opacity: .55; cursor: not-allowed; }
+      button.ghost { background: transparent; color: var(--muted); border-color: var(--border); min-width: 0; }
+      #chat {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+        min-height: 260px;
+        max-height: 52vh;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .msg { max-width: 88%; padding: 10px 13px; border-radius: 12px; white-space: pre-wrap; word-wrap: break-word; }
+      .msg.user { align-self: flex-end; background: var(--user); }
+      .msg.assistant { align-self: flex-start; background: var(--ai); border: 1px solid var(--border); }
+      .msg .who { font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .6px; }
+      .empty { color: var(--muted); text-align: center; margin: auto; font-size: 14px; }
+      .foot { font-size: 12px; color: var(--muted); }
+      .foot a { color: var(--accent); }
+      .err { color: var(--danger); font-size: 13px; }
+      .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ffffff44; border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>OpenRouter Beta</h1>
+        <div class="status"><span id="dot" class="dot"></span><span id="statusText">checking proxy...</span></div>
+      </header>
+
+      <div class="panel">
+        <div class="row">
+          <div>
+            <label for="key">OpenRouter API key</label>
+            <input id="key" type="password" placeholder="sk-or-v1-..." autocomplete="off" />
+          </div>
+          <div>
+            <label for="model">Model</label>
+            <select id="model">
+              <option value="openrouter/auto">openrouter/auto</option>
+            </select>
+          </div>
+        </div>
+        <div class="foot" style="margin-top: 8px;">
+          Key sudhu tomar browser e (localStorage) thake. Sign up / key: <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">openrouter.ai/keys</a>
+        </div>
+      </div>
+
+      <div id="chat">
+        <div class="empty">Kichu likhe Send chapo. Proxy: http://127.0.0.1:4096</div>
+      </div>
+
+      <div class="panel">
+        <label for="prompt">Message</label>
+        <textarea id="prompt" placeholder="Tomar proshno likho..."></textarea>
+        <div class="row" style="margin-top: 10px; align-items: center;">
+          <span id="error" class="err"></span>
+          <div style="display: flex; gap: 8px; justify-content: flex-end; flex: 1 1 auto;">
+            <button id="clear" class="ghost" type="button">Clear</button>
+            <button id="send" type="button">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const PROXY = "http://127.0.0.1:4096";
+      const keyEl = document.getElementById("key");
+      const modelEl = document.getElementById("model");
+      const promptEl = document.getElementById("prompt");
+      const sendEl = document.getElementById("send");
+      const clearEl = document.getElementById("clear");
+      const chatEl = document.getElementById("chat");
+      const errorEl = document.getElementById("error");
+      const dotEl = document.getElementById("dot");
+      const statusEl = document.getElementById("statusText");
+
+      const messages = [];
+      keyEl.value = localStorage.getItem("openrouter_key") || "";
+      keyEl.addEventListener("input", () => localStorage.setItem("openrouter_key", keyEl.value.trim()));
+
+      function setStatus(ok, text) {
+        dotEl.classList.toggle("ok", ok);
+        statusEl.textContent = text;
+      }
+
+      async function checkProxy() {
+        try {
+          const res = await fetch(PROXY + "/health");
+          const data = await res.json();
+          setStatus(true, "proxy " + (data.auth === "env" ? "(key server e ache)" : "(key tumi dao)"));
+        } catch {
+          setStatus(false, "proxy offline - 4096 e chalu koro");
+        }
+      }
+
+      async function loadModels() {
+        try {
+          const res = await fetch(PROXY + "/api/v1/models");
+          if (!res.ok) return;
+          const data = await res.json();
+          const models = (data.data || []).map((m) => m.id).filter(Boolean).sort();
+          if (!models.length) return;
+          modelEl.innerHTML = "";
+          for (const id of models) {
+            const opt = document.createElement("option");
+            opt.value = id;
+            opt.textContent = id;
+            modelEl.appendChild(opt);
+          }
+          modelEl.value = localStorage.getItem("openrouter_model") || "openrouter/auto";
+          if (!modelEl.value) modelEl.value = models[0];
+        } catch {
+          /* ignore model list failures */
+        }
+      }
+      modelEl.addEventListener("change", () => localStorage.setItem("openrouter_model", modelEl.value));
+
+      function addMessage(role, text) {
+        const empty = chatEl.querySelector(".empty");
+        if (empty) empty.remove();
+        const div = document.createElement("div");
+        div.className = "msg " + role;
+        const who = document.createElement("div");
+        who.className = "who";
+        who.textContent = role === "user" ? "You" : "Assistant";
+        const body = document.createElement("div");
+        body.textContent = text;
+        div.append(who, body);
+        chatEl.appendChild(div);
+        chatEl.scrollTop = chatEl.scrollHeight;
+        return body;
+      }
+
+      async function send() {
+        const text = promptEl.value.trim();
+        const key = keyEl.value.trim();
+        errorEl.textContent = "";
+        if (!text) return;
+        if (!key) {
+          errorEl.textContent = "Age API key dao.";
+          return;
+        }
+        promptEl.value = "";
+        messages.push({ role: "user", content: text });
+        addMessage("user", text);
+
+        sendEl.disabled = true;
+        sendEl.innerHTML = '<span class="spinner"></span>';
+        const out = addMessage("assistant", "");
+        out.innerHTML = '<span class="spinner"></span>';
+
+        try {
+          const res = await fetch(PROXY + "/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + key,
+            },
+            body: JSON.stringify({ model: modelEl.value, messages }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const msg = data?.error?.message || res.status + " " + res.statusText;
+            out.textContent = "Error: " + msg;
+            if (res.status === 401) {
+              out.textContent += "\nKey invalid ba missing. https://openrouter.ai/keys theke notun key nao.";
+            }
+            messages.pop();
+          } else {
+            const reply = data?.choices?.[0]?.message?.content || "(empty response)";
+            out.textContent = reply;
+            messages.push({ role: "assistant", content: reply });
+          }
+        } catch (err) {
+          out.textContent = "Proxy error: " + err.message;
+          messages.pop();
+        } finally {
+          sendEl.disabled = false;
+          sendEl.textContent = "Send";
+          chatEl.scrollTop = chatEl.scrollHeight;
+        }
+      }
+
+      sendEl.addEventListener("click", send);
+      promptEl.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") send();
+      });
+      clearEl.addEventListener("click", () => {
+        messages.length = 0;
+        chatEl.innerHTML = '<div class="empty">Chat clear.</div>';
+        errorEl.textContent = "";
+      });
+
+      checkProxy();
+      loadModels();
+    </script>
+  </body>
+</html>

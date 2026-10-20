@@ -2,6 +2,8 @@ package com.madeyourdreambigger.smartroutine;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -44,8 +46,11 @@ public class AlarmRingingActivity extends Activity {
         layout.addView(title);
         TextView label = new TextView(this);
         label.setText(alarmLabel.isEmpty() ? getString(R.string.alarm_notification_body) : alarmLabel);
-        label.setTextSize(20);
+        label.setTextSize(24);
         label.setGravity(Gravity.CENTER);
+        label.setTextColor(Color.rgb(142, 93, 0));
+        label.setTypeface(null, Typeface.BOLD);
+        label.setPadding(16, 12, 16, 12);
         layout.addView(label);
         Button stop = new Button(this);
         stop.setText(R.string.alarm_stop);
@@ -62,9 +67,13 @@ public class AlarmRingingActivity extends Activity {
         Intent intent = new Intent(this, AlarmRingingService.class)
             .setAction(action)
             .putExtra(AlarmScheduler.EXTRA_ID, alarmId)
-            .putExtra(AlarmScheduler.EXTRA_LABEL, alarmLabel);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent);
-        else startService(intent);
+            .putExtra(AlarmScheduler.EXTRA_LABEL, alarmLabel)
+            .putExtra(AlarmScheduler.EXTRA_LANGUAGE, getIntent().getStringExtra(AlarmScheduler.EXTRA_LANGUAGE));
+        // This activity is visible to the user, so a normal service start is allowed.
+        // Do not use startForegroundService for STOP/SNOOZE: those actions exit before
+        // AlarmRingingService calls startForeground(), which can trigger an Android 8+
+        // foreground-service timeout crash.
+        startService(intent);
         finish();
     }
 }

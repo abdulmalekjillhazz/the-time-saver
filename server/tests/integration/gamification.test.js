@@ -45,6 +45,33 @@ describe.skipIf(!uri)('Gamification and activity analytics', () => {
     if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
   });
 
+  it('awards reflection XP only on the first save for a date', async () => {
+    const date = todayInZone('Asia/Dhaka');
+    const first = await request(app)
+      .post('/api/gamification/reflection')
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({ mood: 'happy', note: 'First save', date });
+
+    const edit = await request(app)
+      .post('/api/gamification/reflection')
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({ mood: 'neutral', note: 'Edited reflection', date });
+
+    const stats = await request(app)
+      .get('/api/gamification/stats')
+      .set('Cookie', cookie);
+
+    expect(first.status).toBe(201);
+    expect(first.body.earnedXP).toBe(30);
+    expect(edit.status).toBe(200);
+    expect(edit.body.earnedXP).toBe(0);
+    expect(edit.body.reflection.mood).toBe('neutral');
+    expect(stats.status).toBe(200);
+    expect(stats.body.xp).toBe(30);
+  });
+
   it('stores paired microfallback settings and records fallback completion', async () => {
     const created = await request(app)
       .post('/api/routines')
@@ -140,6 +167,27 @@ describe.skipIf(!uri)('Gamification and activity analytics', () => {
       points: 50,
       timezone: firstLearner.timezone,
     });
+    const firstQuizAttempt = await recordLearningActivity({
+      userId: firstLearner._id,
+      activityType: 'quiz',
+      contentId: 'daily:retake-quiz',
+      points: 10,
+      timezone: firstLearner.timezone,
+    });
+    const improvedQuizAttempt = await recordLearningActivity({
+      userId: firstLearner._id,
+      activityType: 'quiz',
+      contentId: 'daily:retake-quiz',
+      points: 20,
+      timezone: firstLearner.timezone,
+    });
+    const lowerQuizAttempt = await recordLearningActivity({
+      userId: firstLearner._id,
+      activityType: 'quiz',
+      contentId: 'daily:retake-quiz',
+      points: 15,
+      timezone: firstLearner.timezone,
+    });
     const zeroPointQuiz = await recordLearningActivity({
       userId: secondLearner._id,
       activityType: 'quiz',
@@ -182,13 +230,16 @@ describe.skipIf(!uri)('Gamification and activity analytics', () => {
     expect(firstStory.earnedPoints).toBe(50);
     expect(firstStory.awardedBadges.map(({ badge }) => badge.key)).toContain('first-learning-day');
     expect(duplicateStory.earnedPoints).toBe(0);
+    expect(firstQuizAttempt.earnedPoints).toBe(10);
+    expect(improvedQuizAttempt.earnedPoints).toBe(10);
+    expect(lowerQuizAttempt.earnedPoints).toBe(0);
     expect(zeroPointQuiz.recorded).toBe(false);
     expect(firstSummary.stats.learningStreak).toEqual({ current: 1, longest: 1 });
     expect(firstSummary.stats.totalLearningDays).toBe(1);
     expect(firstSummary.badges.find(({ key }) => key === 'first-learning-day').earned).toBe(true);
-    expect(secondSummary.stats.learningStreak).toEqual({ current: 0, longest: 0 });
-    expect(secondSummary.stats.totalLearningDays).toBe(0);
-    expect(secondSummary.badges.find(({ key }) => key === 'first-learning-day').earned).toBe(false);
+    expect(secondSummary.stats.learningStreak).toEqual({ current: 1, longest: 1 });
+    expect(secondSummary.stats.totalLearningDays).toBe(1);
+    expect(secondSummary.badges.find(({ key }) => key === 'first-learning-day').earned).toBe(true);
     expect(upgradedLegacyQuiz.earnedPoints).toBe(8);
     expect(legacySummary.stats.learningStreak).toEqual({ current: 1, longest: 1 });
     expect(streakSummary.stats.learningStreak).toEqual({ current: 7, longest: 7 });

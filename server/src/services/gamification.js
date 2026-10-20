@@ -119,7 +119,7 @@ async function readUserProgress(userId, timezone) {
     Routine.find({ userId }).select('_id startTime').lean(),
     DailyQuizScore.find({ userId, $expr: { $eq: ['$score', '$total'] } })
       .distinct('dailyLessonId'),
-    LearningActivity.distinct('activeDate', { userId, points: { $gt: 0 } }),
+    LearningActivity.distinct('activeDate', { userId }),
   ]);
 
   const routineById = new Map(routines.map((routine) => [String(routine._id), routine]));
@@ -283,39 +283,64 @@ export async function recordDailyLessonRead({ userId, dailyLessonId, timezone })
 }
 
 export async function recordLearningActivity({ userId, activityType, contentId, points, timezone }) {
-  if (points <= 0) return { earnedPoints: 0, recorded: false, awardedBadges: [] };
   const normalizedContentId = String(contentId);
   const activeDate = todayInZone(timezone || 'Asia/Dhaka');
-  let recorded = true;
+  await recordLearningDay(userId, activityType, activeDate);
+
+  let recorded = false;
+  let earnedPoints = 0;
+  if (points > 0) {
+    recorded = true;
+    earnedPoints = points;
+    try {
+      await LearningActivity.create({
+        userId,
+        activityType,
+        contentId: normalizedContentId,
+        points,
+        activeDate,
+      });
+    } catch (err) {
+      if (err.code !== 11000) throw err;
+      const existing = await LearningActivity.findOne({
+        userId,
+        activityType,
+        contentId: normalizedContentId,
+      }).select('_id points').lean();
+      if (!existing) throw err;
+      if (existing.points < points) {
+        const upgraded = await LearningActivity.findOneAndUpdate(
+          { _id: existing._id, points: { $lt: points } },
+          { $set: { points, activeDate } },
+          { new: true },
+        );
+        recorded = Boolean(upgraded);
+        earnedPoints = upgraded ? points - existing.points : 0;
+      } else {
+        recorded = false;
+        earnedPoints = 0;
+      }
+    }
+  }
+  const awardedBadges = await evaluateAndAwardBadges(userId, timezone);
+  return { earnedPoints, recorded, awardedBadges };
+}
+
+async function recordLearningDay(userId, activityType, activeDate) {
+  const contentId = `learning-day:${activeDate}`;
   try {
     await LearningActivity.create({
       userId,
       activityType,
-      contentId: normalizedContentId,
-      points,
+      contentId,
+      points: 0,
       activeDate,
     });
   } catch (err) {
-    if (err.code !== 11000) throw err;
-    const existing = await LearningActivity.findOne({
-      userId,
-      activityType,
-      contentId: normalizedContentId,
-    }).select('_id points').lean();
-    if (!existing) throw err;
-    if (existing.points <= 0) {
-      const upgraded = await LearningActivity.findOneAndUpdate(
-        { _id: existing._id, points: { $lte: 0 } },
-        { $set: { points, activeDate } },
-        { new: true },
-      );
-      recorded = Boolean(upgraded);
-    } else {
-      recorded = false;
+    if (err.code !== 11000 || !(await LearningActivity.exists({ userId, activityType, contentId }))) {
+      throw err;
     }
   }
-  const awardedBadges = await evaluateAndAwardBadges(userId, timezone);
-  return { earnedPoints: recorded ? points : 0, recorded, awardedBadges };
 }
 
 export async function recordQuizPoints({ userId, quizId, score, total, timezone }) {

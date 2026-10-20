@@ -13,7 +13,7 @@ export function AdaptiveReplanModal({ routine, lang = 'bn', onClose, onCompleted
   const isBn = lang === 'bn';
   const copy = {
     title: isBn ? '⚡ ৫-মিনিটের মাইক্রো রুটিন (Adaptive Re-plan)' : '⚡ 5-Minute Micro Routine (Adaptive Re-plan)',
-    loading: isBn ? "AM's রুটিন সহকারী ৫ মিনিটের সহজ সংস্করণ তৈরি করছে..." : "AM's Routine Assistant is generating 5-min fallback...",
+    loading: isBn ? '৫ মিনিটের সহজ বিকল্প তৈরি হচ্ছে...' : 'Creating a simpler 5-minute fallback...',
     doingFiveMin: isBn ? 'ব্যস্ত দিন? পুরো সময় না পারলে ৫ মিনিটে সেরে নিন:' : 'Too busy? Complete this 5-minute version instead:',
     completeBtn: isBn ? '✓ ৫ মিনিটে সম্পন্ন করলাম' : '✓ Completed 5-Minute Version',
     completing: isBn ? 'সংরক্ষণ হচ্ছে...' : 'Saving...',

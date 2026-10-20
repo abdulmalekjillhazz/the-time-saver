@@ -2,6 +2,7 @@ import { generateDailyLesson } from './dailyLesson.js';
 import { findDueReminders, todayInZone } from '@smart-routine/shared';
 import { PushSubscription } from '../models/PushSubscription.js';
 import { ReminderLog } from '../models/ReminderLog.js';
+import { TaskCompletionReminderLog } from '../models/TaskCompletionReminderLog.js';
 import { HolidayNotificationLog } from '../models/HolidayNotificationLog.js';
 import { Routine } from '../models/Routine.js';
 import { Completion } from '../models/Completion.js';
@@ -26,6 +27,7 @@ const LEASE_NAME = 'reminders';
 const LEASE_MS = 55 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REMINDER_LOG_DAYS = 7;
+const TASK_COMPLETION_REMINDER_LOG_DAYS = 7;
 const TRAINING_LEASE_MS = 24 * 60 * 60 * 1000;
 const HOLIDAY_NOTIFICATION_LOG_DAYS = 400;
 const DAILY_LESSON_LEASE_MS = 5 * 60 * 1000;
@@ -44,6 +46,119 @@ export function routineReminderPayload(locale) {
       body: 'Reason: you enabled routine reminders, and a routine has reached its scheduled start time.',
       url: '/app',
     };
+}
+
+const TASK_COMPLETION_REMINDER_SLOTS = [
+  { kind: 'morning', minuteOfDay: 9 * 60 },
+  { kind: 'evening', minuteOfDay: 18 * 60 },
+];
+
+export function taskCompletionReminderSlot(timezone, now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone || 'Asia/Dhaka',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const local = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const minuteOfDay = Number(local.hour) * 60 + Number(local.minute);
+  const slot = TASK_COMPLETION_REMINDER_SLOTS.find(
+    ({ minuteOfDay: scheduledMinute }) => minuteOfDay >= scheduledMinute && minuteOfDay <= scheduledMinute + 4,
+  );
+  if (!slot) return null;
+  return { date: `${local.year}-${local.month}-${local.day}`, kind: slot.kind };
+}
+
+export function taskCompletionReminderPayload(locale, allTasksDone) {
+  if (locale === 'bn') {
+    return allTasksDone
+      ? {
+        title: 'আজকের কাজ সম্পন্ন!',
+        body: 'দারুণ! আজকের রুটিনগুলো শেষ করেছেন। ধারাবাহিকতা ধরে রাখুন।',
+        url: '/app',
+      }
+      : {
+        title: 'রুটিন শেষ করার সময়',
+        body: 'আজকের একটি কাজ এখন সম্পন্ন করুন। অ্যাপে খুলে আপনার রুটিন দেখুন।',
+        url: '/app',
+      };
+  }
+  return allTasksDone
+    ? {
+      title: 'Today’s tasks are complete!',
+      body: 'Great work finishing today’s routines. Keep your momentum going.',
+      url: '/app',
+    }
+    : {
+      title: 'Time to finish a routine',
+      body: 'Complete one of today’s tasks now. Open the app to see your routines.',
+      url: '/app',
+    };
+}
+
+export async function runTaskCompletionReminderTick({ now = new Date(), owner, sender = defaultSender } = {}) {
+  const leased = await acquireLease('task-completion-reminders', owner, LEASE_MS, now);
+  if (!leased) return { skipped: 'lease-held', sent: 0, suppressed: 0, failed: 0 };
+
+  const stats = { sent: 0, suppressed: 0, failed: 0 };
+  const userIds = await PushSubscription.distinct('userId', { routineReminders: { $ne: false } });
+
+  for (const userId of userIds) {
+    if (!(await isEnabledFor('push.reminders', userId))) continue;
+    const user = await User.findById(userId).lean();
+    if (!user || user.deletedAt) continue;
+
+    const slot = taskCompletionReminderSlot(user.timezone, now);
+    if (!slot) continue;
+
+    const routines = await Routine.find({ userId }).select('_id').lean();
+    if (!routines.length) continue;
+
+    try {
+      await TaskCompletionReminderLog.create({
+        userId,
+        date: slot.date,
+        kind: slot.kind,
+        sentAt: now,
+        expiresAt: new Date(now.getTime() + TASK_COMPLETION_REMINDER_LOG_DAYS * DAY_MS),
+      });
+    } catch (err) {
+      if (err.code === 11000) {
+        stats.suppressed += 1;
+        continue;
+      }
+      throw err;
+    }
+
+    const doneIds = new Set((await Completion.distinct('routineId', {
+      userId,
+      date: slot.date,
+      status: 'done',
+    })).map(String));
+    const allTasksDone = routines.every((routine) => doneIds.has(String(routine._id)));
+    const { delivered } = await sendToUser(
+      userId,
+      taskCompletionReminderPayload(user.locale === 'bn' ? 'bn' : 'en', allTasksDone),
+      sender,
+      'routineReminders',
+    );
+    if (delivered > 0) {
+      stats.sent += 1;
+    } else {
+      stats.failed += 1;
+      await TaskCompletionReminderLog.deleteOne({
+        userId,
+        date: slot.date,
+        kind: slot.kind,
+      });
+    }
+  }
+
+  logger.info({ ...stats }, 'task completion reminder tick finished');
+  return stats;
 }
 
 // One tick: check every user with a push subscription and send any reminders that are due.
@@ -278,6 +393,7 @@ export function startScheduler({ intervalMs = 60 * 1000, enableReminders = true,
   const timer = setInterval(() => {
     if (enableReminders) {
       runReminderTick({ owner }).catch((err) => logger.error({ errName: err.name }, 'reminder tick failed'));
+      runTaskCompletionReminderTick({ owner }).catch((err) => logger.error({ errName: err.name }, 'task completion reminder tick failed'));
       runAlarmTick({ owner, telegramToken: config?.TELEGRAM_BOT_TOKEN }).catch((err) => logger.error({ errName: err.name }, 'alarm tick failed'));
     }
     if (trainingSecret) {

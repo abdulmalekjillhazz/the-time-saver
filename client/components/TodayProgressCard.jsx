@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card } from './ui/Card.jsx';
 import { Button } from './ui/Button.jsx';
 import { toBanglaNumber } from '../lib/prayerAnchors.js';
-import { recordDailyVisit } from '../lib/dailyVisit.js';
+import { apiRequest } from '../lib/apiClient.js';
 
 export function TodayProgressCard({
   lang = 'bn',
@@ -15,8 +15,8 @@ export function TodayProgressCard({
 }) {
   const isBn = lang === 'bn';
   const [isOnline, setIsOnline] = useState(true);
-  const [dailyVisit, setDailyVisit] = useState(null);
-  const [dailyVisitError, setDailyVisitError] = useState('');
+  const [learningStreak, setLearningStreak] = useState(null);
+  const [learningStreakError, setLearningStreakError] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -33,14 +33,32 @@ export function TodayProgressCard({
 
   useEffect(() => {
     if (!userId || typeof window === 'undefined') return;
-    try {
-      setDailyVisit(recordDailyVisit(window.localStorage, userId));
-      setDailyVisitError('');
-    } catch (error) {
-      console.error('Could not record daily app visit', error);
-      setDailyVisitError(isBn ? 'আজকের উপস্থিতি সংরক্ষণ করা যায়নি।' : 'Today’s check-in could not be saved.');
-    }
-  }, [isBn, userId]);
+    let active = true;
+    const loadLearningStreak = async () => {
+      try {
+        const summary = await apiRequest('/api/badges', { locale: lang });
+        if (active) {
+          setLearningStreak(summary.stats.learningStreak);
+          setLearningStreakError('');
+        }
+      } catch (error) {
+        if (active) {
+          setLearningStreakError(error.message || (isBn
+            ? 'শেখার স্ট্রিক লোড করা যায়নি।'
+            : 'Learning streak could not be loaded.'));
+        }
+      }
+    };
+    const refresh = () => { void loadLearningStreak(); };
+    refresh();
+    window.addEventListener('smart-routine:learning-activity', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      active = false;
+      window.removeEventListener('smart-routine:learning-activity', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [isBn, lang, userId]);
 
   const total = routines.length;
   const completed = routines.filter((r) => r.completionStatus === 'done').length;
@@ -127,19 +145,25 @@ export function TodayProgressCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-sapphire/20 bg-paper/60 px-3 py-2 text-sm">
-        <span aria-hidden="true">{dailyVisitError ? '⚠️' : dailyVisit ? '✅' : '📅'}</span>
+        <span aria-hidden="true">{learningStreakError ? '⚠️' : '🔥'}</span>
         <span className="font-semibold">
-          {dailyVisitError
-            ? dailyVisitError
-            : dailyVisit
+          {learningStreakError || (learningStreak
+            ? isBn
+              ? `শেখার স্ট্রিক: ${toBanglaNumber(learningStreak.current)} দিন`
+              : `Learning streak: ${learningStreak.current} days`
+            : isBn ? 'শেখার স্ট্রিক লোড হচ্ছে…' : 'Loading learning streak…')}
+        </span>
+        {learningStreak ? (
+          <span className="text-xs opacity-70">
+            {learningStreak.current > 0
               ? isBn
-                ? `আজ উপস্থিত · টানা ${toBanglaNumber(dailyVisit.streak)} দিন`
-                : `Checked in today · ${dailyVisit.streak}-day streak`
-              : isBn ? 'আজকের উপস্থিতি যাচাই হচ্ছে…' : 'Checking today’s visit…'}
-        </span>
-        <span className="text-xs opacity-70">
-          {isBn ? 'এই ডিভাইসে অ্যাপ খোলার দিন গোনা হয়' : 'App visits are counted on this device'}
-        </span>
+                ? `সর্বোচ্চ ${toBanglaNumber(learningStreak.longest)} দিন · প্রতিদিন গল্প শেষ করুন বা কুইজ জমা দিন`
+                : `Best: ${learningStreak.longest} days · Finish a story or submit a quiz each day`
+              : isBn
+                ? 'গল্প শেষ করুন বা কুইজ জমা দিন; একদিন বাদ গেলে নতুন করে শুরু হবে'
+                : 'Finish a story or submit a quiz; missing a day restarts the streak'}
+          </span>
+        ) : null}
       </div>
 
       {total > 0 && (
