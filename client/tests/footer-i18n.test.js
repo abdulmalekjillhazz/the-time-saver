@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { DICTIONARIES } from '../i18n/dictionaries.js';
 
 const FOOTER_KEYS = ['note', 'label', 'privacy', 'terms', 'help'];
-const NAV_KEYS = ['label', 'home', 'lessons', 'about', 'help', 'app', 'menu', 'close'];
+const NAV_KEYS = ['label', 'home', 'lessons', 'about', 'help', 'app', 'downloadAndroid', 'menu', 'close'];
 
 describe('footer and navigation copy', () => {
   it('every footer key exists and is not empty in both languages', () => {
@@ -18,6 +18,13 @@ describe('footer and navigation copy', () => {
       for (const key of NAV_KEYS) {
         expect(dict.nav[key], `${lang} nav.${key}`).toBeTruthy();
       }
+    }
+  });
+
+  it('provides Android download copy and a sideloading notice in both languages', () => {
+    for (const [lang, dict] of Object.entries(DICTIONARIES)) {
+      expect(dict.home.ctaAndroid, `${lang} home.ctaAndroid`).toBeTruthy();
+      expect(dict.home.androidDownloadNote, `${lang} home.androidDownloadNote`).toBeTruthy();
     }
   });
 

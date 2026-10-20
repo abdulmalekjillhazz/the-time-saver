@@ -188,11 +188,15 @@ export default async function HomePage(props) {
               <Link href={`/${lang}/lessons`} className="landing-button secondary-button px-5 py-3 font-semibold">
                 {isBn ? '📚 আজকের পাঠ পড়ুন' : '📚 Explore Habit Lessons'}
               </Link>
+              <a href="/downloads/smart-routine-android.apk" download className="landing-button secondary-button px-5 py-3 font-semibold">
+                {home.ctaAndroid}
+              </a>
             </div>
 
             <p className="mt-4 text-xs font-semibold text-white/80">
               ✓ {isBn ? 'কোনো ক্রেডিট কার্ড লাগবে না · ১০০% ফ্রি · বাংলা ও ইংরেজি' : 'No credit card needed · Free forever · Bangla & English'}
             </p>
+            <p className="mt-2 max-w-xl text-xs text-white/75">{home.androidDownloadNote}</p>
           </div>
 
           {/* Interactive Preview Widget — same tokens as app routine tiles */}

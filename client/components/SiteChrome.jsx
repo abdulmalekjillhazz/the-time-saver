@@ -41,6 +41,13 @@ export function Header({ lang, dict }) {
           >
             {dict.nav.app}
           </Link>
+          <a
+            href="/downloads/smart-routine-android.apk"
+            download
+            className="hidden min-h-[40px] items-center rounded-xl border border-gold/50 px-4 py-2 text-sm font-bold text-gold hover:bg-gold/10 lg:inline-flex"
+          >
+            {dict.nav.downloadAndroid}
+          </a>
         </div>
 
         <MobileMenu label={dict.nav.menu} closeLabel={dict.nav.close}>
@@ -48,6 +55,7 @@ export function Header({ lang, dict }) {
           <Link href={`/${lang}/lessons`} className="min-h-[44px] py-2 font-medium">{dict.nav.lessons}</Link>
           <Link href={`/${lang}/about`} className="min-h-[44px] py-2 font-medium">{dict.nav.about}</Link>
           <Link href={`/${lang}/help`} className="min-h-[44px] py-2 font-medium">{dict.nav.help}</Link>
+          <a href="/downloads/smart-routine-android.apk" download className="min-h-[44px] py-2 font-medium">{dict.nav.downloadAndroid}</a>
           <Link href="/app" className="min-h-[44px] rounded-lg bg-gold px-4 py-2 font-semibold text-on-gold sm:hidden">
             {dict.nav.app}
           </Link>
@@ -68,6 +76,7 @@ export function Footer({ lang, dict }) {
           <Link href={`/${lang}/privacy`}>{dict.footer.privacy}</Link>
           <Link href={`/${lang}/terms`}>{dict.footer.terms}</Link>
           <Link href={`/${lang}/help`}>{dict.footer.help}</Link>
+          <a href="/downloads/smart-routine-android.apk" download>{dict.nav.downloadAndroid}</a>
         </nav>
       </div>
     </footer>
