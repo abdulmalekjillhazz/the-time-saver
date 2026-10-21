@@ -21,14 +21,17 @@ test.describe('mobile header and home page at 360px', () => {
     await expect(button).toBeFocused();
   });
 
-  test('all Android test app links point to the published APK', async ({ page }) => {
-    const downloadUrl = 'https://github.com/abdulmalekjillhazz/the-time-saver/releases/download/android-v1.3-build4-debug-f5eea27/Smart-Routine-v1.3-build4-debug.apk';
+  test('all Android app links point to the production APK download', async ({ page }) => {
+    const downloadUrl = '/downloads/smart-routine-android.apk';
     await page.goto('/en');
-    await expect(page.locator('#main').getByRole('link', { name: 'Download Android test app' })).toHaveAttribute('href', downloadUrl);
-    await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android test app' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.locator('#main').getByRole('link', { name: 'Download Android app' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app' })).toHaveAttribute('href', downloadUrl);
+    const apkResponse = await page.request.head(new URL(downloadUrl, page.url()).href);
+    expect(apkResponse.ok()).toBeTruthy();
+    expect(apkResponse.headers()['content-type']).toContain('application/vnd.android.package-archive');
 
     await page.getByRole('button', { name: 'Menu' }).click();
-    const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android test app' });
+    const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app' });
     await expect(navigationLinks).toHaveAttribute('href', downloadUrl);
   });
 
