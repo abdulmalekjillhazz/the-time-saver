@@ -16,6 +16,7 @@ const apiOrigin = (() => {
   }
   return process.env.NODE_ENV === 'production' ? 'https://server-s3yn.vercel.app' : 'http://localhost:5000';
 })();
+const capacitorBundle = process.env.CAPACITOR_BUNDLE === '1';
 
 const csp = [
   "default-src 'self'",
@@ -43,6 +44,7 @@ const securityHeaders = [
 
 const nextConfig = {
   distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
+  ...(capacitorBundle ? { output: 'export' } : {}),
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['@smart-routine/shared'],
@@ -51,26 +53,30 @@ const nextConfig = {
       { protocol: 'https', hostname: 'res.cloudinary.com', pathname: '/fnxzbafx/**' },
     ],
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${apiOrigin}/api/:path*`,
-      },
-    ];
-  },
-  async headers() {
-    return [
-      {
-        source: '/downloads/smart-routine-android.apk',
-        headers: [
-          { key: 'Content-Disposition', value: 'attachment; filename="Smart-Routine-Android-v1.2.apk"' },
-          { key: 'Cache-Control', value: 'public, max-age=3600' },
-        ],
-      },
-      { source: '/:path*', headers: securityHeaders },
-    ];
-  },
+  ...(!capacitorBundle
+    ? {
+        async rewrites() {
+          return [
+            {
+              source: '/api/:path*',
+              destination: `${apiOrigin}/api/:path*`,
+            },
+          ];
+        },
+        async headers() {
+          return [
+            {
+              source: '/downloads/smart-routine-android.apk',
+              headers: [
+                { key: 'Content-Disposition', value: 'attachment; filename="Smart-Routine-Android-v1.2.apk"' },
+                { key: 'Cache-Control', value: 'public, max-age=3600' },
+              ],
+            },
+            { source: '/:path*', headers: securityHeaders },
+          ];
+        },
+      }
+    : {}),
 };
 
 export default nextConfig;

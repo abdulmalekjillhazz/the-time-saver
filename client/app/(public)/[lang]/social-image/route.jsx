@@ -1,7 +1,12 @@
 import { ImageResponse } from 'next/og';
-import { BRAND, isLang } from '../../../../lib/seo.js';
+import { BRAND, isLang, LANGS } from '../../../../lib/seo.js';
 
 export const revalidate = 86400;
+export const dynamic = 'force-static';
+
+export function generateStaticParams() {
+  return LANGS.map((lang) => ({ lang }));
+}
 
 export async function GET(_request, { params }) {
   const routeParams = await params;

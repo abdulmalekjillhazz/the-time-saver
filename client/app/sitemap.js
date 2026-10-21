@@ -1,6 +1,8 @@
 import { LANGS, absUrl, indexable, languageAlternates } from '../lib/seo.js';
 import { getLessons } from '../lib/api.js';
 
+export const dynamic = 'force-static';
+
 const STATIC_ROUTES = [
   { path: '', changeFrequency: 'daily', priority: 1.0 },
   { path: '/lessons', changeFrequency: 'daily', priority: 0.9 },
@@ -9,6 +11,8 @@ const STATIC_ROUTES = [
 ];
 
 export default async function sitemap() {
+  if (process.env.CAPACITOR_BUNDLE === '1') return [];
+
   const entries = [];
   const langs = LANGS.filter((l) => indexable(l));
   const now = new Date();

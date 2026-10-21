@@ -1,3 +1,5 @@
+export const dynamic = 'force-static';
+
 export default function manifest() {
   return {
     name: 'Smart Routine — Daily Routine Planner & Habit Coach',
