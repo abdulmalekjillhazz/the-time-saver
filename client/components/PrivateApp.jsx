@@ -2174,7 +2174,7 @@ export function PrivateApp() {
           </div>
         </Card>
       ) : null}
-      {!immersiveTab ? <nav className="app-tabs" aria-label={copy.title}>
+      <nav className="app-tabs" aria-label={copy.title}>
         {[
           ['today', '🌤️', copy.today, lang === 'bn' ? 'আজ' : 'Today'],
           ['plan', '🗓️', lang === 'bn' ? 'পরিকল্পনা' : 'Plan', lang === 'bn' ? 'পরিকল্পনা' : 'Plan'],
@@ -2190,7 +2190,7 @@ export function PrivateApp() {
             <span className="tab-label-mobile" aria-hidden="true">{shortLabel}</span>
           </Button>
         ))}
-      </nav> : null}
+      </nav>
 
       {tab === 'leaderboard' ? <LeaderboardPanel lang={lang} /> : null}
 
