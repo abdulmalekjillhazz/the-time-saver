@@ -19,7 +19,8 @@ afterEach(() => vi.restoreAllMocks());
 describe('Daily Lesson: pure utilities and validation', () => {
   it('instructs the daily story generator to write short, funny beginner stories', () => {
     expect(MASTER_PROMPT).toContain('90-120 spoken words');
-    expect(MASTER_PROMPT).toContain('common beginner-level words and short sentences');
+    expect(MASTER_PROMPT).toContain('common beginner-level words throughout');
+    expect(MASTER_PROMPT).toContain('3 story sentences of 3-5 words, 3 of 6-9 words, and 3 of 10-14 words');
     expect(MASTER_PROMPT).toContain('genuinely amusing and warm');
     expect(MASTER_PROMPT).toContain('keep every event, reaction, and solution plausible');
     expect(MASTER_PROMPT).toContain('clear, fair multiple-choice questions');

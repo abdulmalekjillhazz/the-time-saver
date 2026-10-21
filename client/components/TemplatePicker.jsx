@@ -71,9 +71,6 @@ export function TemplatePicker({ lang = 'en', userId, onRoutineAdded }) {
         },
       });
       if (result.operationStatus === 'failed') throw new Error('Routine was rejected by the server.');
-      // Keep the clientId while pending so retries remain idempotent. Once the
-      // outbox confirms delivery, release it so a future intentional add can
-      // create a new routine instead of resolving to the old one forever.
       if (!(result.operationStatus === 'pending' || result.retryable || result.busy)) {
         clearTemplateClientId(userId, template.id);
       }
@@ -95,7 +92,7 @@ export function TemplatePicker({ lang = 'en', userId, onRoutineAdded }) {
   return (
     <Card className="surface-card space-y-3">
       <h2 className="section-heading">{copy.title}</h2>
-      {error ? <p role="alert" className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm font-semibold text-rose-400">{error}</p> : null}
       {queuedIds.size ? <p role="status" className="text-sm opacity-80">{copy.queued}</p> : null}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {ROUTINE_TEMPLATES.map((template) => (
@@ -104,7 +101,7 @@ export function TemplatePicker({ lang = 'en', userId, onRoutineAdded }) {
             type="button"
             onClick={() => addTemplate(template)}
             disabled={!userId || busyId === template.id || addedIds.has(template.id)}
-            className="flex items-center justify-between gap-2 rounded-xl border border-sapphire/20 px-3 py-2 text-left text-sm disabled:opacity-50"
+            className="flex min-h-[44px] items-center justify-between gap-2 rounded-xl border border-sapphire/20 px-3.5 py-2.5 text-left text-sm transition hover:border-gold/50 disabled:opacity-50"
           >
             <span>
               <span className="block font-semibold">{templateTitle(template, lang)}</span>

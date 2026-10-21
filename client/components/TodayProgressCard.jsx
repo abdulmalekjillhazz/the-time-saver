@@ -123,7 +123,7 @@ export function TodayProgressCard({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             variant="secondary"
-            className="flex min-h-[42px] w-full items-center justify-center px-3 text-xs font-bold sm:text-sm"
+            className="flex min-h-[44px] w-full items-center justify-center px-3 text-xs font-bold sm:text-sm touch-manipulation"
             onClick={scrollToAlarms}
             title={isBn ? 'কাস্টম ভয়েস ও নোটিফিকেশন অ্যালার্ম সেট করুন' : 'Set custom voice & notification alarm'}
           >
@@ -134,7 +134,7 @@ export function TodayProgressCard({
           {onScrollToAddRoutine && (
             <Button
               variant="primary"
-              className="flex min-h-[42px] w-full items-center justify-center px-3 text-xs font-bold sm:text-sm"
+              className="flex min-h-[44px] w-full items-center justify-center px-3 text-xs font-bold sm:text-sm touch-manipulation"
               onClick={onScrollToAddRoutine}
             >
               <span aria-hidden="true" className="mr-1">➕</span>
@@ -176,6 +176,8 @@ export function TodayProgressCard({
               aria-valuenow={percentage}
               aria-valuemin={0}
               aria-valuemax={100}
+              aria-label={isBn ? 'আজকের রুটিন সম্পন্ন করার অগ্রগতি' : "Today's routine progress"}
+              aria-valuetext={isBn ? `${toBanglaNumber(percentage)}% সম্পন্ন` : `${percentage}% completed`}
             />
           </div>
           <div className="flex justify-between text-[11px] text-ink/70">

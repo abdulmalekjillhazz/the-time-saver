@@ -2139,13 +2139,27 @@ export function PrivateApp() {
       {error ? (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-rose-400 bg-rose-500/15 px-4 py-3 text-sm font-bold text-rose-300 shadow-lg">
           <span>{error.startsWith('❌') ? error : `❌ ${error}`}</span>
-          <button type="button" onClick={() => setError('')} className="rounded-lg border border-rose-400/50 px-2.5 py-1 text-xs font-extrabold">✕</button>
+          <button
+            type="button"
+            onClick={() => setError('')}
+            aria-label={lang === 'bn' ? 'বার্তা বন্ধ করুন' : 'Dismiss error'}
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-rose-400/50 p-2 text-sm font-extrabold text-rose-300 hover:bg-rose-500/20"
+          >
+            ✕
+          </button>
         </div>
       ) : null}
       {notice ? (
         <div role="status" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-sapphire bg-sapphire/15 px-4 py-3 text-sm font-bold text-sapphire shadow-lg">
           <span>{notice.startsWith('✅') ? notice : `✅ ${notice}`}</span>
-          <button type="button" onClick={() => setNotice('')} className="rounded-lg border border-sapphire/50 px-2.5 py-1 text-xs font-extrabold">✕</button>
+          <button
+            type="button"
+            onClick={() => setNotice('')}
+            aria-label={lang === 'bn' ? 'বার্তা বন্ধ করুন' : 'Dismiss notice'}
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-sapphire/50 p-2 text-sm font-extrabold text-sapphire hover:bg-sapphire/20"
+          >
+            ✕
+          </button>
         </div>
       ) : null}
       {firingAlarm ? (
@@ -2315,7 +2329,29 @@ export function PrivateApp() {
 
           <Card className="surface-card space-y-4">
             <h2 className="section-heading"><span aria-hidden="true">🌤️</span> {copy.today}</h2>
-            {routines.length === 0 ? <p>{copy.noRoutines}</p> : (
+            {routines.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gold/30 bg-gold/5 p-8 text-center sm:p-10">
+                <span className="text-4xl sm:text-5xl" aria-hidden="true">🌱</span>
+                <h3 className="mt-3 text-lg font-bold text-ink sm:text-xl">
+                  {lang === 'bn' ? 'আজকের কোনো রুটিন এখনো যোগ করা হয়নি' : 'No routines planned for today yet'}
+                </h3>
+                <p className="mt-1.5 max-w-md text-sm text-ink/70">
+                  {lang === 'bn'
+                    ? 'সহজ কিছু অভ্যাস ও লক্ষ্য দিয়ে দিনটি সাজান। টেমপ্লেট থেকে দ্রুত বেছে নিতে পারেন অথবা নিজের মতো তৈরি করতে পারেন।'
+                    : 'Start organizing your day with simple habits and goals. Pick from quick templates or create your custom routine.'}
+                </p>
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    variant="primary"
+                    className="min-h-[44px] px-5 py-2.5 text-sm font-bold shadow-md"
+                    onClick={() => setTab('plan')}
+                  >
+                    <span aria-hidden="true" className="mr-1.5">➕</span>
+                    <span>{lang === 'bn' ? 'প্রথম রুটিন যোগ করুন' : 'Add First Routine'}</span>
+                  </Button>
+                </div>
+              </div>
+            ) : (
               <ul className="space-y-3">
                 {routines.map((routine) => (
                   <li key={routine.id} className="routine-tile flex flex-wrap items-center justify-between gap-3 rounded-2xl border-b border-sapphire/20 p-4">
@@ -2329,7 +2365,7 @@ export function PrivateApp() {
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
-                        className="min-h-[42px] px-3.5 text-xs font-bold sm:text-sm"
+                        className="min-h-[44px] px-3.5 text-xs font-bold sm:text-sm"
                         variant="primary"
                         disabled={busy}
                         onClick={() => setActiveRoutineTask(routine)}
@@ -2341,13 +2377,13 @@ export function PrivateApp() {
                         type="button"
                         onClick={() => setReplanRoutine(routine)}
                         title={lang === 'bn' ? 'সময় কম? ৫ মিনিটের সংক্ষেপ বিকল্প' : 'Short on time? 5-min version'}
-                        className="inline-flex items-center gap-1 rounded-lg border border-amber-400 bg-amber-500/10 px-2.5 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500/20"
+                        className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-amber-400 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500/20"
                       >
                         <span aria-hidden="true">⚡</span>
                         <span>{lang === 'bn' ? '৫ মিনিট' : '5 min'}</span>
                       </button>
                       <Button
-                        className="min-h-[42px] px-3.5 text-xs font-bold sm:text-sm"
+                        className="min-h-[44px] px-3.5 text-xs font-bold sm:text-sm"
                         variant={routine.completionStatus === 'done' ? 'primary' : 'secondary'}
                         aria-label={copy.done}
                         title={copy.done}
@@ -2362,7 +2398,7 @@ export function PrivateApp() {
                       ].map(([status, icon]) => (
                         <Button
                           key={status}
-                          className="icon-button min-h-[40px] min-w-[40px]"
+                          className="icon-button inline-flex min-h-[44px] min-w-[44px] items-center justify-center"
                           variant={routine.completionStatus === status ? 'primary' : 'secondary'}
                           aria-label={copy[status]}
                           title={copy[status]}
@@ -2374,7 +2410,7 @@ export function PrivateApp() {
                       ))}
                       <Button
                         variant="secondary"
-                        className="icon-button min-h-[40px] min-w-[40px] text-ink/60 hover:text-red-400"
+                        className="icon-button inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-ink/60 hover:text-red-400"
                         aria-label={copy.delete}
                         title={copy.delete}
                         disabled={busy}
@@ -2618,7 +2654,7 @@ export function PrivateApp() {
                       <div className="grid grid-cols-2 gap-2">
                         <Button
                           variant="primary"
-                          className="flex min-h-[42px] w-full items-center justify-center text-xs font-bold"
+                          className="flex min-h-[44px] w-full items-center justify-center text-xs font-bold"
                           disabled={busy}
                           onClick={() => loadLesson(item.slug, 'story')}
                         >
@@ -2626,7 +2662,7 @@ export function PrivateApp() {
                         </Button>
                         <Button
                           variant="secondary"
-                          className="flex min-h-[42px] w-full items-center justify-center text-xs font-bold"
+                          className="flex min-h-[44px] w-full items-center justify-center text-xs font-bold"
                           disabled={busy}
                           onClick={() => loadLesson(item.slug, 'quiz')}
                         >

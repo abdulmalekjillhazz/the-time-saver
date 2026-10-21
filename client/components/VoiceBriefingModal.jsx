@@ -59,31 +59,31 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
           setSpeechError(speechRequestError.message || copy.speechUnavailable);
         },
       });
-    } catch {
+    } catch (requestError) {
       setSpeaking(false);
       setPaused(false);
-      setSpeechError(copy.speechUnavailable);
+      setSpeechError(requestError?.message || copy.speechUnavailable);
     }
   }, [activeText, copy.speechUnavailable, isBn, lang]);
 
   useEffect(() => {
-    startSpeech();
     return () => {
       controllerRef.current?.close();
-      controllerRef.current = null;
     };
-  }, [startSpeech]);
+  }, []);
 
   const handleSpeech = () => {
     if (!speaking) {
       startSpeech(activeText);
-    } else if (paused) {
+      return;
+    }
+    if (paused) {
       controllerRef.current?.resume();
       setPaused(false);
-    } else {
-      controllerRef.current?.pause();
-      setPaused(true);
+      return;
     }
+    controllerRef.current?.pause();
+    setPaused(true);
   };
 
   const handleStop = () => {
@@ -97,16 +97,30 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
     onClose();
   };
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="voice-briefing-title"
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+    >
       <Card className="surface-card max-h-[90vh] w-full max-w-lg overflow-y-auto p-5 shadow-2xl sm:p-6">
         <div className="flex items-center justify-between border-b border-gold/25 pb-3">
-          <h3 className="section-heading text-lg">{copy.title}</h3>
+          <h2 id="voice-briefing-title" className="section-heading text-lg">{copy.title}</h2>
           <button
             type="button"
             onClick={handleClose}
             aria-label={copy.close}
-            className="secondary-button min-h-[38px] min-w-[38px] px-2.5 py-1 text-xs font-bold"
+            className="secondary-button inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl p-2 font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
           >
             ✕
           </button>
@@ -139,12 +153,24 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
                 {routines.map((r) => (
                   <li
                     key={r.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => startSpeech(
                       isBn
                         ? `${userName}, আপনার রুটিন ${r.title}, শুরুর সময় ${formatNaturalTime(r.startTime, 'bn')}।`
                         : `${userName}, your routine is ${r.title}, starting at ${formatNaturalTime(r.startTime, 'en')}.`
                     )}
-                    className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-sapphire/20 bg-paper px-3 py-2 transition hover:border-gold"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        startSpeech(
+                          isBn
+                            ? `${userName}, আপনার রুটিন ${r.title}, শুরুর সময় ${formatNaturalTime(r.startTime, 'bn')}।`
+                            : `${userName}, your routine is ${r.title}, starting at ${formatNaturalTime(r.startTime, 'en')}.`
+                        );
+                      }
+                    }}
+                    className="flex min-h-[44px] cursor-pointer items-center justify-between gap-2 rounded-lg border border-sapphire/20 bg-paper px-3 py-2 transition hover:border-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
                   >
                     <span className="font-bold text-ink">
                       {r.completionStatus === 'done' ? '✅ ' : r.isFrog ? '⭐ ' : '🔊 '}

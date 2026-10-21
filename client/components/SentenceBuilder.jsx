@@ -1,17 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { getSentenceDifficultyLevel } from '@smart-routine/shared';
 import { apiRequest } from '../lib/apiClient.js';
 import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { Card } from './ui/Card.jsx';
 
 const LEVELS = ['basic', 'intermediate', 'advanced'];
-
-function sentenceLevel(wordCount) {
-  if (wordCount <= 5) return 'basic';
-  if (wordCount <= 9) return 'intermediate';
-  return 'advanced';
-}
 
 export function getUnlockedLevels(levelCounts, completedLevels) {
   const unlocked = ['basic'];
@@ -86,7 +81,7 @@ export function extractGrammarExercises(stories = []) {
         words: shuffledWords,
         answer: chunks,
         wordCount: englishWords.length,
-        level: sentenceLevel(englishWords.length),
+        level: getSentenceDifficultyLevel(englishWords.length),
         structure: sentenceStructure(sentence),
       });
     }
@@ -115,27 +110,33 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const [completionBusy, setCompletionBusy] = useState(false);
   const [completionError, setCompletionError] = useState('');
   const [milestoneNotice, setMilestoneNotice] = useState('');
+
   useEffect(() => {
     let active = true;
     apiRequest('/api/gamification/grammar-sentences')
-      .then(({ completedSentences }) => {
-        if (active) setCompletedSentenceCount(completedSentences);
+      .then(({ completedSentences, completedLevels: savedLevels }) => {
+        if (!active) return;
+        setCompletedSentenceCount(completedSentences);
+        if (savedLevels) setCompletedLevels(savedLevels);
       })
       .catch((error) => {
         if (active) setCompletionError(error.message);
       });
     return () => { active = false; };
   }, []);
+
   const availableStories = useMemo(() => {
     const uniqueStories = new Map();
     for (const exercise of exercises) uniqueStories.set(exercise.slug, exercise.sourceTitle);
     return [...uniqueStories].map(([slug, title]) => ({ slug, title }));
   }, [exercises]);
+
   const filteredExercises = useMemo(
     () => exercises.filter((exercise) => exercise.level === level
       && (storySlug === 'all' || exercise.slug === storySlug)),
     [exercises, level, storySlug],
   );
+
   const levelCounts = useMemo(
     () => Object.fromEntries(LEVELS.map((item) => [
       item,
@@ -143,6 +144,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     ])),
     [exercises],
   );
+
   const unlockedLevels = new Set(getUnlockedLevels(levelCounts, completedLevels));
   const exercise = filteredExercises.length
     ? filteredExercises[exerciseIndex % filteredExercises.length]
@@ -177,6 +179,12 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     setResult('');
   };
 
+  const removeWordAtPosition = (position) => {
+    if (result === 'correct') return;
+    setSelected((current) => current.filter((_, idx) => idx !== position));
+    setResult('');
+  };
+
   const checkSentence = () => {
     if (!correct) {
       setResult('try-again');
@@ -191,9 +199,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
       locale: lang,
     }).then((completion) => {
       setCompletedSentenceCount(completion.completedSentences);
-      if (completion.recorded) {
-        setCompletedLevels((current) => ({ ...current, [level]: current[level] + 1 }));
-      }
+      if (completion.completedLevels) setCompletedLevels(completion.completedLevels);
       if (completion.earnedPoints > 0) {
         setMilestoneNotice(isBn
           ? 'অভিনন্দন! ১০টি বাক্য শেষ করে ৩০ পয়েন্ট পেয়েছ!'
@@ -263,7 +269,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     aria-pressed={level === item}
                     disabled={!unlocked}
                     onClick={() => chooseLevel(item)}
-                    className={`min-h-12 rounded-xl border px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                    className={`min-h-[44px] rounded-xl border px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       level === item
                         ? 'border-gold bg-gold/15 text-ink shadow-sm'
                         : 'border-sapphire/20 bg-paper/65 text-ink/75 hover:border-gold/50'
@@ -285,7 +291,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
               <select
                 value={storySlug}
                 onChange={(event) => chooseStory(event.target.value)}
-                className="mt-1.5 block min-h-11 w-full rounded-xl border border-sapphire/25 bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1.5 block min-h-[44px] w-full rounded-xl border border-sapphire/25 bg-paper px-3 py-2 text-sm text-ink"
               >
                 <option value="all">{isBn ? 'সব গল্প' : 'All stories'}</option>
                 {availableStories.map((story) => (
@@ -312,12 +318,23 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                 <div className="flex min-h-20 flex-wrap items-center gap-2 rounded-xl border border-dashed border-gold/40 bg-paper/70 p-3" aria-live="polite">
                   {selected.length ? (
                     selected.map((wordIndex, position) => (
-                      <span key={`${wordIndex}-${position}`} className="rounded-lg border border-sapphire/25 bg-sapphire/10 px-3 py-2 text-sm font-bold text-ink">
-                        {exercise.words[wordIndex]}
-                      </span>
+                      <button
+                        key={`${wordIndex}-${position}`}
+                        type="button"
+                        onClick={() => removeWordAtPosition(position)}
+                        disabled={result === 'correct'}
+                        aria-label={isBn ? `${exercise.words[wordIndex]} বাদ দিতে ক্লিক করুন` : `Click to remove ${exercise.words[wordIndex]}`}
+                        title={isBn ? 'বাদ দিতে ট্যাপ করুন' : 'Tap to remove'}
+                        className="group inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-sapphire/40 bg-sapphire/15 px-3 py-2 text-sm font-bold text-ink transition hover:border-rose-400 hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sapphire disabled:cursor-default"
+                      >
+                        <span>{exercise.words[wordIndex]}</span>
+                        {result !== 'correct' && (
+                          <span aria-hidden="true" className="text-xs text-ink/40 group-hover:text-rose-400">✕</span>
+                        )}
+                      </button>
                     ))
                   ) : (
-                    <span className="text-sm text-ink/50">{isBn ? 'শব্দগুলো সঠিক ক্রমে বেছে নাও…' : 'Put the words in the correct order…'}</span>
+                    <span className="text-sm text-ink/50">{isBn ? 'নিচের শব্দগুলোতে ট্যাপ করে সঠিক ক্রমে বাক্য সাজাও…' : 'Tap the words below to build the sentence…'}</span>
                   )}
                 </div>
 
@@ -330,7 +347,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                         type="button"
                         disabled={used || result === 'correct'}
                         onClick={() => chooseWord(wordIndex)}
-                        className="min-h-10 rounded-xl border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-bold text-ink transition hover:-translate-y-0.5 hover:border-gold/70 hover:bg-gold/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-default disabled:opacity-35"
+                        className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gold/30 bg-gold/10 px-3.5 py-2 text-sm font-bold text-ink transition hover:-translate-y-0.5 hover:border-gold/70 hover:bg-gold/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-default disabled:opacity-35"
                       >
                         {word}
                       </button>
@@ -338,24 +355,46 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                   })}
                 </div>
 
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button type="button" onClick={checkSentence} disabled={!selected.length || result === 'correct' || completionBusy} className="min-h-11 rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-5 py-2 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">
+                <div className="flex flex-wrap gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={checkSentence}
+                    disabled={!selected.length || result === 'correct' || completionBusy}
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-5 py-2 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
                     {completionBusy
                       ? (isBn ? 'সংরক্ষণ হচ্ছে…' : 'Saving…')
                       : (isBn ? 'বাক্য যাচাই' : 'Check sentence')}
                   </button>
-                  <button type="button" onClick={resetSentence} disabled={!selected.length} className="min-h-11 rounded-xl border border-sapphire/25 bg-paper/70 px-4 py-2 text-sm font-bold text-ink transition hover:bg-sapphire/10 disabled:cursor-not-allowed disabled:opacity-50">
-                    {isBn ? 'আবার সাজাও' : 'Start over'}
+                  <button
+                    type="button"
+                    onClick={resetSentence}
+                    disabled={!selected.length}
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-sapphire/25 bg-paper/70 px-4 py-2 text-sm font-bold text-ink transition hover:bg-sapphire/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isBn ? 'সব মুছুন' : 'Reset all'}
                   </button>
                   {result === 'correct' ? (
-                    <button type="button" onClick={nextExercise} className="min-h-11 rounded-xl border border-gold/40 bg-gold/15 px-4 py-2 text-sm font-extrabold text-gold-soft transition hover:bg-gold/25">
+                    <button
+                      type="button"
+                      onClick={nextExercise}
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gold/40 bg-gold/15 px-4 py-2 text-sm font-extrabold text-gold-soft transition hover:bg-gold/25"
+                    >
                       {isBn ? 'পরের বাক্য →' : 'Next sentence →'}
                     </button>
                   ) : null}
                 </div>
 
                 {result ? (
-                  <div role="status" aria-live="polite" className={`space-y-2 rounded-xl px-3 py-3 text-sm font-bold ${result === 'correct' ? 'bg-emerald-500/10 text-emerald-700' : 'bg-gold/10 text-ink'}`}>
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className={`space-y-2 rounded-xl p-3.5 text-sm font-bold ${
+                      result === 'correct'
+                        ? 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+                        : 'border border-gold/30 bg-gold/10 text-ink'
+                    }`}
+                  >
                     <p>
                       {result === 'correct'
                         ? (isBn ? 'দারুণ! গল্পের বাক্যটি ঠিকভাবে সাজিয়েছ।' : 'Excellent! You rebuilt the story sentence correctly.')
@@ -365,12 +404,12 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     {result === 'correct' ? (
                       <>
                         <p className="font-extrabold text-ink">{exercise.sentence}</p>
-                        <p className="text-xs font-bold">{isBn ? 'বাক্যের গঠন:' : 'Sentence structure:'} {isBn ? exercise.structure.bn : exercise.structure.en}</p>
+                        <p className="text-xs font-bold text-ink/80">{isBn ? 'বাক্যের গঠন:' : 'Sentence structure:'} {isBn ? exercise.structure.bn : exercise.structure.en}</p>
                       </>
                     ) : null}
                   </div>
                 ) : null}
-                {completionError ? <p role="alert" className="text-sm font-bold text-rose-700">{completionError}</p> : null}
+                {completionError ? <p role="alert" className="text-sm font-bold text-rose-300">{completionError}</p> : null}
               </div>
             ) : (
               <p role="status" className="rounded-2xl border border-gold/25 bg-gold/5 p-4 text-sm leading-relaxed text-ink/75">

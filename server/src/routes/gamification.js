@@ -49,7 +49,7 @@ export function gamificationRouter() {
 
   r.get('/grammar-sentences', async (req, res, next) => {
     try {
-      res.json({ completedSentences: await getGrammarSentenceProgress(req.userId) });
+      res.json(await getGrammarSentenceProgress(req.userId));
     } catch (err) {
       next(err);
     }

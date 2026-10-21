@@ -3,6 +3,7 @@ import {
   badgeSchema,
   computeStreak,
   gamificationSummarySchema,
+  summarizeGrammarSentenceProgress,
   todayInZone,
   userBadgeSchema,
 } from '@smart-routine/shared';
@@ -48,11 +49,12 @@ async function isPublishedGrammarSentence(sourceSlug, sentence) {
 }
 
 export async function getGrammarSentenceProgress(userId) {
-  return LearningActivity.countDocuments({
+  const activities = await LearningActivity.find({
     userId,
     activityType: 'grammar',
     contentId: /^sentence:/,
-  });
+  }).select('contentId').lean();
+  return summarizeGrammarSentenceProgress(activities.map(({ contentId }) => contentId));
 }
 
 export async function recordGrammarSentenceCompletion({ userId, sourceSlug, sentence, timezone }) {
@@ -81,8 +83,8 @@ export async function recordGrammarSentenceCompletion({ userId, sourceSlug, sent
   }
   await recordLearningDay(userId, 'grammar', todayInZone(timezone || 'Asia/Dhaka'));
 
-  const completedSentences = await getGrammarSentenceProgress(userId);
-  const reward = completedSentences >= GRAMMAR_SENTENCES_FOR_REWARD
+  const progress = await getGrammarSentenceProgress(userId);
+  const reward = progress.completedSentences >= GRAMMAR_SENTENCES_FOR_REWARD
     ? await recordLearningActivity({
       userId,
       activityType: 'grammar',
@@ -93,10 +95,10 @@ export async function recordGrammarSentenceCompletion({ userId, sourceSlug, sent
     : { earnedPoints: 0 };
 
   return {
-    completedSentences,
+    ...progress,
     recorded,
     earnedPoints: reward.earnedPoints,
-    milestoneReached: completedSentences >= GRAMMAR_SENTENCES_FOR_REWARD,
+    milestoneReached: progress.completedSentences >= GRAMMAR_SENTENCES_FOR_REWARD,
   };
 }
 

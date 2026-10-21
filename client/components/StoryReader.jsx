@@ -101,6 +101,24 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
     }
   }, [vocabulary, lang]);
 
+  useEffect(() => {
+    if (!selected) return undefined;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest?.('[data-story-word="true"]')) {
+        setSelected(null);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setSelected(null);
+    };
+    document.addEventListener('pointerdown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selected]);
+
   const handleWordClick = async (word, keyId) => {
     const clean = normalizeWord(word);
     if (!clean) return;
@@ -141,11 +159,11 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
             const isSelected = selected && selected.keyId === keyId;
 
             return (
-              <span key={partIndex} className="relative inline-block">
+              <span key={partIndex} data-story-word="true" className="relative inline-block">
                 {isSelected ? (
                   <span
                     role="status"
-                    className="absolute bottom-full left-1/2 z-50 mb-2 min-w-[170px] max-w-[260px] -translate-x-1/2 rounded-xl border-2 border-gold bg-paper px-3 py-2 text-xs font-semibold text-ink shadow-2xl"
+                    className="absolute bottom-full left-1/2 z-50 mb-2 min-w-[170px] max-w-[min(260px,85vw)] -translate-x-1/2 rounded-xl border-2 border-gold bg-paper px-3 py-2 text-xs font-semibold text-ink shadow-2xl"
                   >
                     <span className="flex items-start justify-between gap-2">
                       <span className="min-w-0 flex-1">
@@ -158,7 +176,7 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
                           e.stopPropagation();
                           setSelected(null);
                         }}
-                        className="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold text-gold-soft hover:bg-gold/20"
+                        className="inline-flex min-h-[32px] min-w-[32px] items-center justify-center rounded px-1.5 py-0.5 text-xs font-bold text-gold-soft hover:bg-gold/20"
                         aria-label="Close"
                       >
                         ✕
@@ -169,7 +187,7 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
                 <button
                   type="button"
                   onClick={() => handleWordClick(part, keyId)}
-                  className={`cursor-pointer rounded px-1 py-0.5 transition hover:bg-gold/30 ${
+                  className={`inline-flex min-h-[32px] cursor-pointer items-center rounded px-1.5 py-0.5 transition hover:bg-gold/30 ${
                     isSelected ? 'bg-gold font-extrabold text-on-gold ring-2 ring-gold' : ''
                   }`}
                 >

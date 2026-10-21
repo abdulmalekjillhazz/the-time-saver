@@ -15,7 +15,7 @@ test.describe('mobile header and home page at 360px', () => {
     await expect(button).toHaveAttribute('aria-expanded', 'false');
     await button.click();
     await expect(button).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByRole('link', { name: 'Lessons', exact: true })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Lessons', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(button).toHaveAttribute('aria-expanded', 'false');
     await expect(button).toBeFocused();

@@ -33,6 +33,8 @@ Common codes: VALIDATION_FAILED (400), UNAUTHENTICATED (401), FORBIDDEN (403), C
 | GET /api/completions/streak | Session | none | Current and longest streak; freeze days count when enabled | none | User 120 per min |
 | POST /api/completions/streak-freeze | Session | date (today or yesterday) | { freeze } | CONFLICT, VALIDATION_FAILED, FEATURE_DISABLED | User 120 per min |
 | GET /api/badges | Session | none | Localized badge catalog, earned badges, streak and completion statistics | FEATURE_DISABLED | User 60 per min |
+| GET /api/gamification/grammar-sentences | Session | none | { completedSentences, completedLevels: { basic, intermediate, advanced } } | UNAUTHENTICATED | User 60 per min |
+| POST /api/gamification/grammar-sentences | Session | sourceSlug, sentence | { completedSentences, completedLevels, recorded, earnedPoints, milestoneReached } | NOT_FOUND, VALIDATION_FAILED | User 60 per min |
 | POST /api/lessons/today/read | Session | dailyLessonId | { read, date, awardedBadges } | NOT_FOUND, VALIDATION_FAILED, FEATURE_DISABLED | User 30 per min |
 | POST /api/sync | Session | ops (max 100), each with Idempotency-Key | { results } | Per-op errors | User 20 per min |
 | GET /api/lessons | None | locale, cursor | { lessons } published, no answers | none | IP 120 per min |

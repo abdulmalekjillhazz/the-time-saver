@@ -807,7 +807,7 @@ export function AudioDramaPlayer({
               type="button"
               onClick={handlePlayPause}
               disabled={!lines.length}
-              className="primary-button min-h-[42px] bg-sapphire px-4 py-1.5 text-xs font-extrabold text-on-sapphire sm:text-sm"
+              className="primary-button min-h-[44px] bg-sapphire px-4 py-1.5 text-xs font-extrabold text-on-sapphire sm:text-sm"
             >
               {isPaused ? copy.resume : isPlaying ? copy.pause : copy.play}
             </button>
@@ -816,7 +816,7 @@ export function AudioDramaPlayer({
                 type="button"
                 onClick={saveAudioOffline}
                 disabled={offlineAudioSaving || Boolean(offlineAudio)}
-                className="secondary-button min-h-[42px] px-3 py-1.5 text-xs font-bold sm:text-sm"
+                className="secondary-button min-h-[44px] px-3 py-1.5 text-xs font-bold sm:text-sm"
               >
                 {offlineAudioSaving ? copy.offlineAudioSaving : offlineAudio ? copy.offlineAudioSaved : copy.saveOfflineAudio}
               </button>
@@ -829,7 +829,7 @@ export function AudioDramaPlayer({
                   onClose?.();
                 }}
                 aria-label={copy.close}
-                className="secondary-button min-h-[42px] px-3.5 py-1.5 text-xs font-bold sm:text-sm"
+                className="secondary-button min-h-[44px] px-3.5 py-1.5 text-xs font-bold sm:text-sm"
               >
                 {copy.close}
               </button>
@@ -904,7 +904,7 @@ export function AudioDramaPlayer({
                     if (!cancelSpeechPractice()) return;
                     setSpeechPracticeOpen(false);
                   }}
-                  className="secondary-button min-h-[42px] px-4 py-2 text-sm font-bold"
+                  className="secondary-button min-h-[44px] px-4 py-2 text-sm font-bold"
                 >
                   ← {isBn ? 'বের হন' : 'Exit practice'}
                 </button>
@@ -1000,12 +1000,12 @@ export function AudioDramaPlayer({
                       </p>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'error' ? (
-                      <p role="alert" className="text-xs font-semibold text-red-700">{speechPractice.message}</p>
+                      <p role="alert" className="text-xs font-semibold text-rose-400">{speechPractice.message}</p>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'result' && comparison ? (
                       <div role="status" aria-live="polite" className="space-y-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs text-ink">
                         <p className="flex items-center gap-2 font-extrabold text-sapphire">
-                          <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-emerald-500/15 text-emerald-700">✓</span>
+                          <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">✓</span>
                           {copy.wordMatch}: {comparison.accuracy}%
                         </p>
                         <p>
@@ -1019,8 +1019,8 @@ export function AudioDramaPlayer({
                               aria-label={comparison.matchedWords[wordIndex] ? copy.matchedWord : copy.missedWord}
                               className={`rounded px-1.5 py-0.5 font-semibold ${
                                 comparison.matchedWords[wordIndex]
-                                  ? 'bg-emerald-100 text-emerald-900'
-                                  : 'bg-red-100 text-red-900'
+                                  ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-300'
+                                  : 'border border-rose-500/30 bg-rose-500/20 text-rose-300'
                               }`}
                             >
                               {word}
@@ -1028,21 +1028,21 @@ export function AudioDramaPlayer({
                           ))}
                         </p>
                         <p className="flex flex-wrap gap-x-3 gap-y-1">
-                          <span className="font-semibold text-emerald-900">✓ {copy.matchedWord}</span>
-                          <span className="font-semibold text-red-900">✕ {copy.missedWord}</span>
+                          <span className="font-semibold text-emerald-400">✓ {copy.matchedWord}</span>
+                          <span className="font-semibold text-rose-400">✕ {copy.missedWord}</span>
                         </p>
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex, true)}
-                            className="primary-button min-h-[42px] px-4 py-2 text-xs font-bold"
+                            className="primary-button min-h-[44px] px-4 py-2 text-xs font-bold"
                           >
                             {copy.completeLine}
                           </button>
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex)}
-                            className="secondary-button min-h-[42px] px-4 py-2 text-xs font-bold"
+                            className="secondary-button min-h-[44px] px-4 py-2 text-xs font-bold"
                           >
                             {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
                           </button>
@@ -1054,7 +1054,7 @@ export function AudioDramaPlayer({
                         type="button"
                         onClick={() => advancePracticeLine(lineIndex)}
                         disabled={isListening}
-                        className="secondary-button min-h-[42px] px-4 py-2 text-xs font-bold"
+                        className="secondary-button min-h-[44px] px-4 py-2 text-xs font-bold"
                       >
                         {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
                       </button>
@@ -1069,8 +1069,8 @@ export function AudioDramaPlayer({
                   <h4 id="microphone-permission-title" className="text-lg font-extrabold">{copy.microphonePermissionTitle}</h4>
                   <p className="text-sm leading-relaxed">{copy.microphonePermissionHelp}</p>
                   <div className="flex flex-wrap justify-end gap-2">
-                    <button type="button" onClick={() => setMicrophoneConsentLine(null)} className="secondary-button min-h-[42px] px-4 py-2 text-sm font-bold">{copy.cancelMicrophone}</button>
-                    <button type="button" onClick={() => { void confirmMicrophonePermission(); }} className="primary-button min-h-[42px] px-4 py-2 text-sm font-bold">{copy.allowMicrophone}</button>
+                    <button type="button" onClick={() => setMicrophoneConsentLine(null)} className="secondary-button min-h-[44px] px-4 py-2 text-sm font-bold">{copy.cancelMicrophone}</button>
+                    <button type="button" onClick={() => { void confirmMicrophonePermission(); }} className="primary-button min-h-[44px] px-4 py-2 text-sm font-bold">{copy.allowMicrophone}</button>
                   </div>
                 </div>
               </div>

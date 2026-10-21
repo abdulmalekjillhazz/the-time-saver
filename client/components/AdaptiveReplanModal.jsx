@@ -23,6 +23,14 @@ export function AdaptiveReplanModal({ routine, lang = 'bn', onClose, onCompleted
   };
 
   useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     let active = true;
     fetch('/api/assistant/replan', {
       method: 'POST',
@@ -44,7 +52,7 @@ export function AdaptiveReplanModal({ routine, lang = 'bn', onClose, onCompleted
       });
 
     return () => { active = false; };
-  }, [routine, lang]);
+  }, [routine, lang, copy.error]);
 
   const handleCompleteMicro = async () => {
     setCompleting(true);
@@ -70,11 +78,24 @@ export function AdaptiveReplanModal({ routine, lang = 'bn', onClose, onCompleted
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <Card className="surface-card w-full max-w-lg p-6 shadow-2xl">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="adaptive-replan-title"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+    >
+      <Card className="surface-card w-full max-w-lg p-5 sm:p-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-gold/20 pb-3">
-          <h2 className="section-heading text-lg">{copy.title}</h2>
-          <button type="button" onClick={onClose} className="rounded p-1 text-ink/60 hover:text-ink">✕</button>
+          <h2 id="adaptive-replan-title" className="section-heading text-lg">{copy.title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={copy.close}
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl p-2 font-bold text-ink/70 hover:bg-gold/15 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+          >
+            ✕
+          </button>
         </div>
 
         <p className="mt-2 text-sm font-semibold text-sapphire">{routine.title} ({routine.startTime} - {routine.endTime})</p>
@@ -84,7 +105,7 @@ export function AdaptiveReplanModal({ routine, lang = 'bn', onClose, onCompleted
             {copy.loading}
           </div>
         ) : error ? (
-          <div className="py-6 text-center text-sm text-red-400">{error}</div>
+          <div role="alert" className="py-6 text-center text-sm font-semibold text-rose-400">{error}</div>
         ) : (
           <div className="mt-4 space-y-4">
             {data?.coachTip && (
@@ -97,7 +118,7 @@ export function AdaptiveReplanModal({ routine, lang = 'bn', onClose, onCompleted
               <h3 className="eyebrow">
                 {copy.doingFiveMin}
               </h3>
-              <p className="mt-1 text-base font-bold">
+              <p className="mt-1 text-base font-bold text-gold-soft">
                 ⚡ {data?.microAction}
               </p>
             </div>
@@ -108,9 +129,9 @@ export function AdaptiveReplanModal({ routine, lang = 'bn', onClose, onCompleted
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t">
-              <Button variant="secondary" onClick={onClose}>{copy.close}</Button>
-              <Button onClick={handleCompleteMicro} disabled={completing}>
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-gold/20">
+              <Button variant="secondary" className="min-h-[44px] px-4" onClick={onClose}>{copy.close}</Button>
+              <Button className="min-h-[44px] px-4 font-bold" onClick={handleCompleteMicro} disabled={completing}>
                 {completing ? copy.completing : copy.completeBtn}
               </Button>
             </div>

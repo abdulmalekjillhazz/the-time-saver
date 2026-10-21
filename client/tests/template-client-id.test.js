@@ -1,5 +1,4 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, it } from 'vitest';
 import { clearTemplateClientId, getTemplateClientId, peekTemplateClientId } from '../lib/templateClientId.js';
 
 const UUID_A = 'a12b3456-7890-4123-8123-123456789abc';
@@ -13,7 +12,7 @@ function createStorage() {
   };
 }
 
-test('reuses the same client ID for the same user and template', () => {
+it('reuses the same client ID for the same user and template', () => {
   const storage = createStorage();
   let generated = 0;
   const makeId = () => (++generated === 1 ? UUID_A : UUID_B);
@@ -21,12 +20,12 @@ test('reuses the same client ID for the same user and template', () => {
   const first = getTemplateClientId('user-1', 'wake-early', { storage, makeId });
   const retry = getTemplateClientId('user-1', 'wake-early', { storage, makeId });
 
-  assert.equal(first, UUID_A);
-  assert.equal(retry, UUID_A);
-  assert.equal(generated, 1);
+  expect(first).toBe(UUID_A);
+  expect(retry).toBe(UUID_A);
+  expect(generated).toBe(1);
 });
 
-test('isolates IDs by user and template', () => {
+it('isolates IDs by user and template', () => {
   const storage = createStorage();
   let generated = 0;
   const makeId = () => [UUID_A, UUID_B, 'c12b3456-7890-4123-8123-123456789abc'][generated++];
@@ -35,22 +34,22 @@ test('isolates IDs by user and template', () => {
   const b = getTemplateClientId('user-1', 'drink-water', { storage, makeId });
   const c = getTemplateClientId('user-2', 'wake-early', { storage, makeId });
 
-  assert.notEqual(a, b);
-  assert.notEqual(a, c);
-  assert.notEqual(b, c);
+  expect(a).not.toBe(b);
+  expect(a).not.toBe(c);
+  expect(b).not.toBe(c);
 });
 
-test('does not fail when storage throws', () => {
+it('does not fail when storage throws', () => {
   const storage = {
     getItem() { throw new Error('storage unavailable'); },
     setItem() { throw new Error('storage unavailable'); },
   };
   const id = getTemplateClientId('user-1', 'wake-early', { storage, makeId: () => UUID_A });
-  assert.equal(id, UUID_A);
+  expect(id).toBe(UUID_A);
 });
 
 
-test('keeps an ID for pending retries, then allows a fresh ID after success', () => {
+it('keeps an ID for pending retries, then allows a fresh ID after success', () => {
   const values = new Map();
   const storage = {
     getItem(key) { return values.get(key) ?? null; },
@@ -61,10 +60,10 @@ test('keeps an ID for pending retries, then allows a fresh ID after success', ()
   const makeId = () => (++generated === 1 ? UUID_A : UUID_B);
 
   const pendingId = getTemplateClientId('user-1', 'wake-early', { storage, makeId });
-  assert.equal(peekTemplateClientId('user-1', 'wake-early', { storage }), UUID_A);
-  assert.equal(getTemplateClientId('user-1', 'wake-early', { storage, makeId }), pendingId);
+  expect(peekTemplateClientId('user-1', 'wake-early', { storage })).toBe(UUID_A);
+  expect(getTemplateClientId('user-1', 'wake-early', { storage, makeId })).toBe(pendingId);
 
   clearTemplateClientId('user-1', 'wake-early', { storage });
-  assert.equal(peekTemplateClientId('user-1', 'wake-early', { storage }), null);
-  assert.equal(getTemplateClientId('user-1', 'wake-early', { storage, makeId }), UUID_B);
+  expect(peekTemplateClientId('user-1', 'wake-early', { storage })).toBeNull();
+  expect(getTemplateClientId('user-1', 'wake-early', { storage, makeId })).toBe(UUID_B);
 });
