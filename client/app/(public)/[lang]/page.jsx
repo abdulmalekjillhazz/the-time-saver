@@ -4,6 +4,7 @@ import { isLang, pageMetadata, DEFAULT_LANG, BRAND, absUrl, SITE_URL, breadcrumb
 import { getDictionary } from '../../../i18n/dictionaries.js';
 import { JsonLd } from '../../../components/JsonLd.jsx';
 import { getIslamicReflection, getLandingQuizzes, getLessons, getTodayLesson } from '../../../lib/api.js';
+import { ANDROID_APK_DOWNLOAD_URL } from '../../../lib/downloads.js';
 import { AudioDramaPlayer } from '../../../components/AudioDramaPlayer.jsx';
 import { LandingQuizGrid } from '../../../components/LandingQuizGrid.jsx';
 import { StoryReader } from '../../../components/StoryReader.jsx';
@@ -188,7 +189,7 @@ export default async function HomePage(props) {
               <Link href={`/${lang}/lessons`} className="landing-button secondary-button px-5 py-3 font-semibold">
                 {isBn ? '📚 আজকের পাঠ পড়ুন' : '📚 Explore Habit Lessons'}
               </Link>
-              <a href="/downloads/smart-routine-android.apk" download className="landing-button secondary-button px-5 py-3 font-semibold">
+              <a href={ANDROID_APK_DOWNLOAD_URL} className="landing-button secondary-button px-5 py-3 font-semibold">
                 {home.ctaAndroid}
               </a>
             </div>
