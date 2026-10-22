@@ -21,14 +21,15 @@ test.describe('mobile header and home page at 360px', () => {
     await expect(button).toBeFocused();
   });
 
-  test('all Android app links point to the production APK download', async ({ page }) => {
-    const downloadUrl = '/downloads/smart-routine-android.apk';
+  test('all Android app links point to the Cloudinary-backed production APK download', async ({ page }) => {
+    const downloadUrl = '/api/downloads/android';
     await page.goto('/en');
     await expect(page.locator('#main').getByRole('link', { name: 'Download Android app' })).toHaveAttribute('href', downloadUrl);
     await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app' })).toHaveAttribute('href', downloadUrl);
     const apkResponse = await page.request.head(new URL(downloadUrl, page.url()).href);
     expect(apkResponse.ok()).toBeTruthy();
     expect(apkResponse.headers()['content-type']).toContain('application/vnd.android.package-archive');
+    expect(apkResponse.headers()['content-disposition']).toContain('Smart-Routine-Android-v1.3.apk');
 
     await page.getByRole('button', { name: 'Menu' }).click();
     const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app' });

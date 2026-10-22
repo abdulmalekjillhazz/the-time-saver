@@ -65,13 +65,6 @@ const nextConfig = {
         },
         async headers() {
           return [
-            {
-              source: '/downloads/smart-routine-android.apk',
-              headers: [
-                { key: 'Content-Disposition', value: 'attachment; filename="Smart-Routine-Android-v1.2.apk"' },
-                { key: 'Cache-Control', value: 'public, max-age=3600' },
-              ],
-            },
             { source: '/:path*', headers: securityHeaders },
           ];
         },

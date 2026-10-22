@@ -14,9 +14,9 @@ afterEach(() => {
 });
 
 describe('azan audio source', () => {
-  it('plays the bundled nicer azan first, keeping the old file as fallback', () => {
-    expect(REMOTE).toBe('/azan.mp3');
-    expect(azan.AZAN_FALLBACK_URL).toBe('/adhan.ogg');
+  it('uses the Cloudinary azan first and keeps the Cloudinary fallback', () => {
+    expect(REMOTE).toBe('https://res.cloudinary.com/fnxzbafx/video/upload/v1792674330/smart-routine/app-media/smart-routine-azan-v1.mp3');
+    expect(azan.AZAN_FALLBACK_URL).toBe('https://res.cloudinary.com/fnxzbafx/video/upload/v1792674331/smart-routine/app-media/smart-routine-adhan-fallback-v1.ogg');
     expect(azan.AZAN_CREDIT).toMatch(/Andrewler/);
   });
 

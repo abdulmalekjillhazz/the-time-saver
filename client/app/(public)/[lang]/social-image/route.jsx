@@ -48,7 +48,9 @@ export async function GET(_request, { params }) {
         <div style={{ display: 'flex', width: 270, height: 310, flexDirection: 'column', justifyContent: 'center', gap: 22, border: '1px solid #5f805f', borderRadius: 26, background: 'rgba(0,0,0,0.58)', padding: 26 }}>
           {['07:00  ·  Routine', '09:30  ·  Focus', '11:00  ·  Progress'].map((item) => (
             <div key={item} style={{ display: 'flex', alignItems: 'center', color: '#f0fdf4', fontSize: 20 }}>
-              <span style={{ display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', marginRight: 14, border: '1px solid #4ade80', borderRadius: 99, color: '#4ade80' }}>✓</span>
+              <span style={{ display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center', marginRight: 14, border: '1px solid #4ade80', borderRadius: 99 }}>
+                <span style={{ width: 11, height: 6, borderLeft: '2px solid #4ade80', borderBottom: '2px solid #4ade80', transform: 'rotate(-45deg)', marginTop: -3 }} />
+              </span>
               {item}
             </div>
           ))}

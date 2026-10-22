@@ -6,8 +6,8 @@
 // (MP3 transcode of the 3 min 3 s recitation featured on the Bengali Wikipedia আযান article).
 // Served from /azan.mp3 and cached in Cache Storage on first tap — every later
 // play comes from the local cache. The previous /adhan.ogg stays as fallback.
-export const AZAN_REMOTE_URL = '/azan.mp3';
-export const AZAN_FALLBACK_URL = '/adhan.ogg';
+export const AZAN_REMOTE_URL = 'https://res.cloudinary.com/fnxzbafx/video/upload/v1792674330/smart-routine/app-media/smart-routine-azan-v1.mp3';
+export const AZAN_FALLBACK_URL = 'https://res.cloudinary.com/fnxzbafx/video/upload/v1792674331/smart-routine/app-media/smart-routine-adhan-fallback-v1.ogg';
 export const AZAN_CACHE_NAME = 'smart-routine-azan-v2';
 export const AZAN_CREDIT = 'Azan: “Azan” by Andrewler · CC BY-SA 4.0 (Wikimedia Commons)';
 
