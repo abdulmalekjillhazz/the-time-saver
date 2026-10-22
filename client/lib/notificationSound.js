@@ -14,6 +14,7 @@ export const ALARM_SOUNDS = [
 const SAMPLE_RATE = 22050;
 const DURATION_SECONDS = 3.2;
 const soundUriCache = new Map();
+const CONGRATULATIONS_PHRASE = [[0.03, 659.25], [0.2, 783.99], [0.38, 1046.5], [0.6, 1318.51]];
 const ALARM_PHRASES = {
   dawn: [[0.08, 659.25], [0.48, 783.99], [0.98, 987.77], [1.6, 783.99], [2.05, 880], [2.58, 1318.51]],
   momentum: [[0.08, 523.25], [0.34, 659.25], [0.62, 783.99], [0.94, 1046.5], [1.48, 783.99], [1.78, 1046.5], [2.16, 1318.51], [2.62, 1567.98]],
@@ -29,8 +30,8 @@ function writeAscii(view, offset, text) {
   for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
 }
 
-function synthesizeAlarmSound(soundId) {
-  const sampleCount = Math.floor(SAMPLE_RATE * DURATION_SECONDS);
+function synthesizeSound(phrase, durationSeconds) {
+  const sampleCount = Math.floor(SAMPLE_RATE * durationSeconds);
   const buffer = new ArrayBuffer(44 + sampleCount * 2);
   const view = new DataView(buffer);
 
@@ -48,8 +49,6 @@ function synthesizeAlarmSound(soundId) {
   view.setUint16(34, 16, true); // Bits per sample
   writeAscii(view, 36, 'data');
   view.setUint32(40, sampleCount * 2, true);
-
-  const phrase = ALARM_PHRASES[soundId] || ALARM_PHRASES.dawn;
 
   for (let i = 0; i < sampleCount; i += 1) {
     const t = i / SAMPLE_RATE;
@@ -69,7 +68,7 @@ function synthesizeAlarmSound(soundId) {
 
     const loopFadeSeconds = 0.05;
     const fadeIn = Math.min(1, t / loopFadeSeconds);
-    const fadeOut = Math.min(1, (DURATION_SECONDS - t) / loopFadeSeconds);
+    const fadeOut = Math.min(1, (durationSeconds - t) / loopFadeSeconds);
     const fade = Math.sin((fadeIn * Math.PI) / 2) * Math.sin((fadeOut * Math.PI) / 2);
     const intSample = Math.max(-32767, Math.min(32767, Math.round(sample * fade * 0.48 * 32767)));
     view.setInt16(44 + i * 2, intSample, true);
@@ -88,13 +87,21 @@ function synthesizeAlarmSound(soundId) {
 export function getAlarmSoundDataUri(soundId = ALARM_SOUNDS[0].id) {
   const sound = ALARM_SOUNDS.some((option) => option.id === soundId) ? soundId : ALARM_SOUNDS[0].id;
   if (!soundUriCache.has(sound)) {
-    soundUriCache.set(sound, synthesizeAlarmSound(sound));
+    soundUriCache.set(sound, synthesizeSound(ALARM_PHRASES[sound], DURATION_SECONDS));
   }
   return soundUriCache.get(sound);
 }
 
+export function getCongratulationsSoundDataUri() {
+  if (!soundUriCache.has('congratulations')) {
+    soundUriCache.set('congratulations', synthesizeSound(CONGRATULATIONS_PHRASE, 0.95));
+  }
+  return soundUriCache.get('congratulations');
+}
+
 let alarmSound;
 let activeSoundId;
+let congratulationsSound;
 
 export function playAlarmSound(soundId = ALARM_SOUNDS[0].id) {
   const sound = ALARM_SOUNDS.some((option) => option.id === soundId) ? soundId : ALARM_SOUNDS[0].id;
@@ -118,4 +125,29 @@ export function stopAlarmSound() {
   alarmSound.unload();
   alarmSound = undefined;
   activeSoundId = undefined;
+}
+
+export function playCongratulationsSound() {
+  stopCongratulationsSound();
+  const sound = new Howl({
+    src: [getCongratulationsSoundDataUri()],
+    format: ['wav'],
+    html5: true,
+    loop: false,
+    volume: 0.38,
+    onend: () => {
+      sound.unload();
+      if (congratulationsSound === sound) congratulationsSound = undefined;
+    },
+  });
+  congratulationsSound = sound;
+  sound.play();
+}
+
+export function stopCongratulationsSound() {
+  if (!congratulationsSound) return;
+  const sound = congratulationsSound;
+  congratulationsSound = undefined;
+  sound.stop();
+  sound.unload();
 }

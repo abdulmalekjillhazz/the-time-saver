@@ -9,11 +9,20 @@ vi.mock('howler', () => ({
   },
 }));
 
-import { ALARM_SOUNDS, getAlarmSoundDataUri, playAlarmSound, stopAlarmSound } from '../lib/notificationSound.js';
+import {
+  ALARM_SOUNDS,
+  getAlarmSoundDataUri,
+  getCongratulationsSoundDataUri,
+  playAlarmSound,
+  playCongratulationsSound,
+  stopAlarmSound,
+  stopCongratulationsSound,
+} from '../lib/notificationSound.js';
 
 describe('alarm sound lifecycle', () => {
   afterEach(() => {
     stopAlarmSound();
+    stopCongratulationsSound();
     HowlMock.mockReset();
   });
 
@@ -71,6 +80,25 @@ describe('alarm sound lifecycle', () => {
       expect(wav.length).toBeLessThan(180_000);
       expect(wav.readUInt32LE(24)).toBe(22050);
     }
+  });
+
+  it('plays and cleans up a short one-shot congratulations chime', () => {
+    const sound = { play: vi.fn(), stop: vi.fn(), unload: vi.fn() };
+    HowlMock.mockReturnValue(sound);
+
+    playCongratulationsSound();
+
+    const options = HowlMock.mock.calls[0][0];
+    expect(options.src[0]).toBe(getCongratulationsSoundDataUri());
+    expect(options.loop).toBe(false);
+    expect(options.volume).toBeLessThanOrEqual(0.4);
+    const chime = Buffer.from(options.src[0].slice('data:audio/wav;base64,'.length), 'base64');
+    expect(chime.readUInt32LE(40) / (22050 * 2)).toBeLessThanOrEqual(1);
+    expect(sound.play).toHaveBeenCalledOnce();
+
+    options.onend();
+    expect(sound.stop).not.toHaveBeenCalled();
+    expect(sound.unload).toHaveBeenCalledOnce();
   });
 
   it('unloads the old preview before switching to a different selection', () => {
