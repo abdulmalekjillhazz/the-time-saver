@@ -1,4 +1,4 @@
-const CLOUDINARY_APK_URL = 'https://res.cloudinary.com/fnxzbafx/raw/upload/v1792678167/smart-routine/downloads/smart-routine-android-v1-3-20261022.zip';
+const CLOUDINARY_APK_URL = 'https://res.cloudinary.com/fnxzbafx/raw/upload/v1792685048/smart-routine/downloads/smart-routine-android-v1-3-20261022-rebuild.zip';
 
 export const runtime = 'nodejs';
 
