@@ -19,6 +19,7 @@ import {
 import { base64UrlToBytes, bengaliCalendarMonthRange, buildCalendarDays } from '../lib/calendar.js';
 import { getRoutineMood } from '../lib/routineMood.js';
 import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithGoogleTts, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
+import { SpeakingSituations } from './SpeakingSituations.jsx';
 import { syncAlarmCreate, syncAlarmDelete, syncAlarmUpdate, reportAlarmFired, fetchServerAlarms, fetchMissedAlarms, acknowledgeAlarm } from '../lib/alarmsSync.js';
 import { ensureAlarmPushSubscription } from '../lib/pushClient.js';
 import { ALARM_SOUNDS, getAlarmSoundDataUri, playAlarmSound, stopAlarmSound } from '../lib/notificationSound.js';
@@ -89,7 +90,7 @@ const COPY = {
     reminder: 'Starting soon', consent: 'Allow my data to help train future routine models',
     export: 'Export my data', deleteAccount: 'Delete my account', confirmPassword: 'Confirm with your password',
     exportNow: 'Download export', deleteNow: 'Permanently delete account', cancel: 'Cancel',
-    noLessons: 'No published lessons are available yet.', read: 'Open lesson', quiz: 'Take quiz', closeLesson: 'Back to lessons', loadingLesson: 'Loading lesson…', lessonPrefetchWarning: 'Some lessons could not be preloaded and will load when opened.', storyPoints: 'points for reading', quizPoints: 'leaderboard points', completeStory: 'Mark story complete', storyCompleted: 'Story completed', submit: 'Submit answers',
+    noLessons: 'No published lessons are available yet.', read: 'Open lesson', quiz: 'Take quiz', closeLesson: 'Back to lessons', loadingLesson: 'Loading lesson…', lessonPrefetchWarning: 'Some lessons could not be preloaded and will load when opened.', storyPoints: 'points for reading', storyPointsAlreadyEarned: 'You already earned points for this story. Reading it again is still saved as a learning day.', quizPoints: 'leaderboard points', completeStory: 'Mark story complete', storyCompleted: 'Story completed', submit: 'Submit answers',
     risk: 'Estimated miss risk', noModel: 'No validated real-data model is active. The model file currently included is synthetic and is intentionally not used to estimate your personal risk.',
     routineSaved: 'Routine queued for sync.', routineDeleted: 'Routine queued for deletion.',
     completionSaved: 'Routine status saved.', completionPending: 'Routine status is still waiting to sync. The app will retry automatically.',
@@ -157,7 +158,7 @@ const COPY = {
     reminder: 'শুরু হতে যাচ্ছে', consent: 'ভবিষ্যতের রুটিন মডেল প্রশিক্ষণে আমার তথ্য ব্যবহারের অনুমতি দিন',
     export: 'আমার তথ্য এক্সপোর্ট', deleteAccount: 'আমার অ্যাকাউন্ট মুছুন', confirmPassword: 'পাসওয়ার্ড দিয়ে নিশ্চিত করুন',
     exportNow: 'এক্সপোর্ট ডাউনলোড', deleteNow: 'স্থায়ীভাবে অ্যাকাউন্ট মুছুন', cancel: 'বাতিল',
-    noLessons: 'এখনো কোনো প্রকাশিত পাঠ নেই।',     read: 'পাঠ খুলুন', quiz: 'কুইজ দিন', closeLesson: 'পাঠের তালিকায় ফিরুন', loadingLesson: 'পাঠ লোড হচ্ছে…', lessonPrefetchWarning: 'কিছু পাঠ আগে থেকে লোড করা যায়নি; খুললে তখন লোড হবে।', storyPoints: 'গল্প পড়ার পয়েন্ট', quizPoints: 'লিডারবোর্ড পয়েন্ট', completeStory: 'গল্প পড়া শেষ করেছি', storyCompleted: 'গল্প সম্পন্ন', submit: 'উত্তর জমা দিন',
+    noLessons: 'এখনো কোনো প্রকাশিত পাঠ নেই।',     read: 'পাঠ খুলুন', quiz: 'কুইজ দিন', closeLesson: 'পাঠের তালিকায় ফিরুন', loadingLesson: 'পাঠ লোড হচ্ছে…', lessonPrefetchWarning: 'কিছু পাঠ আগে থেকে লোড করা যায়নি; খুললে তখন লোড হবে।', storyPoints: 'গল্প পড়ার পয়েন্ট', storyPointsAlreadyEarned: 'এই গল্পের পয়েন্ট আগেই পেয়েছেন। আবার পড়লেও শেখার দিন হিসেবে সংরক্ষিত হবে।', quizPoints: 'লিডারবোর্ড পয়েন্ট', completeStory: 'গল্প পড়া শেষ করেছি', storyCompleted: 'গল্প সম্পন্ন', submit: 'উত্তর জমা দিন',
     risk: 'মিস হওয়ার আনুমানিক ঝুঁকি', noModel: 'যাচাইকৃত বাস্তব-তথ্যের কোনো মডেল চালু নেই। বর্তমানে থাকা মডেল ফাইলটি কৃত্রিম তথ্যের, তাই আপনার ব্যক্তিগত ঝুঁকি অনুমানে এটি ব্যবহার করা হয় না।',
     routineSaved: 'রুটিনটি সিঙ্কের জন্য রাখা হয়েছে।', routineDeleted: 'রুটিন মোছার অনুরোধ সিঙ্কের জন্য রাখা হয়েছে।',
     completionSaved: 'রুটিনের অবস্থা সংরক্ষিত হয়েছে।', completionPending: 'রুটিনের অবস্থা এখনো সিঙ্ক হয়নি। অ্যাপটি স্বয়ংক্রিয়ভাবে আবার চেষ্টা করবে।',
@@ -404,6 +405,7 @@ function GoogleSignInButton({ clientId, lang, disabled, nativeAndroid, onCredent
   }, [renderGoogleButton]);
 
   async function handleNativeSignIn() {
+    if (nativeLoginPending || disabled) return;
     setNativeLoginPending(true);
     try {
       const credential = await signInWithGoogleNative(clientId);
@@ -421,11 +423,40 @@ function GoogleSignInButton({ clientId, lang, disabled, nativeAndroid, onCredent
         type="button"
         disabled={disabled || nativeLoginPending}
         onClick={handleNativeSignIn}
-        className="mx-auto flex min-h-[48px] w-full max-w-[380px] items-center justify-center gap-3 rounded-lg border border-ink/25 bg-white px-4 font-semibold text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+        className="mx-auto flex min-h-[48px] w-full max-w-[380px] items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         aria-label={lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}
       >
-        <span aria-hidden="true" className="text-xl font-bold text-blue-600">G</span>
-        {lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}
+        {nativeLoginPending ? (
+          <span className="flex items-center gap-2 text-sm text-slate-500">
+            <svg className="h-5 w-5 animate-spin text-slate-600" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            {lang === 'bn' ? 'অপেক্ষা করুন...' : 'Signing in...'}
+          </span>
+        ) : (
+          <>
+            <svg className="h-5 w-5" viewBox="0 0 24 24">
+              <path
+                fill="rgb(var(--brand-google-blue))"
+                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.87c2.26-2.09 3.67-5.17 3.67-9.15z"
+              />
+              <path
+                fill="rgb(var(--brand-google-green))"
+                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.87-3.05c-1.08.72-2.45 1.16-4.06 1.16-3.13 0-5.78-2.11-6.73-4.96H1.26v3.15C3.25 21.36 7.35 24 12 24z"
+              />
+              <path
+                fill="rgb(var(--brand-google-yellow))"
+                d="M5.27 14.24A7.18 7.18 0 0 1 4.9 12c0-.78.14-1.54.37-2.24V6.61H1.26C.46 8.23 0 10.06 0 12c0 1.94.46 3.77 1.26 5.39l4.01-3.15z"
+              />
+              <path
+                fill="rgb(var(--brand-google-red))"
+                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.25 2.64 1.26 6.61l4.01 3.15c.95-2.85 3.6-4.96 6.73-4.96z"
+              />
+            </svg>
+            <span>{lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}</span>
+          </>
+        )}
       </button>
     );
   }
@@ -477,14 +508,6 @@ export function PrivateApp() {
   const [holidayNotificationsEnabled, setHolidayNotificationsEnabled] = useState(false);
   const [holidayPushBusy, setHolidayPushBusy] = useState(false);
   const [lessons, setLessons] = useState([]);
-  const [practiceStorySlug, setPracticeStorySlug] = useState('');
-  const narratedLessons = lessons.filter((item) => {
-    const englishTitle = localized(item.title, 'en').trim();
-    return item.audioUrl && englishTitle && !/[\u0980-\u09ff]/.test(englishTitle);
-  });
-  const selectedPracticeStorySlug = narratedLessons.some((item) => item.slug === practiceStorySlug)
-    ? practiceStorySlug
-    : narratedLessons[0]?.slug || '';
   const [offlineSavedLessons, setOfflineSavedLessons] = useState([]);
   const [dailyLesson, setDailyLesson] = useState(null);
   const grammarStorySources = useMemo(() => {
@@ -2047,6 +2070,77 @@ export function PrivateApp() {
     );
   }
 
+  const renderAppHeaderControls = () => (
+    <div className="app-header-controls">
+      <Button
+        variant={tab === 'settings' ? 'primary' : 'secondary'}
+        className={`tab-button app-header-settings ${tab === 'settings' ? 'tab-button-active app-header-settings-active' : ''}`}
+        aria-label={copy.settings}
+        title={copy.settings}
+        aria-current={tab === 'settings' ? 'page' : undefined}
+        onClick={() => setTab('settings')}
+      >
+        <span className="tab-icon" aria-hidden="true">⚙️</span>
+      </Button>
+      <Button
+        variant={tab === 'focus' ? 'primary' : 'secondary'}
+        className={`tab-button app-header-focus ${tab === 'focus' ? 'tab-button-active app-header-focus-active' : ''}`}
+        aria-label={lang === 'bn' ? 'ফোকাস ও অ্যালার্ম' : 'Focus and alarms'}
+        title={lang === 'bn' ? 'ফোকাস ও অ্যালার্ম' : 'Focus and alarms'}
+        aria-current={tab === 'focus' ? 'page' : undefined}
+        onClick={() => setTab('focus')}
+      >
+        <span className="tab-icon" aria-hidden="true">⏱️</span>
+      </Button>
+      <Button
+        variant="secondary"
+        className="tab-button app-header-language"
+        aria-label={copy.languageToggle}
+        title={copy.languageToggle}
+        onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
+      >
+        <span className="tab-icon" aria-hidden="true">
+          <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
+        </span>
+        <span>{lang === 'bn' ? 'EN' : 'বাংলা'}</span>
+      </Button>
+      <Button
+        variant="secondary"
+        className="tab-button app-header-voice"
+        aria-label={copy.voiceBriefing}
+        title={copy.voiceBriefing}
+        onClick={() => setVoiceModalOpen(true)}
+      >
+        <span aria-hidden="true" className="tab-icon text-2xl leading-none">🌹</span>
+      </Button>
+      <Button
+        variant="secondary"
+        className={`tab-button app-header-leaderboard ${tab === 'leaderboard' ? 'tab-button-active' : ''}`}
+        aria-label={copy.leaderboard}
+        title={copy.leaderboard}
+        aria-current={tab === 'leaderboard' ? 'page' : undefined}
+        onClick={() => setTab('leaderboard')}
+      >
+        <span className="tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="leaderboard-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 21h8m-4-4v4m-7-17h14v5a7 7 0 0 1-14 0V4Z" />
+            <path d="M5 6H3v2a5 5 0 0 0 5 5m11-7h2v2a5 5 0 0 1-5 5" />
+          </svg>
+        </span>
+      </Button>
+      <Button
+        variant="secondary"
+        className="tab-button app-header-theme"
+        aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
+        title={theme === 'dark' ? copy.themeLight : copy.themeDark}
+        aria-pressed={theme === 'dark'}
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      >
+        <span className="tab-icon" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+      </Button>
+    </div>
+  );
+
   return (
     <main className={`app-shell app-shell-main mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7${immersiveTab ? ' app-shell-immersive' : ''}`}>
       {immersiveTab ? (
@@ -2067,70 +2161,7 @@ export function PrivateApp() {
       <header className="app-hero flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl px-5 py-6 sm:px-8 sm:py-8">
         <div className="relative z-10 w-full">
           <div className="app-hero-heading-row">
-            <div className="app-header-controls">
-              <Button
-                variant={tab === 'settings' ? 'primary' : 'secondary'}
-                className={`app-header-settings ${tab === 'settings' ? 'app-header-settings-active' : ''}`}
-                aria-label={copy.settings}
-                title={copy.settings}
-                aria-current={tab === 'settings' ? 'page' : undefined}
-                onClick={() => setTab('settings')}
-              >
-                <span aria-hidden="true">⚙️</span>
-              </Button>
-              <Button
-                variant={tab === 'focus' ? 'primary' : 'secondary'}
-                className={`app-header-focus ${tab === 'focus' ? 'app-header-focus-active' : ''}`}
-                aria-label={lang === 'bn' ? 'ফোকাস ও অ্যালার্ম' : 'Focus and alarms'}
-                title={lang === 'bn' ? 'ফোকাস ও অ্যালার্ম' : 'Focus and alarms'}
-                aria-current={tab === 'focus' ? 'page' : undefined}
-                onClick={() => setTab('focus')}
-              >
-                <span aria-hidden="true">⏱️</span>
-              </Button>
-              <Button
-                variant="secondary"
-                className="app-header-language"
-                aria-label={copy.languageToggle}
-                title={copy.languageToggle}
-                onClick={() => setStoredLanguage(lang === 'bn' ? 'en' : 'bn')}
-              >
-                <LanguageFlag lang={lang === 'bn' ? 'en' : 'bn'} />
-                <span>{lang === 'bn' ? 'EN' : 'বাংলা'}</span>
-              </Button>
-              <Button
-                variant="secondary"
-                className="app-header-voice"
-                aria-label={copy.voiceBriefing}
-                title={copy.voiceBriefing}
-                onClick={() => setVoiceModalOpen(true)}
-              >
-                <span aria-hidden="true" className="text-2xl leading-none">🌹</span>
-              </Button>
-              <Button
-                variant="secondary"
-                className="app-header-leaderboard"
-                aria-label={copy.leaderboard}
-                title={copy.leaderboard}
-                aria-current={tab === 'leaderboard' ? 'page' : undefined}
-                onClick={() => setTab('leaderboard')}
-              >
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="leaderboard-icon" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M8 21h8m-4-4v4m-7-17h14v5a7 7 0 0 1-14 0V4Z" />
-                  <path d="M5 6H3v2a5 5 0 0 0 5 5m11-7h2v2a5 5 0 0 1-5 5" />
-                </svg>
-              </Button>
-              <Button
-                variant="secondary"
-                className="app-header-theme"
-                aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
-                title={theme === 'dark' ? copy.themeLight : copy.themeDark}
-                aria-pressed={theme === 'dark'}
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
-              </Button>
-            </div>
+            <div className="app-tabs app-header-controls-mobile">{renderAppHeaderControls()}</div>
           </div>
         </div>
       </header>
@@ -2190,94 +2221,14 @@ export function PrivateApp() {
             <span className="tab-label-mobile" aria-hidden="true">{shortLabel}</span>
           </Button>
         ))}
+        <div className="app-tabs-utilities" aria-label={lang === 'bn' ? 'অতিরিক্ত নিয়ন্ত্রণ' : 'More controls'}>
+          {renderAppHeaderControls()}
+        </div>
       </nav>
 
       {tab === 'leaderboard' ? <LeaderboardPanel lang={lang} /> : null}
 
-      {tab === 'speaking' ? (
-        <section className="space-y-4">
-          <Card className="surface-card space-y-5 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/30 via-paper to-gold/10 p-5 shadow-xl sm:p-7">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gold/15 text-3xl shadow-inner">📚</span>
-                <h2 className="section-heading">
-                  {lang === 'bn' ? 'গল্পে ইংরেজি বলার অনুশীলন' : 'Practice English with stories'}
-                </h2>
-              </div>
-              <p className="text-sm leading-relaxed opacity-75">
-                {lang === 'bn'
-                  ? 'ElevenLabs অডিওসহ একটি গল্প বেছে নিন। আগে গল্পটি শুনুন, তারপর প্রতিটি ইংরেজি লাইন মাইক্রোফোনে বলুন। প্রতি লাইনে সর্বোচ্চ ৩ বার চেষ্টা করা যাবে; শব্দে ট্যাপ করলে অর্থ দেখাবে। অ্যাপ আপনার অডিও সংরক্ষণ করে না; শনাক্তকরণে Android-এর speech service ব্যবহার হতে পারে।'
-                  : 'Choose a story with ElevenLabs audio. Listen first, then say each English line into the microphone. You get up to 3 tries per line; tap a word to see its meaning. The app does not save your audio; Android speech services may process it for recognition.'}
-              </p>
-            </div>
-            {narratedLessons.length ? (
-              <div className="space-y-4">
-                <h3 className="text-sm font-extrabold uppercase tracking-wide text-ink/70">
-                  {lang === 'bn' ? 'ইংরেজি গল্প বেছে নিন' : 'Choose an English story'}
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {narratedLessons.map((item, index) => {
-                    const selected = item.slug === selectedPracticeStorySlug;
-                    const storyIcons = ['📖', '🎭', '🪴', '💡', '🎈', '🧭'];
-                    return (
-                      <button
-                        key={item.slug}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => setPracticeStorySlug(item.slug)}
-                        className={`group flex min-h-28 items-center gap-4 rounded-2xl border-2 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/40 ${
-                          selected
-                            ? 'border-gold bg-gold/15 shadow-md'
-                            : 'border-sapphire/15 bg-paper/75 hover:border-gold/70'
-                        }`}
-                      >
-                        <span aria-hidden="true" className="grid size-16 shrink-0 place-items-center rounded-2xl bg-sapphire/10 text-4xl transition-transform group-hover:scale-105">
-                          {storyIcons[index % storyIcons.length]}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-xs font-bold uppercase tracking-wider text-ink/55">
-                            {lang === 'bn' ? 'ইংরেজি গল্প' : 'English story'}
-                          </span>
-                          <span className="mt-1 block text-base font-extrabold leading-snug text-ink sm:text-lg">
-                            {localized(item.title, 'en')}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="min-h-[48px] w-full rounded-2xl font-extrabold sm:w-auto sm:px-8"
-                  disabled={busy}
-                  onClick={() => loadLesson(selectedPracticeStorySlug, 'story')}
-                >
-                  {lang === 'bn' ? 'গল্প খোলো' : 'Open story'}
-                </Button>
-              </div>
-            ) : (
-              <p className="rounded-2xl border border-sapphire/15 bg-paper/70 p-4 text-sm leading-relaxed opacity-75">
-                {lang === 'bn' ? 'এখনো ElevenLabs অডিওসহ কোনো গল্প নেই। পরে আবার দেখুন।' : 'No stories with ElevenLabs audio are available yet. Please check again later.'}
-              </p>
-            )}
-            {lessonLoadingSlug ? <p role="status" className="text-sm">{copy.loadingLesson}</p> : null}
-            {tab === 'speaking' && lesson?.media?.type === 'audio' && !lessonLoadingSlug ? (
-              <AudioDramaPlayer
-                key={`speaking-practice-${lesson.slug}`}
-                title={localized(lesson.title, 'en')}
-                slug={lesson.slug}
-                content={localized(lesson.body, 'en')}
-                practiceContent={localized(lesson.body, 'en')}
-                audioUrl={lesson.media.url}
-                vocabulary={lesson.vocabulary || []}
-                lang={lang}
-                startInPracticeMode
-              />
-            ) : null}
-          </Card>
-        </section>
-      ) : null}
+      {tab === 'speaking' ? <SpeakingSituations lang={lang} dailyLesson={dailyLesson} /> : null}
 
       {tab === 'settings' ? (
         <section className="space-y-4">
@@ -2696,27 +2647,30 @@ export function PrivateApp() {
                     {lessonLoadingSlug ? copy.loadingLesson : copy.chooseLesson}
                   </p>
                 ) : (
-                  <>
-                    <div className="rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 via-paper to-sapphire/10 p-4 sm:p-5">
+                  <div className="lesson-reader-layout">
+                    <div className="lesson-story-heading rounded-2xl border border-gold/40 bg-gradient-to-r from-gold/10 via-paper to-sapphire/10 p-4 sm:p-5">
                       <p className="text-xs font-extrabold uppercase tracking-wider text-gold-soft">
                         📖 {lang === 'bn' ? 'নির্বাচিত গল্প ও কুইজ' : 'Selected Story & Quiz'}
                       </p>
-                      <h2 className="mt-1 text-2xl font-extrabold leading-tight text-ink sm:text-3xl">{localized(lesson.title, 'en')}</h2>
+                      <h2 className="mt-1 break-words text-xl font-extrabold leading-snug text-ink sm:text-3xl">{localized(lesson.title, 'en')}</h2>
                     </div>
-                    <AudioDramaPlayer
-                      title={localized(lesson.title, 'en')}
-                      slug={lesson.slug}
-                      content={localized(lesson.body, 'en')}
-                      practiceContent={localized(lesson.body, 'en')}
-                      audioUrl={lesson.media?.type === 'audio' ? lesson.media.url : ''}
-                      vocabulary={lesson.vocabulary || []}
-                      lang={lang}
-                    />
+                    <div className="lesson-story-player">
+                      <AudioDramaPlayer
+                        title={localized(lesson.title, 'en')}
+                        slug={lesson.slug}
+                        content={localized(lesson.body, 'en')}
+                        practiceContent={localized(lesson.body, 'en')}
+                        audioUrl={lesson.media?.type === 'audio' ? lesson.media.url : ''}
+                        vocabulary={lesson.vocabulary || []}
+                        lang={lang}
+                      />
+                    </div>
                     {!lesson.isOffline ? (
-                      <div className="flex flex-wrap items-center gap-3">
+                      <div className="lesson-story-actions flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                         <Button
                           type="button"
                           variant="secondary"
+                          className="min-h-12 w-full sm:w-auto"
                           disabled={storyCompletionBusy || storyAward?.lessonId === lesson.id}
                           onClick={markPublishedLessonComplete}
                         >
@@ -2729,11 +2683,14 @@ export function PrivateApp() {
                         {storyAward?.lessonId === lesson.id && storyAward.earnedPoints > 0 ? (
                           <span className="text-sm font-bold text-sapphire">+{storyAward.earnedPoints} ⭐</span>
                         ) : null}
+                        {storyAward?.lessonId === lesson.id && storyAward.earnedPoints === 0 ? (
+                          <span role="status" className="text-sm text-ink/70">{copy.storyPointsAlreadyEarned}</span>
+                        ) : null}
                       </div>
                     ) : null}
                     {lesson.quiz?.length ? (
-                      <div id="published-lesson-quiz" className="scroll-mt-6 space-y-4">
-                        <h3 className="text-xl font-semibold">{copy.quiz}</h3>
+                      <div id="published-lesson-quiz" className="lesson-quiz-panel scroll-mt-6 space-y-4">
+                        <h3 className="text-xl font-semibold text-ink">{copy.quiz}</h3>
                         {lesson.quiz.map((question, index) => (
                           <fieldset key={`${lesson.id}-${index}`} className="space-y-3 rounded-2xl border border-sapphire/20 bg-paper/70 p-4 sm:p-5">
                             <legend className="text-base font-bold leading-relaxed text-ink sm:text-lg">{localized(question.question, 'en')}</legend>
@@ -2759,8 +2716,8 @@ export function PrivateApp() {
                           </p>
                         ) : null}
                       </div>
-                    ) : <p>{copy.noQuiz}</p>}
-                  </>
+                    ) : <p className="lesson-quiz-panel">{copy.noQuiz}</p>}
+                  </div>
                 )}
               </Card>
             </div>

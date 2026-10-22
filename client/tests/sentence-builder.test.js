@@ -3,8 +3,11 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
   extractGrammarExercises,
+  createCoreSentenceExercises,
   getUnlockedLevels,
   isSentenceCorrect,
+  shuffleItems,
+  shuffleSentenceWords,
   SentenceBuilder,
 } from '../components/SentenceBuilder.jsx';
 
@@ -36,6 +39,16 @@ describe('English sentence builder', () => {
     expect(exercises[0].structure.en).toContain('Subject + verb');
   });
 
+  it('keeps a substantial original practice bank at every level', () => {
+    const exercises = createCoreSentenceExercises();
+
+    expect(exercises).toHaveLength(24);
+    expect(exercises.filter(({ level }) => level === 'basic')).toHaveLength(8);
+    expect(exercises.filter(({ level }) => level === 'intermediate')).toHaveLength(8);
+    expect(exercises.filter(({ level }) => level === 'advanced')).toHaveLength(8);
+    expect(new Set(exercises.map(({ sentence }) => sentence.toLowerCase())).size).toBe(24);
+  });
+
   it('unlocks harder levels only after completing the current level', () => {
     const counts = { basic: 4, intermediate: 2, advanced: 1 };
     expect(getUnlockedLevels(counts, { basic: 0, intermediate: 0, advanced: 0 }))
@@ -59,6 +72,17 @@ describe('English sentence builder', () => {
     expect(isSentenceCorrect(correctOrder.slice(1), exercise)).toBe(false);
   });
 
+  it('randomizes words and sentence sources instead of reversing the answer', () => {
+    const answer = ['The', 'family', 'talks', 'together.'];
+    expect(shuffleSentenceWords(answer, () => 0)).not.toEqual(answer);
+    expect(shuffleSentenceWords(answer, () => 0).sort()).toEqual([...answer].sort());
+
+    const sourceSentences = extractGrammarExercises(stories);
+    const randomized = shuffleItems(sourceSentences, () => 0);
+    expect(randomized.map((item) => item.slug)).not.toEqual(sourceSentences.map((item) => item.slug));
+    expect(randomized).toHaveLength(sourceSentences.length);
+  });
+
   it('starts with Basic and uses the selected story as the lesson source', () => {
     const markup = renderToStaticMarkup(createElement(SentenceBuilder, { lang: 'bn', stories }));
 
@@ -68,8 +92,12 @@ describe('English sentence builder', () => {
     expect(markup).toContain('মাঝারি · একটু বড় বাক্য');
     expect(markup).toContain('উন্নত · লম্বা বাক্য');
     expect(markup).toContain('A Morning Walk');
+    expect(markup).toContain('value="all"');
+    expect(markup).toContain('Why Breaks Help the Brain');
+    expect(markup).toContain('শব্দের উচ্চারণ শুনুন');
     expect(markup).toContain('বাক্য যাচাই');
-    expect(markup).toContain('অনুশীলন 1 / 1');
+    expect(markup).toContain('অনুশীলন 1 / 9');
+    expect(markup).toContain('Everyday sentence practice');
     expect(markup).toContain('আগের স্তর:');
   });
 });

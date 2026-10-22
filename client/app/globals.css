@@ -16,6 +16,10 @@
   --c-azure: 125 211 252;
   --c-on-sapphire: 6 20 38;
   --c-on-gold: 27 27 31;
+  --brand-google-blue: 66 133 244;
+  --brand-google-green: 52 168 83;
+  --brand-google-yellow: 251 188 5;
+  --brand-google-red: 234 67 53;
   --radius-md: 0.75rem;
 }
 
@@ -535,13 +539,13 @@ body:lang(en) {
 }
 
 .practice-completion-feedback {
-  animation: practice-feedback-in 180ms ease-out both;
+  animation: practice-feedback-in 420ms cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
 }
 
 @keyframes practice-feedback-in {
   from {
     opacity: 0;
-    transform: translateY(0.4rem) scale(0.98);
+    transform: translateY(0.7rem) scale(0.94);
   }
   to {
     opacity: 1;
@@ -782,6 +786,10 @@ button:disabled {
 }
 
 @media (min-width: 641px) {
+  .app-tabs.app-header-controls-mobile {
+    display: none;
+  }
+
   .app-shell-main {
     width: calc(100% - 3rem);
     max-width: 80rem !important;
@@ -804,16 +812,31 @@ button:disabled {
 
   .app-tabs {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(11, minmax(0, 1fr));
     align-items: stretch;
-    gap: 0.5rem;
+    gap: 0;
     padding: 0.5rem;
+  }
+
+  .app-tabs-utilities {
+    display: contents;
+  }
+
+  .app-tabs-utilities .app-header-controls {
+    display: contents;
+  }
+
+  .app-tabs-utilities .tab-icon {
+    width: 1.65rem;
+    height: 1.65rem;
+    font-size: 1.35rem;
   }
 
   .app-tabs .tab-button {
     width: 100%;
     min-width: 0;
-    min-height: 3.2rem;
+    height: 3.5rem;
+    min-height: 3.5rem;
     flex-direction: row;
     gap: 0.45rem;
     border-radius: 0.9rem !important;
@@ -826,12 +849,12 @@ button:disabled {
 
   .app-tabs .tab-icon {
     display: inline-flex;
-    width: 1.3rem;
-    height: 1.3rem;
+    width: 1.5rem;
+    height: 1.5rem;
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    font-size: 1.15rem;
+    font-size: 1.25rem;
     line-height: 1;
   }
 
@@ -845,6 +868,14 @@ button:disabled {
 }
 
 @media (min-width: 641px) and (max-width: 900px) {
+  .app-shell-main {
+    padding-inline: 1rem !important;
+  }
+
+  .app-tabs {
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+  }
+
   .app-tabs .tab-button {
     flex-direction: column;
     gap: 0.15rem;
@@ -852,7 +883,56 @@ button:disabled {
   }
 
   .app-tabs .tab-label-desktop {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
+  }
+
+  .app-tabs-utilities {
+    padding-left: 0;
+  }
+
+  .app-tabs-utilities .app-header-controls {
+    gap: 0;
+  }
+
+  .app-tabs-utilities .app-header-controls .app-header-language,
+  .app-tabs-utilities .app-header-controls .app-header-settings,
+  .app-tabs-utilities .app-header-controls .app-header-focus,
+  .app-tabs-utilities .app-header-controls .app-header-voice,
+  .app-tabs-utilities .app-header-controls .app-header-leaderboard,
+  .app-tabs-utilities .app-header-controls .app-header-theme {
+    width: 100%;
+    min-width: 0;
+    height: 3.5rem;
+    min-height: 3.5rem;
+    border-radius: 0.9rem !important;
+  }
+
+  .app-tabs-utilities .tab-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 1.4rem;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1200px) {
+  .app-tabs .tab-button {
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-inline: 0.2rem !important;
+  }
+
+  .app-tabs .tab-label-desktop {
+    font-size: 0.75rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 700px) {
+  .app-tabs .tab-label-desktop {
+    display: none;
+  }
+
+  .app-tabs .tab-button {
+    justify-content: center;
   }
 }
 
@@ -1188,7 +1268,7 @@ select:disabled {
     min-width: 2.35rem;
     height: 2.35rem;
     min-height: 2.35rem;
-    border-radius: 0.75rem !important;
+    border-radius: 0.8rem !important;
   }
 
   .app-header-controls .app-header-language {
@@ -1196,7 +1276,7 @@ select:disabled {
     padding: 0 !important;
   }
 
-  .app-header-language > span {
+  .app-header-language > span:not(.tab-icon) {
     display: none;
   }
 
@@ -1650,6 +1730,53 @@ select:disabled {
   display: none;
 }
 
+.lesson-reader-layout {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+}
+
+.lesson-reader-layout > * {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .lesson-reader-layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
+    align-items: start;
+    gap: 1.25rem;
+  }
+
+  .lesson-story-heading {
+    grid-column: 1 / -1;
+  }
+
+  .lesson-story-player,
+  .lesson-story-actions {
+    grid-column: 1;
+  }
+
+  .lesson-quiz-panel {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+    border: 1px solid rgb(var(--c-sapphire) / 0.2);
+    border-radius: 1rem;
+    background: rgb(var(--c-paper) / 0.7);
+    padding: 1rem;
+  }
+}
+
+.audio-drama-story-stage {
+  display: grid;
+  min-height: clamp(18rem, 42dvh, 32rem);
+  align-content: center;
+  gap: 0.75rem;
+}
+
+.audio-drama-story-stage > [role="listitem"] {
+  width: 100%;
+}
+
 @media (max-width: 640px) {
   html {
     overflow-x: clip;
@@ -1703,6 +1830,48 @@ select:disabled {
     box-shadow: none;
   }
 
+  #published-lesson-story.lesson-reader-overlay-open .lesson-story-heading {
+    display: none;
+  }
+
+  .lesson-reader-layout {
+    gap: 1rem;
+  }
+
+  .lesson-story-heading {
+    border-radius: 1rem;
+    padding: 1rem;
+  }
+
+  .lesson-story-player {
+    min-width: 0;
+  }
+
+  .audio-drama-player-content {
+    display: flex;
+    min-height: calc(100dvh - 10rem);
+    flex-direction: column;
+  }
+
+  .audio-drama-story-stage {
+    flex: 1;
+    min-height: max(16rem, calc(100dvh - 31rem));
+    align-content: center;
+  }
+
+  .offline-audio-notice {
+    max-width: 34rem;
+    align-self: center;
+  }
+
+  .lesson-story-actions {
+    padding-inline: 0.15rem;
+  }
+
+  .lesson-quiz-panel {
+    min-width: 0;
+  }
+
   .daily-lesson-reader-screen .daily-lesson-close-bottom {
     display: none;
   }
@@ -1717,7 +1886,7 @@ select:disabled {
     width: 100%;
     margin-bottom: 0 !important;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.2rem;
+    gap: 0;
     border: 1px solid rgb(var(--c-sapphire) / 0.26);
     border-bottom: 0;
     border-radius: 1rem 1rem 0 0;
@@ -1730,10 +1899,50 @@ select:disabled {
     -webkit-backdrop-filter: blur(16px);
   }
 
+  .app-header-controls-mobile.app-tabs {
+    position: relative;
+    z-index: auto;
+    inset: auto;
+    display: block;
+    width: 100%;
+    margin-bottom: 0 !important;
+    grid-template-columns: none;
+    gap: 0;
+    border-bottom: 1px solid rgb(var(--c-sapphire) / 0.26);
+    border-radius: 1rem;
+    padding: 0.28rem max(0.2rem, env(safe-area-inset-left)) 0.28rem;
+  }
+
+  .app-header-controls-mobile .app-header-controls {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .app-header-controls-mobile .tab-icon {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.35rem;
+  }
+
+  .app-header-controls-mobile .tab-button:not(.tab-button-active) {
+    color: rgb(var(--c-ink)) !important;
+  }
+
+  .app-tabs-utilities {
+    display: none;
+  }
+
+  .app-tabs-utilities .app-header-controls {
+    display: flex;
+  }
+
   .app-tabs .tab-button {
     position: relative;
     width: 100%;
     min-width: 0;
+    height: auto;
     min-height: 2.55rem;
     flex-direction: column;
     gap: 0.15rem;
@@ -1824,6 +2033,10 @@ select:disabled {
 }
 
 @media (max-width: 360px) {
+  .app-tabs:not(.app-header-controls-mobile) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
   .app-tabs .tab-button {
     font-size: 0.55rem;
   }
@@ -1981,4 +2194,105 @@ select:disabled {
 .primary-button {
   color: #fff !important;
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+}
+
+/* ============================================================
+   PREMIUM REDESIGN — shared layer (batch 1)
+   Pure CSS, no new deps. Reused across upcoming component batches.
+   ============================================================ */
+
+.glass-panel {
+  position: relative;
+  border-radius: 1.5rem;
+  border: 1px solid rgb(var(--c-sapphire) / 0.22);
+  background:
+    linear-gradient(155deg, rgb(var(--c-sapphire) / 0.10), rgb(var(--c-paper) / 0.55) 55%, rgb(var(--c-gold) / 0.06)),
+    rgb(var(--c-paper) / 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.04) inset,
+    0 18px 40px -22px rgb(0 0 0 / 0.65);
+}
+
+.glow-border {
+  position: relative;
+  isolation: isolate;
+}
+.glow-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg, rgb(var(--c-sapphire) / 0.9), rgb(var(--c-gold) / 0.8), rgb(var(--c-azure) / 0.9));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.glow-border:hover::before,
+.glow-border:focus-within::before {
+  opacity: 1;
+}
+
+@keyframes shimmer-sweep {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer-bg {
+  background: linear-gradient(90deg, rgb(var(--c-ink) / 0.06) 25%, rgb(var(--c-ink) / 0.14) 37%, rgb(var(--c-ink) / 0.06) 63%);
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.float-soft {
+  animation: float-soft 5s ease-in-out infinite;
+}
+
+.progress-glow {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(90deg, rgb(var(--c-sapphire-deep)), rgb(var(--c-sapphire)), rgb(var(--c-azure)));
+  box-shadow: 0 0 12px rgb(var(--c-sapphire) / 0.65);
+}
+.progress-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  width: 40%;
+  animation: shimmer-sweep 2.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-bg, .float-soft, .progress-glow::after {
+    animation: none !important;
+  }
+  .glow-border::before {
+    transition: none !important;
+  }
+}
+
+.app-tabs {
+  --app-tab-surface: linear-gradient(145deg, rgb(var(--c-paper) / 0.98), rgb(var(--c-sapphire) / 0.075));
+}
+
+.app-tabs .tab-button {
+  border-color: rgb(var(--c-sapphire) / 0.24) !important;
+  background: var(--app-tab-surface) !important;
+  color: rgb(var(--c-ink)) !important;
+}
+
+.app-tabs .tab-button-active {
+  border-color: rgb(var(--c-gold) / 0.82) !important;
+  background: var(--app-tab-surface) !important;
+  box-shadow: inset 0 0 0 1px rgb(var(--c-gold) / 0.56) !important;
+  color: rgb(var(--c-ink)) !important;
 }

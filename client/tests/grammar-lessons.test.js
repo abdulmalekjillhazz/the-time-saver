@@ -12,16 +12,16 @@ describe('progressive grammar lessons', () => {
     expect(getGrammarLevelAvailability({ basic: 0, intermediate: 0, advanced: 0 })
       .map(({ id, unlocked }) => [id, unlocked]))
       .toEqual([['basic', true], ['intermediate', false], ['advanced', false]]);
-    expect(getGrammarLevelAvailability({ basic: 2, intermediate: 1, advanced: 0 })
+    expect(getGrammarLevelAvailability({ basic: 4, intermediate: 1, advanced: 0 })
       .map(({ id, unlocked }) => [id, unlocked]))
       .toEqual([['basic', true], ['intermediate', true], ['advanced', false]]);
-    expect(getGrammarLevelAvailability({ basic: 2, intermediate: 2, advanced: 0 })
+    expect(getGrammarLevelAvailability({ basic: 4, intermediate: 4, advanced: 0 })
       .map(({ id, unlocked }) => [id, unlocked]))
       .toEqual([['basic', true], ['intermediate', true], ['advanced', true]]);
   });
 
   it('provides progressively harder lessons with English examples and practice', () => {
-    expect(GRAMMAR_LEVELS.map(({ lessons }) => lessons.length)).toEqual([2, 2, 2]);
+    expect(GRAMMAR_LEVELS.map(({ lessons }) => lessons.length)).toEqual([4, 4, 4]);
     expect(GRAMMAR_LEVELS.flatMap(({ lessons }) => lessons).every((lesson) => (
       lesson.rule.en && lesson.rule.bn && lesson.example && lesson.choices.length > 1
     ))).toBe(true);
@@ -36,6 +36,12 @@ describe('progressive grammar lessons', () => {
       'past-simple': 'We visited our friend yesterday.',
       'present-continuous': 'The children are playing in the garden now.',
       'joining-ideas': 'I took a break because I felt tired.',
+      'do-questions': 'Does Maya walk to class every day?',
+      'there-is-are': 'There are two chairs near the window.',
+      'going-to-plans': 'We are going to visit the museum tomorrow.',
+      'some-any': 'Could I have some water, please?',
+      'first-conditional': 'If we leave now, we will catch the earlier bus.',
+      'present-perfect-experience': 'I have visited the new science museum.',
     };
     for (const lesson of lessons) {
       expect(lesson.choices[lesson.answer], lesson.id).toBe(expectedAnswers[lesson.id]);

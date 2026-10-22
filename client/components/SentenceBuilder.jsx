@@ -4,9 +4,52 @@ import { useEffect, useMemo, useState } from 'react';
 import { getSentenceDifficultyLevel } from '@smart-routine/shared';
 import { apiRequest } from '../lib/apiClient.js';
 import { announceLearningActivity } from '../lib/learningFeedback.js';
+import { playCongratulationsSound } from '../lib/notificationSound.js';
 import { Card } from './ui/Card.jsx';
 
 const LEVELS = ['basic', 'intermediate', 'advanced'];
+const CORE_SENTENCES = [
+  { level: 'basic', sentence: 'I wake up early.' },
+  { level: 'basic', sentence: 'She drinks warm tea.' },
+  { level: 'basic', sentence: 'We walk after lunch.' },
+  { level: 'basic', sentence: 'The bus arrives soon.' },
+  { level: 'basic', sentence: 'Please open the window now.' },
+  { level: 'basic', sentence: 'My sister reads daily.' },
+  { level: 'basic', sentence: 'They share their food.' },
+  { level: 'basic', sentence: 'He rests after work.' },
+  { level: 'intermediate', sentence: 'I review my notes before class begins.' },
+  { level: 'intermediate', sentence: 'She practices English with a friend after work.' },
+  { level: 'intermediate', sentence: 'We packed some fruit for the long journey.' },
+  { level: 'intermediate', sentence: 'The manager explained the schedule during our morning meeting.' },
+  { level: 'intermediate', sentence: 'He checks the bus time before leaving home.' },
+  { level: 'intermediate', sentence: 'They take short breaks to protect their focus.' },
+  { level: 'intermediate', sentence: 'My neighbor waters the plants every other morning.' },
+  { level: 'intermediate', sentence: 'Please send the report before the office closes today.' },
+  { level: 'advanced', sentence: 'Although the first answer seemed correct, Maya checked every detail again.' },
+  { level: 'advanced', sentence: 'If the train arrives late, we will call the hotel reception.' },
+  { level: 'advanced', sentence: 'Because Omar practiced each difficult sound, his presentation became easier to follow.' },
+  { level: 'advanced', sentence: 'The team finished the project early because everyone shared updates regularly.' },
+  { level: 'advanced', sentence: 'After the rain stopped, we walked through the market to find the library.' },
+  { level: 'advanced', sentence: 'Unless you save your work often, a sudden restart can erase your changes.' },
+  { level: 'advanced', sentence: 'She asked for clearer instructions before starting the unfamiliar task.' },
+  { level: 'advanced', sentence: 'While my friend prepared lunch, I finished the report and answered two messages.' },
+];
+
+export function shuffleItems(items, random = Math.random) {
+  const shuffled = items.map((value, index) => ({ value, index }));
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const target = Math.min(index, Math.max(0, Math.floor(random() * (index + 1))));
+    [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+  }
+  if (shuffled.length > 1 && shuffled.every((item, index) => item.index === index)) {
+    [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+  }
+  return shuffled.map((item) => item.value);
+}
+
+export function shuffleSentenceWords(words, random = Math.random) {
+  return shuffleItems(words, random);
+}
 
 export function getUnlockedLevels(levelCounts, completedLevels) {
   const unlocked = ['basic'];
@@ -69,16 +112,12 @@ export function extractGrammarExercises(stories = []) {
       seen.add(identity);
 
       const chunks = sentence.split(/\s+/);
-      let shuffledWords = [...chunks].reverse();
-      if (shuffledWords.every((word, index) => word === chunks[index])) {
-        shuffledWords = [...chunks.slice(1), chunks[0]];
-      }
 
       exercises.push({
         slug: story.slug || title,
         sourceTitle: title,
         sentence,
-        words: shuffledWords,
+        words: shuffleSentenceWords(chunks),
         answer: chunks,
         wordCount: englishWords.length,
         level: getSentenceDifficultyLevel(englishWords.length),
@@ -92,6 +131,22 @@ export function extractGrammarExercises(stories = []) {
   ));
 }
 
+export function createCoreSentenceExercises() {
+  return CORE_SENTENCES.map(({ level, sentence }) => {
+    const answer = sentence.split(/\s+/);
+    return {
+      slug: 'everyday-sentence-practice',
+      sourceTitle: 'Everyday sentence practice',
+      sentence,
+      words: shuffleSentenceWords(answer),
+      answer,
+      wordCount: (sentence.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []).length,
+      level,
+      structure: sentenceStructure(sentence),
+    };
+  });
+}
+
 export function isSentenceCorrect(selectedIndices, exercise) {
   return selectedIndices.length === exercise.answer.length
     && selectedIndices.every((index, position) => exercise.words[index] === exercise.answer[position]);
@@ -99,10 +154,20 @@ export function isSentenceCorrect(selectedIndices, exercise) {
 
 export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const isBn = lang === 'bn';
-  const exercises = useMemo(() => extractGrammarExercises(stories), [stories]);
+  const exercises = useMemo(() => {
+    const storyExercises = extractGrammarExercises(stories);
+    const storySentences = new Set(storyExercises.map(({ sentence }) => sentence.toLowerCase()));
+    return [
+      ...createCoreSentenceExercises().filter(({ sentence }) => !storySentences.has(sentence.toLowerCase())),
+      ...storyExercises,
+    ];
+  }, [stories]);
   const [level, setLevel] = useState('basic');
   const [storySlug, setStorySlug] = useState('all');
   const [exerciseIndex, setExerciseIndex] = useState(0);
+  const [shuffleRound, setShuffleRound] = useState(0);
+  const [wordOrderVersion, setWordOrderVersion] = useState(0);
+  const [sessionFinished, setSessionFinished] = useState(false);
   const [selected, setSelected] = useState([]);
   const [result, setResult] = useState('');
   const [completedLevels, setCompletedLevels] = useState({ basic: 0, intermediate: 0, advanced: 0 });
@@ -110,6 +175,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const [completionBusy, setCompletionBusy] = useState(false);
   const [completionError, setCompletionError] = useState('');
   const [milestoneNotice, setMilestoneNotice] = useState('');
+  const [pronunciationError, setPronunciationError] = useState('');
+  const [speakingWord, setSpeakingWord] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -136,6 +203,10 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
       && (storySlug === 'all' || exercise.slug === storySlug)),
     [exercises, level, storySlug],
   );
+  const shuffledExercises = useMemo(
+    () => shuffleItems(filteredExercises),
+    [filteredExercises, shuffleRound],
+  );
 
   const levelCounts = useMemo(
     () => Object.fromEntries(LEVELS.map((item) => [
@@ -146,9 +217,13 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   );
 
   const unlockedLevels = new Set(getUnlockedLevels(levelCounts, completedLevels));
-  const exercise = filteredExercises.length
-    ? filteredExercises[exerciseIndex % filteredExercises.length]
-    : null;
+  const currentExercise = shuffledExercises[exerciseIndex] || null;
+  const exercise = useMemo(
+    () => currentExercise
+      ? { ...currentExercise, words: shuffleSentenceWords(currentExercise.answer) }
+      : null,
+    [currentExercise, wordOrderVersion],
+  );
   const correct = Boolean(exercise && isSentenceCorrect(selected, exercise));
   const levelLabels = {
     basic: isBn ? 'শুরু · ছোট বাক্য' : 'Basic · short sentences',
@@ -160,17 +235,23 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     if (!unlockedLevels.has(nextLevel)) return;
     setLevel(nextLevel);
     setExerciseIndex(0);
+    setShuffleRound((current) => current + 1);
+    setSessionFinished(false);
     setSelected([]);
     setResult('');
     setMilestoneNotice('');
+    setCompletionError('');
   };
 
   const chooseStory = (nextStory) => {
     setStorySlug(nextStory);
     setExerciseIndex(0);
+    setShuffleRound((current) => current + 1);
+    setSessionFinished(false);
     setSelected([]);
     setResult('');
     setMilestoneNotice('');
+    setCompletionError('');
   };
 
   const chooseWord = (wordIndex) => {
@@ -191,6 +272,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
       return;
     }
     if (!exercise || completionBusy || result === 'correct') return;
+    playCongratulationsSound();
     setCompletionBusy(true);
     setCompletionError('');
     apiRequest('/api/gamification/grammar-sentences', {
@@ -204,7 +286,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
         setMilestoneNotice(isBn
           ? 'অভিনন্দন! ১০টি বাক্য শেষ করে ৩০ পয়েন্ট পেয়েছ!'
           : 'Congratulations! You completed 10 sentences and earned 30 points!');
-        announceLearningActivity(completion.earnedPoints);
+        announceLearningActivity(completion.earnedPoints, { soundAlreadyPlayed: true });
       } else {
         setMilestoneNotice('');
       }
@@ -215,16 +297,68 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   };
 
   const nextExercise = () => {
-    setExerciseIndex((current) => (current + 1) % filteredExercises.length);
+    if (exerciseIndex >= shuffledExercises.length - 1) {
+      setSessionFinished(true);
+    } else {
+      setExerciseIndex((current) => current + 1);
+      setWordOrderVersion((current) => current + 1);
+    }
     setSelected([]);
     setResult('');
     setMilestoneNotice('');
+    setCompletionError('');
+  };
+
+  const restartExercises = () => {
+    setShuffleRound((current) => current + 1);
+    setWordOrderVersion((current) => current + 1);
+    setExerciseIndex(0);
+    setSessionFinished(false);
+    setSelected([]);
+    setResult('');
+    setMilestoneNotice('');
+    setCompletionError('');
   };
 
   const resetSentence = () => {
     setSelected([]);
     setResult('');
     setMilestoneNotice('');
+  };
+
+  const speakWord = (word) => {
+    const speechSynthesis = globalThis.window?.speechSynthesis;
+    const Utterance = globalThis.window?.SpeechSynthesisUtterance
+      || globalThis.SpeechSynthesisUtterance;
+    if (!speechSynthesis || typeof Utterance !== 'function') {
+      setPronunciationError(isBn
+        ? 'এই ডিভাইসে উচ্চারণ শোনা যাচ্ছে না।'
+        : 'Word audio is not available on this device.');
+      return;
+    }
+    speechSynthesis.cancel();
+    const utterance = new Utterance(word);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.82;
+    utterance.onstart = () => {
+      setSpeakingWord(word);
+      setPronunciationError('');
+    };
+    utterance.onend = () => setSpeakingWord('');
+    utterance.onerror = () => {
+      setSpeakingWord('');
+      setPronunciationError(isBn
+        ? 'শব্দের অডিও চালানো যায়নি। আবার চেষ্টা করুন।'
+        : 'Could not play the word audio. Please try again.');
+    };
+    try {
+      speechSynthesis.speak(utterance);
+    } catch {
+      setSpeakingWord('');
+      setPronunciationError(isBn
+        ? 'শব্দের অডিও চালানো যায়নি। আবার চেষ্টা করুন।'
+        : 'Could not play the word audio. Please try again.');
+    }
   };
 
   return (
@@ -241,8 +375,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-ink/75">
               {isBn
-                ? 'ছোট ও সহজ বাক্য দিয়ে শুরু করো। কয়েকটি ঠিক হলে পরের স্তর খুলবে—সব অনুশীলন তোমার পড়া গল্প থেকে নেওয়া।'
-                : 'Start with short, easy sentences. Complete a few to unlock the next level. Every exercise comes from a story you have read.'}
+                ? 'প্রতিটি স্তরে নতুন অনুশীলন আছে। আগের গল্পের বাক্যগুলো রাখা হয়েছে, আর প্রতিদিনের নতুন AI গল্প থেকেও বাক্য যোগ হয়।'
+                : 'Choose from a growing set of levelled challenges. Existing story sentences stay available, and new daily AI story sentences are added as they publish.'}
             </p>
           </div>
         </div>
@@ -325,12 +459,9 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                         disabled={result === 'correct'}
                         aria-label={isBn ? `${exercise.words[wordIndex]} বাদ দিতে ক্লিক করুন` : `Click to remove ${exercise.words[wordIndex]}`}
                         title={isBn ? 'বাদ দিতে ট্যাপ করুন' : 'Tap to remove'}
-                        className="group inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-sapphire/40 bg-sapphire/15 px-3 py-2 text-sm font-bold text-ink transition hover:border-rose-400 hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sapphire disabled:cursor-default"
+                        className="inline-flex min-h-[44px] items-center rounded-lg border border-sapphire/40 bg-sapphire/15 px-3 py-2 text-sm font-bold text-ink transition hover:border-rose-400 hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sapphire disabled:cursor-default"
                       >
                         <span>{exercise.words[wordIndex]}</span>
-                        {result !== 'correct' && (
-                          <span aria-hidden="true" className="text-xs text-ink/40 group-hover:text-rose-400">✕</span>
-                        )}
                       </button>
                     ))
                   ) : (
@@ -342,18 +473,29 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                   {exercise.words.map((word, wordIndex) => {
                     const used = selected.includes(wordIndex);
                     return (
-                      <button
-                        key={`${exercise.slug}-${exerciseIndex}-${wordIndex}`}
-                        type="button"
-                        disabled={used || result === 'correct'}
-                        onClick={() => chooseWord(wordIndex)}
-                        className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gold/30 bg-gold/10 px-3.5 py-2 text-sm font-bold text-ink transition hover:-translate-y-0.5 hover:border-gold/70 hover:bg-gold/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-default disabled:opacity-35"
-                      >
-                        {word}
-                      </button>
+                      <div key={`${exercise.slug}-${exerciseIndex}-${wordIndex}`} className="inline-flex items-stretch gap-1">
+                        <button
+                          type="button"
+                          disabled={used || result === 'correct'}
+                          onClick={() => chooseWord(wordIndex)}
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gold/30 bg-gold/10 px-3.5 py-2 text-sm font-bold text-ink transition hover:-translate-y-0.5 hover:border-gold/70 hover:bg-gold/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-default disabled:opacity-35"
+                        >
+                          {word}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => speakWord(word)}
+                          aria-label={`${isBn ? 'শব্দের উচ্চারণ শুনুন' : 'Hear pronunciation'}: ${word}`}
+                          title={isBn ? 'শব্দের উচ্চারণ শুনুন' : 'Hear word pronunciation'}
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-sapphire/25 bg-sapphire/10 text-base text-sapphire transition hover:bg-sapphire/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sapphire/25"
+                        >
+                          <span className={speakingWord === word ? 'animate-pulse' : ''} aria-hidden="true">🔊</span>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
+                {pronunciationError ? <p role="alert" className="text-sm font-semibold text-rose-700">{pronunciationError}</p> : null}
 
                 <div className="flex flex-wrap gap-2.5 pt-1">
                   <button
@@ -380,7 +522,9 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                       onClick={nextExercise}
                       className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gold/40 bg-gold/15 px-4 py-2 text-sm font-extrabold text-gold-soft transition hover:bg-gold/25"
                     >
-                      {isBn ? 'পরের বাক্য →' : 'Next sentence →'}
+                      {exerciseIndex === shuffledExercises.length - 1
+                        ? (isBn ? 'অনুশীলন শেষ করুন' : 'Finish practice')
+                        : (isBn ? 'পরের বাক্য →' : 'Next sentence →')}
                     </button>
                   ) : null}
                 </div>
@@ -391,7 +535,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     aria-live="polite"
                     className={`space-y-2 rounded-xl p-3.5 text-sm font-bold ${
                       result === 'correct'
-                        ? 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+                        ? 'practice-completion-feedback border border-emerald-500/30 bg-emerald-500/15 text-emerald-800'
                         : 'border border-gold/30 bg-gold/10 text-ink'
                     }`}
                   >
@@ -418,6 +562,18 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                   : 'No story sentences are available at this level for the selected story. Choose another story or return to Basic.'}
               </p>
             )}
+            {sessionFinished ? (
+              <div role="status" aria-live="polite" className="practice-completion-feedback flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-bold text-ink">
+                <span>{isBn ? 'এই গল্প ও স্তরের সব বাক্য শেষ।' : 'You have finished every sentence in this story and level.'}</span>
+                <button
+                  type="button"
+                  onClick={restartExercises}
+                  className="min-h-[44px] rounded-xl bg-sapphire px-4 py-2 font-extrabold text-white"
+                >
+                  {isBn ? 'আবার অনুশীলন' : 'Practice again'}
+                </button>
+              </div>
+            ) : null}
           </>
         ) : (
           <p role="status" className="rounded-2xl border border-gold/25 bg-gold/5 p-4 text-sm leading-relaxed text-ink/75">
