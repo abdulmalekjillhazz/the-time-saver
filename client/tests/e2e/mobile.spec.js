@@ -22,7 +22,7 @@ test.describe('mobile header and home page at 360px', () => {
   });
 
   test('all Android app links point to the Cloudinary-backed production APK download', async ({ page }) => {
-    const downloadUrl = '/api/downloads/android';
+    const downloadUrl = '/downloads/android';
     await page.goto('/en');
     await expect(page.locator('#main').getByRole('link', { name: 'Download Android app' })).toHaveAttribute('href', downloadUrl);
     await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app' })).toHaveAttribute('href', downloadUrl);

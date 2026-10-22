@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const nextCli = require.resolve('next/dist/bin/next');
-const downloadRoute = resolve(process.cwd(), 'app', 'api', 'downloads', 'android', 'route.js');
+const downloadRoute = resolve(process.cwd(), 'app', 'downloads', 'android', 'route.js');
 const temporarilyDisabledRoute = resolve(process.cwd(), '.android-download-route.js');
 
 renameSync(downloadRoute, temporarilyDisabledRoute);
