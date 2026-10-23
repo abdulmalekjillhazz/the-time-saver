@@ -98,7 +98,6 @@ public class AlarmRingingService extends Service {
         if (alarmLabel == null) alarmLabel = "";
         if (alarmLanguage == null) alarmLanguage = "bn";
         startForeground(NOTIFICATION_ID, buildNotification());
-        requestAlarmAudioFocus();
         startRingtone();
         speakAlarmName();
         return START_NOT_STICKY;
@@ -171,17 +170,25 @@ public class AlarmRingingService extends Service {
 
     private void startRingtone() {
         stopRingtone();
+        acquireWakeLock();
+        requestAlarmAudioFocus();
         String dataUri = getSharedPreferences(NativeAlarmPlugin.PREFS_ALARM, MODE_PRIVATE)
             .getString(NativeAlarmPlugin.PREF_ALARM_SOUND, null);
         if (dataUri != null) {
             try {
                 customSoundFile = writeCustomSoundFile(dataUri);
                 startPlayer(customSoundFile.getAbsolutePath());
-                acquireWakeLock();
                 return;
             } catch (Exception error) {
                 Log.w("SmartRoutineAlarm", "Could not play the selected alarm sound; using the phone ringtone.", error);
-                stopRingtone();
+                if (player != null) {
+                    player.release();
+                    player = null;
+                }
+                if (customSoundFile != null) {
+                    customSoundFile.delete();
+                    customSoundFile = null;
+                }
             }
         }
         Uri ringtone = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
@@ -189,7 +196,6 @@ public class AlarmRingingService extends Service {
         try {
             if (ringtone == null) throw new IllegalStateException("No default ringtone is available.");
             startPlayer(ringtone);
-            acquireWakeLock();
         } catch (Exception error) {
             Log.e("SmartRoutineAlarm", "Could not start the alarm ringtone.", error);
             stopRingtone();
@@ -240,6 +246,7 @@ public class AlarmRingingService extends Service {
 
     private MediaPlayer createPlayer() {
         MediaPlayer newPlayer = new MediaPlayer();
+        newPlayer.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK);
         newPlayer.setAudioAttributes(new AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
