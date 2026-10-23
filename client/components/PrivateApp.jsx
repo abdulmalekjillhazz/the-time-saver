@@ -16,6 +16,9 @@ import {
   listOfflineLessons,
   setOfflineCacheConsent,
 } from '../lib/offlineStoryCache.js';
+import { cacheOfflineUser, clearOfflineUser, isOfflineFailure, readOfflineUser } from '../lib/offlineSession.js';
+import { clearCachedRoutines, loadCachedRoutinesForOffline, saveCachedRoutines } from '../lib/routineCache.js';
+import { buildRoutineAlarms } from '../lib/routineAlarms.js';
 import { base64UrlToBytes, bengaliCalendarMonthRange, buildCalendarDays } from '../lib/calendar.js';
 import { getRoutineMood } from '../lib/routineMood.js';
 import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithGoogleTts, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
@@ -77,6 +80,8 @@ const COPY = {
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     switchLogin: 'Already have an account?', logout: 'Sign out', loading: 'Loading your private app…', addRoutine: 'Add a routine',
+    offlineRestored: 'You are offline. Showing the routines saved on this device; changes will sync when you reconnect.',
+    offlineStaleRoutines: 'You are offline. Showing the most recent routine saved on this device. Completion status is not carried over.',
     routineName: 'Routine name', start: 'Start time', end: 'End time', category: 'Category', priority: 'Priority', anchorHabit: 'After I… (anchor habit)',
     mood: 'Routine mood', moodNeutral: 'Looks balanced', moodHappy: 'Nice duration', moodAngry: 'That is too long',
     moodHelp: 'Up to 1 hour stays neutral, over 1–4 hours smiles, and over 4 hours gets angry.',
@@ -119,7 +124,7 @@ const COPY = {
     voiceAlarmNote: 'When an alarm rings, your Google voice speaks the alarm name and your next routine, and a notification is sent with the same message. Alarms ring while this app is open.', nativeAlarmNote: 'Android uses your selected alarm sound and keeps alarms ringing when Smart Routine is closed. Allow the Android alarm permissions below.', alarmVoiceUnavailable: 'The voice alarm could not play in this browser. The notification was still sent.',
     alarmPushOn: 'Closed-app alerts are on for this device — alarms ring even with the app closed.', alarmPushOff: 'Turn on closed-app alerts so alarms ring even with the app closed.',
     enableClosedAppAlerts: '🔔 Enable closed-app alerts', pushUnavailable: 'Closed-app alerts are unavailable in this browser.',
-    pushServiceUnavailable: 'This browser could not connect to its push service. Try again with internet access or use the Android app; alarms still ring while this page is open.',
+    pushServiceUnavailable: 'This browser profile cannot receive closed-app alerts. Try a regular browser profile or the Android app; browser alarms only ring while this page is open.',
     enableNativeAlarm: '📞 Enable Android call-style alarms', nativeAlarmEnabled: 'Android alarms can ring when Smart Routine is closed.', nativeAlarmPermissionMissing: 'Allow notifications, exact alarms, and full-screen alarms in Android settings, then tap enable again.',
     missedAlarms: 'Missed alarms', acknowledgeAlarm: 'Got it', alarmSnoozed: 'Snoozed for 5 minutes.',
     alarmPermissionDenied: 'Browser notifications are blocked. The in-app alarm will still ring while this page is open.',
@@ -145,6 +150,8 @@ const COPY = {
     showPassword: 'পাসওয়ার্ড দেখান',
     hidePassword: 'পাসওয়ার্ড লুকান',
     switchLogin: 'আগে থেকেই অ্যাকাউন্ট আছে?', logout: 'সাইন আউট', loading: 'আপনার ব্যক্তিগত অ্যাপ লোড হচ্ছে…', addRoutine: 'রুটিন যোগ করুন',
+    offlineRestored: 'আপনি অফলাইনে আছেন। এই ডিভাইসে সংরক্ষিত রুটিন দেখা হচ্ছে; ইন্টারনেট ফিরলে পরিবর্তনগুলো সিঙ্ক হবে।',
+    offlineStaleRoutines: 'আপনি অফলাইনে আছেন। এই ডিভাইসে সর্বশেষ সংরক্ষিত রুটিনটি দেখানো হচ্ছে। আগের দিনের সম্পন্ন অবস্থা আজকের জন্য ধরা হচ্ছে না।',
     routineName: 'রুটিনের নাম', start: 'শুরুর সময়', end: 'শেষের সময়', category: 'ধরন', priority: 'গুরুত্ব', anchorHabit: 'এর পরে… (অভ্যাসের সংকেত)',
     mood: 'রুটিনের মুড', moodNeutral: 'সময়টা ভারসাম্যপূর্ণ', moodHappy: 'ভালো সময়', moodAngry: 'সময়টা অনেক বেশি',
     moodHelp: '১ ঘণ্টা পর্যন্ত নিরপেক্ষ, ১–৪ ঘণ্টায় হাসি, আর ৪ ঘণ্টার বেশি হলে রাগী হবে।',
@@ -187,7 +194,7 @@ const COPY = {
     voiceAlarmNote: 'অ্যালার্ম বাজলে Google ভয়েসে অ্যালার্মের নাম ও পরের রুটিন শোনা যাবে, আর একই বার্তায় নোটিফিকেশন আসবে। অ্যাপ খোলা থাকলে অ্যালার্ম বাজবে।', nativeAlarmNote: 'Android-এ আপনার বেছে নেওয়া অ্যালার্মের শব্দ বাজবে এবং Smart Routine বন্ধ থাকলেও অ্যালার্ম চলবে। নিচের Android alarm অনুমতিগুলো দিন।', alarmVoiceUnavailable: 'এই browser-এ ভয়েস অ্যালার্ম চালানো যায়নি। নোটিফিকেশন পাঠানো হয়েছে।',
     alarmPushOn: 'এই ডিভাইসে বন্ধ-অ্যাপ অ্যালার্ট চালু আছে — অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।', alarmPushOff: 'বন্ধ-অ্যাপ অ্যালার্ট চালু করুন, তাহলে অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।',
     enableClosedAppAlerts: '🔔 বন্ধ-অ্যাপ অ্যালার্ট চালু করুন', pushUnavailable: 'এই browser-এ বন্ধ-অ্যাপ অ্যালার্ট সমর্থিত নয়।',
-    pushServiceUnavailable: 'এই browser-এর push service-এ সংযোগ করা যায়নি। ইন্টারনেট চালু রেখে আবার চেষ্টা করুন, অথবা Android app ব্যবহার করুন; এই পেজ খোলা থাকলে অ্যালার্ম বাজবে।',
+    pushServiceUnavailable: 'এই browser profile বন্ধ-অ্যাপ alert নিতে পারছে না। সাধারণ browser profile বা Android app ব্যবহার করুন; browser alarm শুধু পেজ খোলা থাকলে বাজে।',
     enableNativeAlarm: '📞 Android কলের মতো অ্যালার্ম চালু করুন', nativeAlarmEnabled: 'Smart Routine বন্ধ থাকলেও Android অ্যালার্ম বাজতে পারবে।', nativeAlarmPermissionMissing: 'Android সেটিংসে notification, exact alarm ও full-screen alarm অনুমতি দিন, তারপর আবার চালু করুন।',
     missedAlarms: 'মিস হওয়া অ্যালার্ম', acknowledgeAlarm: 'বুঝেছি', alarmSnoozed: '৫ মিনিটের জন্য স্নুজ করা হয়েছে।',
     alarmPermissionDenied: 'ব্রাউজার নোটিফিকেশন বন্ধ আছে। পেজ খোলা থাকলে অ্যাপের ভেতর অ্যালার্ম বাজবে।',
@@ -530,6 +537,7 @@ export function PrivateApp() {
   const [lesson, setLesson] = useState(null);
   const [storyAward, setStoryAward] = useState(null);
   const [storyCompletionBusy, setStoryCompletionBusy] = useState(false);
+  const speakingStoryCompletionsRef = useRef({ inFlight: new Set(), completed: new Set() });
   const [lessonLoadingSlug, setLessonLoadingSlug] = useState('');
   const lessonDetailsRef = useRef(new Map());
   const lessonRequestsRef = useRef(new Map());
@@ -617,28 +625,24 @@ export function PrivateApp() {
   const loadRoutines = useCallback(async (activeUser = user) => {
     if (!activeUser) return;
     const date = todayInZone(activeUser.timezone);
-    const cacheKey = `smart-routine:routines:${activeUser.id}:${date}`;
     try {
       const result = await request(`/api/routines?date=${encodeURIComponent(date)}`);
       setRoutines(result.routines);
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(cacheKey, JSON.stringify(result.routines));
-      }
+      saveCachedRoutines(activeUser.id, date, result.routines);
     } catch (networkError) {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const cached = window.localStorage.getItem(cacheKey);
-        if (cached) {
-          try {
-            setRoutines(JSON.parse(cached));
-            return;
-          } catch {
-            // fallback
-          }
-        }
+      if (!isOfflineFailure(networkError)) {
+        reportError(networkError);
+        return;
+      }
+      const cached = loadCachedRoutinesForOffline(activeUser.id, date);
+      if (cached) {
+        setRoutines(cached.routines);
+        setNotice(cached.stale ? COPY[lang].offlineStaleRoutines : COPY[lang].offlineRestored);
+        return;
       }
       reportError(networkError);
     }
-  }, [user]);
+  }, [user, lang]);
 
   const loadLessons = useCallback(async () => {
     const [publishedResult, dailyResult] = await Promise.allSettled([
@@ -797,6 +801,7 @@ export function PrivateApp() {
       .then(({ user: currentUser }) => {
         if (!active) return;
         setUser(currentUser);
+        cacheOfflineUser(currentUser);
         setProfileName(currentUser.displayName);
         setProfileAvatarId(currentUser.avatarId || 'sunrise');
         if (!useAppStore.getState().language) {
@@ -804,7 +809,26 @@ export function PrivateApp() {
         }
       })
       .catch((err) => {
-        if (active && err.status !== 401 && err.status !== 500 && err.status !== 503) reportErrorRef.current(err);
+        if (!active) return;
+        if (err.status === 401) {
+          clearOfflineUser();
+          return;
+        }
+        const cachedUser = isOfflineFailure(err) ? readOfflineUser() : null;
+        if (cachedUser) {
+          // The API is unreachable but this device has an authenticated snapshot.
+          // Keep the cached shell usable; the stored HTTP-only session cookie is
+          // still the authority and every write goes through the sync outbox.
+          setUser(cachedUser);
+          setProfileName(cachedUser.displayName);
+          setProfileAvatarId(cachedUser.avatarId || 'sunrise');
+          if (!useAppStore.getState().language) {
+            setStoredLanguage(cachedUser.locale === 'en' ? 'en' : 'bn');
+          }
+          setNotice(COPY[cachedUser.locale].offlineRestored);
+          return;
+        }
+        if (err.status !== 500 && err.status !== 503) reportErrorRef.current(err);
       })
       .finally(() => {
         if (active) setAuthReady(true);
@@ -813,9 +837,21 @@ export function PrivateApp() {
   }, [setStoredLanguage]);
 
   useEffect(() => {
+    if (user) cacheOfflineUser(user);
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') document.documentElement.lang = lang;
+  }, [lang]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    if ('serviceWorker' in navigator) {
+    if (!nativeAndroid && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch((registrationError) => {
+        if (/registration failed.*permission denied/i.test(registrationError?.message || '')) {
+          setNotice(copy.pushServiceUnavailable);
+          return;
+        }
         reportErrorRef.current(registrationError);
       });
     }
@@ -824,7 +860,7 @@ export function PrivateApp() {
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-  }, []);
+  }, [nativeAndroid, copy.pushServiceUnavailable]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1144,15 +1180,7 @@ export function PrivateApp() {
       setPushAlarmReady(enabled);
       if (!enabled) return;
       const pendingAlarms = alarms.filter((alarm) => !alarm.firedAt && alarm.at > Date.now());
-      const now = new Date();
-      const routineAlarms = routines
-        .filter((r) => !r.completionStatus && r.startTime && /^\d{2}:\d{2}$/.test(r.startTime))
-        .map((r) => {
-          const [hours, minutes] = r.startTime.split(':').map(Number);
-          const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
-          return target.getTime() > Date.now() ? { id: `routine-${r.id}`, at: target.getTime(), label: r.title } : null;
-        })
-        .filter(Boolean);
+      const routineAlarms = buildRoutineAlarms(routines, new Date(), user?.timezone);
       await Promise.all([
         ...pendingAlarms.map((alarm) => scheduleNativeAlarm(alarm, lang)),
         ...routineAlarms.map((alarm) => scheduleNativeAlarm(alarm, lang)),
@@ -1167,7 +1195,7 @@ export function PrivateApp() {
       active = false;
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [nativeAndroid, alarms, routines, pushAlarmReady, reportError]);
+  }, [nativeAndroid, alarms, routines, pushAlarmReady, lang, user?.timezone, reportError]);
 
   useEffect(() => {
     if (nativeAndroid) return undefined;
@@ -1604,6 +1632,8 @@ export function PrivateApp() {
     setBusy(true);
     try {
       await request('/api/auth/logout', { method: 'POST', body: {} });
+      clearOfflineUser();
+      clearCachedRoutines(user?.id);
       setUser(null);
       setRoutines([]);
       setLessons([]);
@@ -1658,6 +1688,7 @@ export function PrivateApp() {
     setError('');
     try {
       await enqueueAndFlush(user.id, { type: 'routine.delete', routineId });
+      if (nativeAndroid) void cancelNativeAlarm(`routine-${routineId}`).catch(() => {});
       await loadRoutines(user);
       setNotice(copy.routineDeleted);
     } catch (err) {
@@ -1832,6 +1863,32 @@ export function PrivateApp() {
     }
   }
 
+  async function markSpeakingStoryComplete(dailyLessonId) {
+    if (
+      !dailyLesson?._id
+      || dailyLesson.isOffline
+      || String(dailyLesson._id) !== String(dailyLessonId)
+    ) return;
+
+    const completionId = String(dailyLesson._id);
+    const completions = speakingStoryCompletionsRef.current;
+    if (completions.inFlight.has(completionId) || completions.completed.has(completionId)) return;
+
+    completions.inFlight.add(completionId);
+    try {
+      const result = await request('/api/lessons/today/read', {
+        method: 'POST',
+        body: { dailyLessonId: completionId },
+      });
+      completions.completed.add(completionId);
+      announceLearningActivity(result.earnedPoints);
+    } catch (completionError) {
+      reportError(completionError);
+    } finally {
+      completions.inFlight.delete(completionId);
+    }
+  }
+
   async function submitAccountAction(event) {
     event.preventDefault();
     setBusy(true);
@@ -1853,6 +1910,8 @@ export function PrivateApp() {
         const confirmed = window.confirm(copy.deleteNow);
         if (!confirmed) return;
         await request('/api/me', { method: 'DELETE', body: { password: actionPassword } });
+        clearOfflineUser();
+        clearCachedRoutines(user?.id);
         setUser(null);
         setRoutines([]);
         setLessons([]);
@@ -2228,7 +2287,13 @@ export function PrivateApp() {
 
       {tab === 'leaderboard' ? <LeaderboardPanel lang={lang} /> : null}
 
-      {tab === 'speaking' ? <SpeakingSituations lang={lang} dailyLesson={dailyLesson} /> : null}
+      {tab === 'speaking' ? (
+        <SpeakingSituations
+          lang={lang}
+          dailyLesson={dailyLesson}
+          onStoryComplete={markSpeakingStoryComplete}
+        />
+      ) : null}
 
       {tab === 'settings' ? (
         <section className="space-y-4">
@@ -2390,6 +2455,14 @@ export function PrivateApp() {
               onSubmitRoutine={addRoutine}
             />
           </div>
+          <details className="group">
+            <summary className="cursor-pointer rounded-2xl border border-gold/25 bg-paper/80 px-4 py-3 font-extrabold text-ink shadow-sm">
+              {lang === 'bn' ? 'লক্ষ্য থেকে রুটিন বানানোর সহায়ক' : 'Goal-to-routine helper'}
+            </summary>
+            <div className="pt-3">
+              <GoalToRoutine lang={lang} userId={user.id} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
+            </div>
+          </details>
           <Card className="surface-card p-4">
             <h2 className="section-heading"><span aria-hidden="true">📅</span> {lang === 'bn' ? 'ধাপ ২ · মাসিক ক্যালেন্ডার' : 'STEP 2 · MONTHLY CALENDAR'}</h2>
             <div className="mt-4 space-y-4 border-t border-sapphire/15 pt-3">
@@ -2841,7 +2914,6 @@ export function PrivateApp() {
               </Button>
             </div>
           </Card>
-          <GoalToRoutine lang={lang} userId={user.id} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
           <PrayerTimesCard lang={lang} />
           <Card className="space-y-3">
             <h2 className="text-2xl font-semibold">{copy.settings}</h2>

@@ -71,4 +71,17 @@ describe('closed-app alarm push subscription', () => {
     await expect(ensureAlarmPushSubscription()).rejects.toThrow('push-service-unavailable');
     expect(fetch).toHaveBeenCalledOnce();
   });
+
+  it('maps incognito push permission failures to the unsupported push-service result', async () => {
+    const { registration } = stubBrowser();
+    registration.pushManager.subscribe.mockRejectedValue(
+      new Error('Registration failed - permission denied'),
+    );
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ publicKey: 'AQIDBAUGBwgJ' }),
+    })));
+
+    await expect(ensureAlarmPushSubscription()).rejects.toThrow('push-service-unavailable');
+  });
 });

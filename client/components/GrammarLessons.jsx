@@ -328,7 +328,7 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
   };
 
   return (
-    <section className="space-y-4" aria-label={isBn ? 'ইংরেজি Grammar পাঠ' : 'English grammar lessons'}>
+    <section className="grammar-lessons-section space-y-4" aria-label={isBn ? 'ইংরেজি Grammar পাঠ' : 'English grammar lessons'}>
       <Card className="surface-card space-y-5 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/20 via-paper to-gold/10 p-5 shadow-xl sm:p-7">
         <div className="flex items-start gap-3">
           <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gold/15 text-3xl shadow-inner">📖</span>
@@ -451,7 +451,9 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
 
       <details className="group">
         <summary className="cursor-pointer rounded-2xl border border-gold/25 bg-paper/80 px-4 py-3 font-extrabold text-ink shadow-sm">
-          {isBn ? 'গল্প থেকে বাক্য সাজানোর অনুশীলন' : 'Practice building sentences from stories'}
+          {isBn
+            ? 'গল্প থেকে বাক্য সাজানোর অনুশীলন · ১০টি বাক্যে ৩০ পয়েন্ট'
+            : 'Practice building sentences from stories · earn 30 points at 10'}
         </summary>
         <div className="pt-4">
           <SentenceBuilder lang={lang} stories={stories} />

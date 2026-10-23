@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getSentenceDifficultyLevel } from '@smart-routine/shared';
 import { apiRequest } from '../lib/apiClient.js';
 import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { playCongratulationsSound } from '../lib/notificationSound.js';
+import { speakWithVoice } from '../lib/voiceBriefing.js';
 import { Card } from './ui/Card.jsx';
 
 const LEVELS = ['basic', 'intermediate', 'advanced'];
@@ -116,6 +117,7 @@ export function extractGrammarExercises(stories = []) {
       exercises.push({
         slug: story.slug || title,
         sourceTitle: title,
+        storyBacked: true,
         sentence,
         words: shuffleSentenceWords(chunks),
         answer: chunks,
@@ -137,6 +139,7 @@ export function createCoreSentenceExercises() {
     return {
       slug: 'everyday-sentence-practice',
       sourceTitle: 'Everyday sentence practice',
+      storyBacked: false,
       sentence,
       words: shuffleSentenceWords(answer),
       answer,
@@ -162,6 +165,10 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
       ...storyExercises,
     ];
   }, [stories]);
+  const practiceExercises = useMemo(() => {
+    const storyExercises = exercises.filter(({ storyBacked }) => storyBacked);
+    return storyExercises.length ? storyExercises : exercises;
+  }, [exercises]);
   const [level, setLevel] = useState('basic');
   const [storySlug, setStorySlug] = useState('all');
   const [exerciseIndex, setExerciseIndex] = useState(0);
@@ -177,6 +184,9 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const [milestoneNotice, setMilestoneNotice] = useState('');
   const [pronunciationError, setPronunciationError] = useState('');
   const [speakingWord, setSpeakingWord] = useState('');
+  const speechRef = useRef(null);
+
+  useEffect(() => () => speechRef.current?.stop(), []);
 
   useEffect(() => {
     let active = true;
@@ -194,14 +204,16 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
 
   const availableStories = useMemo(() => {
     const uniqueStories = new Map();
-    for (const exercise of exercises) uniqueStories.set(exercise.slug, exercise.sourceTitle);
+    for (const exercise of practiceExercises) {
+      if (exercise.storyBacked) uniqueStories.set(exercise.slug, exercise.sourceTitle);
+    }
     return [...uniqueStories].map(([slug, title]) => ({ slug, title }));
-  }, [exercises]);
+  }, [practiceExercises]);
 
   const filteredExercises = useMemo(
-    () => exercises.filter((exercise) => exercise.level === level
+    () => practiceExercises.filter((exercise) => exercise.level === level
       && (storySlug === 'all' || exercise.slug === storySlug)),
-    [exercises, level, storySlug],
+    [practiceExercises, level, storySlug],
   );
   const shuffledExercises = useMemo(
     () => shuffleItems(filteredExercises),
@@ -211,9 +223,9 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const levelCounts = useMemo(
     () => Object.fromEntries(LEVELS.map((item) => [
       item,
-      exercises.filter((exercise) => exercise.level === item).length,
+      practiceExercises.filter((exercise) => exercise.level === item).length,
     ])),
-    [exercises],
+    [practiceExercises],
   );
 
   const unlockedLevels = new Set(getUnlockedLevels(levelCounts, completedLevels));
@@ -273,6 +285,10 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     }
     if (!exercise || completionBusy || result === 'correct') return;
     playCongratulationsSound();
+    if (!exercise.storyBacked) {
+      setResult('correct');
+      return;
+    }
     setCompletionBusy(true);
     setCompletionError('');
     apiRequest('/api/gamification/grammar-sentences', {
@@ -327,32 +343,24 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   };
 
   const speakWord = (word) => {
-    const speechSynthesis = globalThis.window?.speechSynthesis;
-    const Utterance = globalThis.window?.SpeechSynthesisUtterance
-      || globalThis.SpeechSynthesisUtterance;
-    if (!speechSynthesis || typeof Utterance !== 'function') {
-      setPronunciationError(isBn
-        ? 'এই ডিভাইসে উচ্চারণ শোনা যাচ্ছে না।'
-        : 'Word audio is not available on this device.');
-      return;
-    }
-    speechSynthesis.cancel();
-    const utterance = new Utterance(word);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.82;
-    utterance.onstart = () => {
+    const clearSpeakingWord = () => setSpeakingWord('');
+    const errorMessage = isBn
+      ? 'শব্দের অডিও চালানো যায়নি। আবার চেষ্টা করুন।'
+      : 'Could not play the word audio. Please try again.';
+    try {
+      speechRef.current?.stop();
       setSpeakingWord(word);
       setPronunciationError('');
-    };
-    utterance.onend = () => setSpeakingWord('');
-    utterance.onerror = () => {
-      setSpeakingWord('');
-      setPronunciationError(isBn
-        ? 'শব্দের অডিও চালানো যায়নি। আবার চেষ্টা করুন।'
-        : 'Could not play the word audio. Please try again.');
-    };
-    try {
-      speechSynthesis.speak(utterance);
+      speechRef.current = speakWithVoice(word, {
+        lang: 'en-US',
+        rate: 0.82,
+        onEnd: clearSpeakingWord,
+        onStop: clearSpeakingWord,
+        onError: () => {
+          clearSpeakingWord();
+          setPronunciationError(errorMessage);
+        },
+      });
     } catch {
       setSpeakingWord('');
       setPronunciationError(isBn
@@ -385,8 +393,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
           <>
             <p className="rounded-xl border border-gold/25 bg-gold/10 px-3 py-2 text-sm font-extrabold text-ink">
               {isBn
-                ? `সম্পন্ন বাক্য: ${Math.min(completedSentenceCount, 10)} / 10 · ১০টি শেষ করলে ৩০ পয়েন্ট`
-                : `Sentences completed: ${Math.min(completedSentenceCount, 10)} / 10 · Earn 30 points at 10`}
+                ? `গল্পের বাক্য: ${Math.min(completedSentenceCount, 10)} / 10 · ১০টি গল্পের বাক্যে ৩০ পয়েন্ট`
+                : `Story sentences: ${Math.min(completedSentenceCount, 10)} / 10 · Earn 30 points at 10`}
             </p>
             <div className="grid gap-2 sm:grid-cols-3" aria-label={isBn ? 'বাক্যের স্তর' : 'Sentence level'}>
               {LEVELS.map((item, levelIndex) => {
@@ -446,7 +454,10 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                 </div>
 
                 <p className="text-xs font-semibold text-ink/65">
-                  {isBn ? 'গল্প:' : 'From story:'} <span className="font-extrabold text-ink">{exercise.sourceTitle}</span>
+                  {isBn
+                    ? (exercise.storyBacked ? 'গল্প:' : 'অনুশীলন:')
+                    : (exercise.storyBacked ? 'From story:' : 'Practice:')}{' '}
+                  <span className="font-extrabold text-ink">{exercise.sourceTitle}</span>
                 </p>
 
                 <div className="flex min-h-20 flex-wrap items-center gap-2 rounded-xl border border-dashed border-gold/40 bg-paper/70 p-3" aria-live="polite">

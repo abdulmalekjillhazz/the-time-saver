@@ -274,6 +274,7 @@ export default async function HomePage(props) {
               <div className="w-full">
                 <AudioDramaPlayer
                   title={dailyLesson.title}
+                  slug={dailyLesson.slug}
                   content={dailyLesson.content}
                   practiceContent={dailyLesson.locale === 'en' ? dailyLesson.content : ''}
                   vocabulary={dailyLesson.vocabulary || []}

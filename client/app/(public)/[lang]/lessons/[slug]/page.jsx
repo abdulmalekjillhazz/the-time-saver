@@ -74,6 +74,7 @@ export default async function LessonPage(props) {
       <div className="mt-6">
         <AudioDramaPlayer
           title={lesson.title[lang]}
+          slug={lesson.slug}
           content={lesson.body[lang]}
           practiceContent={lesson.body.en}
           audioUrl={lesson.media?.type === 'audio' ? lesson.media.url : ''}

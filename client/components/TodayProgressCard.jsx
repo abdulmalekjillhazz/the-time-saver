@@ -95,7 +95,7 @@ export function TodayProgressCard({
   };
 
   return (
-    <Card className="surface-card space-y-3 border border-sapphire/30 bg-gradient-to-r from-sapphire/10 via-transparent to-gold/10 p-4">
+    <Card className="surface-card glass-panel glow-border space-y-3 border border-sapphire/30 p-4">
       {!isOnline && (
         <div
           role="status"
@@ -123,9 +123,9 @@ export function TodayProgressCard({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button
             variant="secondary"
-            className="flex min-h-[44px] w-full items-center justify-center px-3 text-xs font-bold sm:text-sm touch-manipulation"
+            className="flex min-h-[44px] w-full items-center justify-center px-3 text-xs font-bold transition-transform duration-200 active:scale-95 sm:text-sm touch-manipulation"
             onClick={scrollToAlarms}
-            title={isBn ? 'কাস্টম ভয়েস ও নোটিফিকেশন অ্যালার্ম সেট করুন' : 'Set custom voice & notification alarm'}
+            title={isBn ? 'কাস্টম ভয়েস ও নোটিফিকেশন অ্যালার্ম সেট করুন' : 'Set custom voice & notification alarm'}
           >
             <span aria-hidden="true" className="mr-1.5">⏰</span>
             <span>{isBn ? 'অ্যালার্ম সেট' : 'Set Alarm'}</span>
@@ -134,7 +134,7 @@ export function TodayProgressCard({
           {onScrollToAddRoutine && (
             <Button
               variant="primary"
-              className="flex min-h-[44px] w-full items-center justify-center px-3 text-xs font-bold sm:text-sm touch-manipulation"
+              className="flex min-h-[44px] w-full items-center justify-center px-3 text-xs font-bold shadow-[0_8px_24px_-8px_rgba(96,165,250,0.6)] transition-transform duration-200 active:scale-95 sm:text-sm touch-manipulation"
               onClick={onScrollToAddRoutine}
             >
               <span aria-hidden="true" className="mr-1">➕</span>
@@ -170,7 +170,7 @@ export function TodayProgressCard({
         <div className="space-y-1.5 pt-1">
           <div className="h-2.5 w-full overflow-hidden rounded-full bg-paper/60 border border-sapphire/20">
             <div
-              className="h-full rounded-full bg-sapphire transition-all duration-500 ease-out"
+              className="progress-glow h-full rounded-full transition-all duration-700 ease-out"
               style={{ width: `${percentage}%` }}
               role="progressbar"
               aria-valuenow={percentage}

@@ -1,4 +1,4 @@
-export function announceLearningActivity(earnedPoints = 0) {
+export function announceLearningActivity(earnedPoints = 0, { soundAlreadyPlayed = false } = {}) {
   if (typeof window === 'undefined') return;
   const points = Number.isFinite(earnedPoints) ? Math.max(0, Math.floor(earnedPoints)) : 0;
   window.dispatchEvent(new CustomEvent('smart-routine:learning-activity', {
@@ -6,7 +6,7 @@ export function announceLearningActivity(earnedPoints = 0) {
   }));
   if (points > 0) {
     window.dispatchEvent(new CustomEvent('smart-routine:points-awarded', {
-      detail: { points },
+      detail: soundAlreadyPlayed ? { points, soundAlreadyPlayed: true } : { points },
     }));
   }
 }

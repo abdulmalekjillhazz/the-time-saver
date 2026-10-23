@@ -37,6 +37,7 @@ describe('English sentence builder', () => {
       { sentence: 'Scientists studied how short breaks changed the way the brain held attention.', level: 'advanced', sourceTitle: 'Why Breaks Help the Brain' },
     ]);
     expect(exercises[0].structure.en).toContain('Subject + verb');
+    expect(exercises.every(({ storyBacked }) => storyBacked)).toBe(true);
   });
 
   it('keeps a substantial original practice bank at every level', () => {
@@ -47,6 +48,7 @@ describe('English sentence builder', () => {
     expect(exercises.filter(({ level }) => level === 'intermediate')).toHaveLength(8);
     expect(exercises.filter(({ level }) => level === 'advanced')).toHaveLength(8);
     expect(new Set(exercises.map(({ sentence }) => sentence.toLowerCase())).size).toBe(24);
+    expect(exercises.every(({ storyBacked }) => !storyBacked)).toBe(true);
   });
 
   it('unlocks harder levels only after completing the current level', () => {
@@ -96,8 +98,8 @@ describe('English sentence builder', () => {
     expect(markup).toContain('Why Breaks Help the Brain');
     expect(markup).toContain('শব্দের উচ্চারণ শুনুন');
     expect(markup).toContain('বাক্য যাচাই');
-    expect(markup).toContain('অনুশীলন 1 / 9');
-    expect(markup).toContain('Everyday sentence practice');
+    expect(markup).toContain('অনুশীলন 1 / 1');
+    expect(markup).not.toContain('Everyday sentence practice');
     expect(markup).toContain('আগের স্তর:');
   });
 });

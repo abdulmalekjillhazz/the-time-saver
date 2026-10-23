@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { playCongratulationsSound } from '../lib/notificationSound.js';
 
 export function PointsAwardToast({ lang = 'bn' }) {
   const [award, setAward] = useState({ points: 0, celebration: 0 });
@@ -11,6 +12,7 @@ export function PointsAwardToast({ lang = 'bn' }) {
     const showAward = (event) => {
       const awardedPoints = event.detail?.points;
       if (!Number.isSafeInteger(awardedPoints) || awardedPoints <= 0) return;
+      if (!event.detail?.soundAlreadyPlayed) playCongratulationsSound();
       setAward((current) => ({
         points: current.points + awardedPoints,
         celebration: current.celebration + 1,

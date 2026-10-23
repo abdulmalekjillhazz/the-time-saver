@@ -54,7 +54,7 @@ describe('native Android Google sign-in', () => {
     });
 
     await expect(signInWithGoogleNative('web-client-id')).rejects.toThrow(
-      'Google sign-in did not return an ID token. Please try again.'
+      'Google sign-in did not return a valid ID token. Ensure your Android SHA-1 is added in Google Cloud Console.'
     );
   });
 });

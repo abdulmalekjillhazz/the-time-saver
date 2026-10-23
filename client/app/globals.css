@@ -330,6 +330,16 @@ body:lang(en) {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Private app shell: with viewport-fit=cover and target SDK 36, body padding
+   must respect cutouts and system bars instead of a fixed 1rem. */
+.private-app-body {
+  padding:
+    max(1rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+}
+
 :root[data-theme="light"] body {
   background-color: rgb(var(--c-paper));
   background-image:
@@ -1154,8 +1164,8 @@ select:disabled {
     position: sticky;
     z-index: 40;
     top: env(safe-area-inset-top, 0px);
-    width: calc(100% + 1.5rem);
-    margin-inline: -0.75rem;
+    width: 100%;
+    margin-inline: 0;
     padding: 0.35rem 0.75rem !important;
     border-bottom: 1px solid rgb(var(--c-gold) / 0.22);
     background: rgb(var(--c-paper) / 0.92);
@@ -1778,16 +1788,51 @@ select:disabled {
 }
 
 @media (max-width: 640px) {
+  .private-app-body {
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
   html {
     overflow-x: clip;
+  }
+
+  .app-shell-main {
+    width: 100%;
+    max-width: none !important;
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    padding-inline: 0 !important;
+  }
+
+  .app-shell-main.app-shell-immersive {
+    padding-inline: 0 !important;
+  }
+
+  .app-shell-main::before {
+    border-radius: 0;
   }
 
   .app-shell-main {
     padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;
   }
 
+  /* Immersive tabs keep the fixed bottom navigation mounted. Without this,
+     their 1.25rem padding let the last controls sit behind the nav bar. */
+  .app-shell-main.app-shell-immersive {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom)) !important;
+  }
+
   .lesson-catalog-reading {
     display: none;
+  }
+
+  .speaking-situations-section,
+  .grammar-lessons-section {
+    width: 100%;
+    margin-inline: 0;
   }
 
   .lesson-reader-overlay-open,
@@ -2280,19 +2325,88 @@ select:disabled {
   }
 }
 
-.app-tabs {
-  --app-tab-surface: linear-gradient(145deg, rgb(var(--c-paper) / 0.98), rgb(var(--c-sapphire) / 0.075));
+/* Desktop tab surface. Scoped above 641px on purpose: the mobile bottom bar has
+   its own fixed, safe-area-aware, high-contrast active state. Applying these
+   later rules on phones overwrote the active tab's navy surface and white label
+   and left only a thin gold border as the selected-state signal. */
+@media (min-width: 641px) {
+  .app-tabs {
+    --app-tab-surface: linear-gradient(145deg, rgb(var(--c-paper) / 0.98), rgb(var(--c-sapphire) / 0.075));
+  }
+
+  .app-tabs .tab-button {
+    border-color: rgb(var(--c-sapphire) / 0.24) !important;
+    background: var(--app-tab-surface) !important;
+    color: rgb(var(--c-ink)) !important;
+  }
+
+  .app-tabs .tab-button-active {
+    border-color: rgb(var(--c-gold) / 0.82) !important;
+    background: var(--app-tab-surface) !important;
+    box-shadow: inset 0 0 0 1px rgb(var(--c-gold) / 0.56) !important;
+    color: rgb(var(--c-ink)) !important;
+  }
 }
 
-.app-tabs .tab-button {
-  border-color: rgb(var(--c-sapphire) / 0.24) !important;
-  background: var(--app-tab-surface) !important;
-  color: rgb(var(--c-ink)) !important;
+/* Restrained depth for the mobile navigation: one soft top highlight and a
+   grounded shadow, no extra glow or blur beyond the existing backdrop. */
+@media (max-width: 640px) {
+  .app-tabs:not(.app-header-controls-mobile) {
+    box-shadow:
+      0 -10px 28px rgb(0 0 0 / 0.34),
+      inset 0 1px rgb(255 255 255 / 0.22) !important;
+  }
+
+  :root[data-theme="light"] .app-tabs:not(.app-header-controls-mobile) {
+    box-shadow:
+      0 -10px 24px rgb(15 23 42 / 0.12),
+      inset 0 1px rgb(255 255 255 / 0.9) !important;
+  }
+
+  .app-tabs .tab-button {
+    transition: transform 160ms ease, color 160ms ease, background-color 160ms ease;
+  }
+
+  .app-tabs .tab-button:active {
+    transform: scale(0.96);
+  }
 }
 
-.app-tabs .tab-button-active {
-  border-color: rgb(var(--c-gold) / 0.82) !important;
-  background: var(--app-tab-surface) !important;
-  box-shadow: inset 0 0 0 1px rgb(var(--c-gold) / 0.56) !important;
-  color: rgb(var(--c-ink)) !important;
+/* Shared card lift is hover-only and motion-safe: touch devices keep the
+   static 3D depth and users who ask for less motion get no movement. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .surface-card {
+    transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  }
+
+  .surface-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 16px 34px rgb(0 0 0 / 0.34),
+      0 3px 10px rgb(var(--c-sapphire-deep) / 0.22),
+      inset 0 1px rgb(255 255 255 / 0.12);
+  }
+
+  .surface-card.mobile-speaking-practice-open:hover {
+    transform: none;
+  }
+
+  :root[data-theme="light"] .surface-card:hover {
+    box-shadow:
+      0 16px 30px rgb(15 23 42 / 0.13),
+      0 3px 10px rgb(var(--c-sapphire-deep) / 0.1),
+      inset 0 1px rgb(255 255 255 / 0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-tabs .tab-button,
+  .surface-card {
+    transition: none !important;
+  }
+
+  .app-tabs .tab-button:active,
+  .app-tabs .tab-button-active {
+    transform: none !important;
+  }
 }

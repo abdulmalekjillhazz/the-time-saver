@@ -70,9 +70,11 @@ describe('progressive grammar lessons', () => {
     }));
 
     expect(markup).toContain('Building — ইংরেজি বাক্য অনুশীলন');
+    expect(markup).toContain('grammar-lessons-section');
     expect(markup).toContain('স্বাভাবিক কণ্ঠে শুনুন');
     expect(markup).toContain('Mina reads a book every evening.');
     expect(markup).toContain('গল্প থেকে বাক্য সাজানোর অনুশীলন');
+    expect(markup).toContain('১০টি বাক্যে ৩০ পয়েন্ট');
     expect(markup).toContain('বাক্য যাচাই');
   });
 });

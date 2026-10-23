@@ -76,6 +76,8 @@ describe('situation-based English speaking practice', () => {
 
     expect(markup).toContain('17 situations');
     expect(markup).toContain('The Helpful Neighbors');
+    expect(markup).toContain('>Start</button>');
+    expect(markup).not.toContain('Fresh story sentences');
     expect(markup).toContain('Good morning.');
     expect(markup).toContain('At a café');
   });

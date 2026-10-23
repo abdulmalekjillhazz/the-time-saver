@@ -63,12 +63,20 @@ public class AlarmRingingService extends Service {
             String language = intent.getStringExtra(AlarmScheduler.EXTRA_LANGUAGE);
             if (id != null && !id.isEmpty()) {
                 try {
+                    // Preserve a repeating routine's daily alarm across snooze.
+                    // The scheduler keeps the original anchor time, so the next
+                    // daily ring stays at the routine's real start time.
+                    org.json.JSONObject existing = AlarmScheduler.getAlarm(this, id);
+                    boolean repeating = existing != null && existing.optBoolean("repeat", false);
+                    String timeZone = existing == null ? "" : existing.optString("timeZone", "");
                     AlarmScheduler.schedule(
                         this,
                         id,
                         System.currentTimeMillis() + 5 * 60_000L,
                         label == null ? "" : label,
-                        language == null ? "bn" : language
+                        language == null ? "bn" : language,
+                        repeating,
+                        timeZone
                     );
                 } catch (Exception ignored) {
                     Log.e("SmartRoutineAlarm", "Could not snooze the ringing alarm.");
@@ -262,7 +270,7 @@ public class AlarmRingingService extends Service {
         String title = getString(R.string.alarm_notification_title);
         String body = alarmLabel.isEmpty() ? getString(R.string.alarm_notification_body) : alarmLabel;
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(title)
             .setContentText(body)
             .setCategory(NotificationCompat.CATEGORY_ALARM)

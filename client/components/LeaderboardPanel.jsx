@@ -8,7 +8,6 @@ import { Card } from './ui/Card.jsx';
 const COPY = {
   en: {
     title: 'Learning leaderboard',
-    subtitle: 'Read a story for 50 points. Earn up to 30 points for each quiz based on accuracy.',
     levels: 'Level up every 3 active learning days.',
     loading: 'Loading leaderboard…',
     error: 'The leaderboard could not be loaded. Please try again.',
@@ -20,7 +19,6 @@ const COPY = {
   },
   bn: {
     title: 'শেখার লিডারবোর্ড',
-    subtitle: 'গল্প পড়লে ৫০ পয়েন্ট; কুইজে সঠিক উত্তরের অনুপাতে সর্বোচ্চ ৩০ পয়েন্ট।',
     levels: 'প্রতি ৩টি সক্রিয় শেখার দিনে লেভেল বাড়বে।',
     loading: 'লিডারবোর্ড লোড হচ্ছে…',
     error: 'লিডারবোর্ড লোড করা যায়নি। আবার চেষ্টা করুন।',

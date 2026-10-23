@@ -1,3 +1,5 @@
+import { claimAudioPlayback } from './audioPlayback.js';
+
 function getTimeZoneParts(date, timeZone) {
   try {
     const parts = new Intl.DateTimeFormat('en-GB', {
@@ -178,7 +180,7 @@ export function pickSpeechVoice(voices, lang = 'en-US') {
     || (prefix === 'bn' ? undefined : list.find((voice) => voice.default) || list[0]);
 }
 
-export function speakWithVoice(text, { lang = 'en-US', onEnd, onError, errorMessage } = {}) {
+export function speakWithVoice(text, { lang = 'en-US', rate = 0.96, onEnd, onError, onStop, errorMessage } = {}) {
   const speechSynthesis = globalThis.window?.speechSynthesis;
   const Utterance = globalThis.SpeechSynthesisUtterance;
   if (!speechSynthesis || typeof Utterance !== 'function') {
@@ -187,7 +189,7 @@ export function speakWithVoice(text, { lang = 'en-US', onEnd, onError, errorMess
 
   const utterance = new Utterance(text);
   utterance.lang = lang;
-  utterance.rate = 0.96;
+  utterance.rate = rate;
   utterance.pitch = 1;
   const voice = pickSpeechVoice(speechSynthesis.getVoices(), lang);
   if (String(lang).toLowerCase().startsWith('bn') && !voice) {
@@ -196,22 +198,30 @@ export function speakWithVoice(text, { lang = 'en-US', onEnd, onError, errorMess
   if (voice) utterance.voice = voice;
 
   let stopped = false;
+  let releasePlayback = () => {};
   utterance.onend = () => {
-    if (!stopped) onEnd?.();
+    if (!stopped) {
+      releasePlayback();
+      onEnd?.();
+    }
   };
   utterance.onerror = (event) => {
     if (stopped) return;
+    releasePlayback();
     if (event.error === 'canceled') onEnd?.();
     else onError?.(new Error(errorMessage || 'The voice could not play this announcement.'));
   };
 
-  speechSynthesis.cancel();
-  speechSynthesis.speak(utterance);
   const stop = () => {
     if (stopped) return;
     stopped = true;
     speechSynthesis.cancel();
+    releasePlayback();
+    onStop?.();
   };
+  speechSynthesis.cancel();
+  releasePlayback = claimAudioPlayback(stop);
+  speechSynthesis.speak(utterance);
   return {
     pause: () => { if (!stopped) speechSynthesis.pause(); },
     resume: () => { if (!stopped) speechSynthesis.resume(); },
@@ -234,6 +244,7 @@ export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, on
   let paused = false;
   let stopped = false;
   let finished = false;
+  let releasePlayback = () => {};
 
   const closeContext = () => {
     if (audioContext.state !== 'closed') void audioContext.close();
@@ -244,6 +255,7 @@ export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, on
     finished = true;
     source = null;
     closeContext();
+    releasePlayback();
     onEnd?.();
   };
 
@@ -252,6 +264,7 @@ export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, on
     finished = true;
     source = null;
     closeContext();
+    releasePlayback();
     onError?.(error instanceof Error ? error : new Error('Google voice playback failed.'));
   };
 
@@ -277,6 +290,18 @@ export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, on
     }
   };
 
+  const stop = () => {
+    if (stopped || finished) return;
+    stopped = true;
+    requestController.abort();
+    source?.stop();
+    source = null;
+    closeContext();
+    releasePlayback();
+  };
+
+  globalThis.window?.speechSynthesis?.cancel();
+  releasePlayback = claimAudioPlayback(stop);
   // Resume the audio context synchronously from the click gesture, before the network request.
   void audioContext.resume().catch(fail);
 
@@ -289,15 +314,6 @@ export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, on
     audioBuffer = await audioContext.decodeAudioData(audioData);
     await playBuffer();
   }).catch(fail);
-
-  const stop = () => {
-    if (stopped || finished) return;
-    stopped = true;
-    requestController.abort();
-    source?.stop();
-    source = null;
-    closeContext();
-  };
 
   return {
     pause: () => {

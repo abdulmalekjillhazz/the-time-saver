@@ -19,6 +19,14 @@ export const metadata = {
   },
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#071426',
+  colorScheme: 'dark light',
+};
+
 export function generateStaticParams() {
   return LANGS.map((lang) => ({ lang }));
 }

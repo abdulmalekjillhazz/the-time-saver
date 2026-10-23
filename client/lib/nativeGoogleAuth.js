@@ -1,27 +1,53 @@
 import { Capacitor } from '@capacitor/core';
 
+/**
+ * Android APK-এর ভেতর নেটিভ Google Sign-In সম্পাদন করে ID Token ফিরিয়ে দেয়।
+ * @param {string} webClientId - Google Cloud Console থেকে প্রাপ্ত Web Client ID
+ * @returns {Promise<string>} idToken
+ */
 export async function signInWithGoogleNative(webClientId) {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') {
     throw new Error('Native Google sign-in is only available in the Android app.');
   }
+
   if (typeof webClientId !== 'string' || !webClientId.trim()) {
-    throw new Error('Google sign-in is not configured.');
+    throw new Error('Google Web Client ID is not configured. Check your environment variables.');
   }
 
-  const { SocialLogin } = await import('@capgo/capacitor-social-login');
-  await SocialLogin.initialize({
-    google: {
-      webClientId,
-      mode: 'online',
-    },
-  });
-  const response = await SocialLogin.login({
-    provider: 'google',
-    options: { scopes: ['email', 'profile'] },
-  });
-  if (response.result?.responseType !== 'online' || typeof response.result.idToken !== 'string') {
-    throw new Error('Google sign-in did not return an ID token. Please try again.');
-  }
+  try {
+    const { SocialLogin } = await import('@capgo/capacitor-social-login');
 
-  return response.result.idToken;
+    // প্লাগইন ইনিশিয়ালাইজেশন
+    await SocialLogin.initialize({
+      google: {
+        webClientId: webClientId.trim(),
+        mode: 'online',
+      },
+    });
+
+    // নেটিভ গুগল প্লে সার্ভিসেস ডায়ালগ চালু করা
+    const response = await SocialLogin.login({
+      provider: 'google',
+      options: {
+        scopes: ['email', 'profile'],
+      },
+    });
+
+    // রেসপন্স যাচাইকরণ
+    const result = response?.result;
+    const idToken = result?.idToken || result?.authentication?.idToken;
+
+    if (!idToken || typeof idToken !== 'string') {
+      throw new Error(
+        'Google sign-in did not return a valid ID token. Ensure your Android SHA-1 is added in Google Cloud Console.'
+      );
+    }
+
+    return idToken;
+  } catch (error) {
+    if (error?.message?.includes('cancel') || error?.code === 'canceled') {
+      throw new Error('Google sign-in was canceled.');
+    }
+    throw error;
+  }
 }

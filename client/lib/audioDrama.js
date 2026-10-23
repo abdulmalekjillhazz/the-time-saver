@@ -1,4 +1,6 @@
-import { apiRequest } from './apiClient.js';
+import { apiRequest, apiRequestAudio } from './apiClient.js';
+import { claimAudioPlayback } from './audioPlayback.js';
+import { saveOfflineStoryAudio } from './offlineStoryCache.js';
 
 const CHARACTERS = {
   narrator: { character: 'Narrator', pan: 0, pitch: 1, rate: 1 },
@@ -136,6 +138,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   offlineAudio = null,
   onError = () => {},
   onNotice = () => {},
+  onStop = () => {},
 } = {}) {
   let index = 0;
   let isPlaying = false;
@@ -147,6 +150,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   let runId = 0;
   let currentVolume = Math.max(0, Math.min(1, volume));
   let desiredStartIndex = 0;
+  let releasePlayback = () => {};
   const content = storyContent || lines.map(({ character, text }) => `[${character}]: ${text}`).join('\n');
 
   const emitProgress = (position) => {
@@ -190,6 +194,8 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     isPlaying = false;
     isPaused = false;
     cleanupAudio();
+    releasePlayback();
+    releasePlayback = () => {};
     onError(message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play the story audio.'));
   };
 
@@ -242,6 +248,8 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     isPlaying = false;
     isPaused = false;
     emitProgress(lines.length);
+    releasePlayback();
+    releasePlayback = () => {};
     onEnd();
   };
 
@@ -258,25 +266,27 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
 
   const loadAndPlayStory = async (id) => {
     if (id !== runId || !isPlaying || !lines.length) return;
+    if (audioUrl) {
+      onNotice(lang === 'bn' ? 'গল্পের অডিও চালানো হচ্ছে…' : 'Playing story audio…');
+      configureAudio(id, audioUrl, 'cloudinary');
+      return;
+    }
+    if (playOfflineAudio(id)) return;
     if (globalThis.navigator?.onLine === false) {
-      if (!playOfflineAudio(id)) {
-        fail(lang === 'bn'
-          ? 'এই গল্পের অডিও এই ডিভাইসে ডাউনলোড করা নেই। ইন্টারনেটে যুক্ত হয়ে আগে অডিও ডাউনলোড করুন।'
-          : 'This story audio is not saved on this device. Connect to the internet and download it first.');
-      }
+      fail(lang === 'bn'
+        ? 'এই গল্পের অডিও এই ডিভাইসে ডাউনলোড করা নেই। ইন্টারনেটে যুক্ত হয়ে আগে অডিও ডাউনলোড করুন।'
+        : 'This story audio is not saved on this device. Connect to the internet and download it first.');
       return;
     }
     const abortController = new AbortController();
     requestAbortController = abortController;
     try {
-      const result = audioUrl
-        ? { audioUrl, cached: true }
-        : await apiRequest('/api/speech/audio-drama', {
-          method: 'POST',
-          body: { content },
-          locale: lang,
-          signal: abortController.signal,
-        });
+      const result = await apiRequest('/api/speech/audio-drama', {
+        method: 'POST',
+        body: { content },
+        locale: lang,
+        signal: abortController.signal,
+      });
       if (id !== runId || !isPlaying) return;
       if (typeof result.audioUrl !== 'string' || !result.audioUrl) {
         throw new Error(lang === 'bn'
@@ -288,7 +298,26 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       configureAudio(id, result.audioUrl, 'cloudinary');
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
-      if (!playOfflineAudio(id)) {
+      if (playOfflineAudio(id)) return;
+      try {
+        const audioData = await apiRequestAudio('/api/speech/audio-drama/free', {
+          body: { content, lang },
+          locale: lang,
+          signal: abortController.signal,
+        });
+        if (id !== runId || !isPlaying) return;
+        const fallbackAudio = new Blob([audioData], { type: 'audio/mpeg' });
+        if (slug && typeof globalThis.indexedDB !== 'undefined') {
+          void saveOfflineStoryAudio(slug, content, fallbackAudio).catch(() => {});
+        }
+        if (typeof globalThis.URL?.createObjectURL !== 'function') {
+          throw new Error('Audio playback is unavailable on this device.');
+        }
+        cleanupAudio();
+        audioObjectUrl = globalThis.URL.createObjectURL(fallbackAudio);
+        onNotice(lang === 'bn' ? 'Google-এর স্বাভাবিক কণ্ঠে গল্প শোনা হচ্ছে।' : 'Playing the story with Google voice.');
+        configureAudio(id, audioObjectUrl, 'offline');
+      } catch {
         fail(lang === 'bn'
           ? 'গল্পের অডিও চালানো যাচ্ছে না। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
           : 'Story audio could not be played. Check your connection and try again.');
@@ -298,13 +327,15 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     }
   };
 
-  return {
+  const player = {
     play(startAt = 0) {
       if (!lines.length) {
         onEnd();
         return;
       }
       cleanupAudio();
+      releasePlayback();
+      releasePlayback = () => {};
       runId += 1;
       desiredStartIndex = Math.max(0, Math.min(lines.length - 0.001, Number(startAt) || 0));
       index = Math.floor(desiredStartIndex);
@@ -312,6 +343,11 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       isPaused = false;
       emitProgress(desiredStartIndex);
       onNotice(lang === 'bn' ? 'গল্পের অডিও প্রস্তুত হচ্ছে…' : 'Preparing story audio…');
+      releasePlayback();
+      releasePlayback = () => {};
+      releasePlayback = claimAudioPlayback(() => {
+        player.stop(true);
+      });
       void loadAndPlayStory(runId, index);
     },
     pause() {
@@ -324,11 +360,14 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       isPaused = false;
       if (audio) void startAudio(runId);
     },
-    stop() {
+    stop(notify = false) {
       runId += 1;
       isPlaying = false;
       isPaused = false;
       cleanupAudio();
+      releasePlayback();
+      releasePlayback = () => {};
+      if (notify) onStop();
     },
     seek(position) {
       const target = Number.isFinite(Number(position))
@@ -349,7 +388,9 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       return false;
     },
     close() {
-      this.stop();
+      player.stop();
     },
   };
+
+  return player;
 }

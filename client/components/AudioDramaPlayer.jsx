@@ -9,12 +9,14 @@ import {
   MAX_SPEECH_PRACTICE_ATTEMPTS,
 } from '../lib/speechPractice.js';
 import { isAndroidNativeApp, recognizeEnglishSpeech, stopEnglishSpeechRecognition } from '../lib/nativeSpeech.js';
+import { playCongratulationsSound } from '../lib/notificationSound.js';
 import { lookupStoryWordMeaning, normalizeWord } from './StoryReader.jsx';
 import {
   getOfflineStoryAudio,
   saveOfflineMeanings,
   saveOfflineStoryAudio,
 } from '../lib/offlineStoryCache.js';
+import { speakWithVoice } from '../lib/voiceBriefing.js';
 
 function characterIcon(role) {
   if (role === 'male') return '👨';
@@ -121,7 +123,7 @@ export function spokenTextParts(
           },
           className: [
             baseClass || 'rounded px-1 py-0.5',
-            'cursor-pointer transition hover:bg-gold/30',
+            'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold',
             isSelected ? 'bg-gold text-on-gold font-extrabold ring-2 ring-gold' : '',
           ].filter(Boolean).join(' '),
         },
@@ -141,6 +143,7 @@ export function AudioDramaPlayer({
   lang = 'bn',
   autoPlaySignal = 0,
   onClose,
+  onComplete,
   startInPracticeMode = false,
 }) {
   const isBn = lang === 'bn';
@@ -164,6 +167,8 @@ export function AudioDramaPlayer({
   const [offlineAudioSaving, setOfflineAudioSaving] = useState(false);
   const [offlineAudioStatus, setOfflineAudioStatus] = useState('');
   const [offlineAudioError, setOfflineAudioError] = useState('');
+  const offlineAudioRef = useRef(null);
+  const offlineAudioSaveInFlightRef = useRef(false);
   const [speechPracticeOpen, setSpeechPracticeOpen] = useState(startInPracticeMode);
   const [microphoneConsentLine, setMicrophoneConsentLine] = useState(null);
   const [microphoneConsentAccepted, setMicrophoneConsentAccepted] = useState(false);
@@ -209,16 +214,24 @@ export function AudioDramaPlayer({
     story: isBn ? 'গল্পের সংলাপ' : 'Story dialogue',
     loading: isBn ? 'পাঠ প্রস্তুত হচ্ছে…' : 'Preparing lesson audio…',
     friendlyError: isBn ? 'অডিও এখন চালানো যাচ্ছে না। ইন্টারনেট দেখে আবার চেষ্টা করুন।' : 'Audio cannot play right now. Check your connection and try again.',
-    saveOfflineAudio: isBn ? 'অফলাইনে অডিও রাখুন' : 'Save audio offline',
+    offlineAudioHint: isBn
+      ? 'অনলাইনে গল্পটি একবার চালালেই অডিও এই ডিভাইসে স্বয়ংক্রিয়ভাবে সংরক্ষিত হবে—পরে অফলাইনে শুনতে পারবেন।'
+      : 'Play this story once online; its audio will save to this device for offline listening.',
     offlineAudioSaved: isBn ? 'এই গল্পের অডিও এই ডিভাইসে রাখা হয়েছে।' : 'Story audio is saved on this device.',
     offlineAudioSaving: isBn ? 'অডিও এই ডিভাইসে সংরক্ষণ হচ্ছে…' : 'Saving audio on this device…',
     offlineAudioSaveFailed: isBn ? 'অফলাইনে অডিও রাখা যায়নি। আবার চেষ্টা করুন।' : 'Could not save audio offline. Please try again.',
+    offlineAudioUnavailable: isBn ? 'এই ব্রাউজারে অফলাইনে অডিও রাখার সুবিধা নেই।' : 'Offline audio storage is not available in this browser.',
+    offlineAudioConnect: isBn ? 'অফলাইনে শোনার জন্য ইন্টারনেটে যুক্ত হলে অডিও স্বয়ংক্রিয়ভাবে সংরক্ষিত হবে।' : 'Connect to the internet and the audio will save automatically for offline listening.',
+    retryOfflineAudio: isBn ? 'আবার চেষ্টা করুন' : 'Retry saving audio',
     practice: isBn ? '🎙 উচ্চারণ অনুশীলন' : '🎙 Practice pronunciation',
     closePractice: isBn ? '✕ অনুশীলন বন্ধ' : '✕ Close practice',
     practiceTitle: isBn ? 'গল্পের লাইন পড়ে উচ্চারণ অনুশীলন করুন' : 'Practice speaking story lines',
     practiceHelp: isBn
-      ? 'একটি ইংরেজি লাইন পড়ুন। ব্রাউজারের speech recognition আপনার বলা শব্দের সঙ্গে লাইনটি মেলাবে—এটি নিখুঁত phonetic score নয়। ব্রাউজারভেদে ফল বদলাতে পারে এবং অডিও অনলাইনে প্রক্রিয়াকৃত হতে পারে।'
-      : 'Read an English line aloud. Browser speech recognition compares the words it hears with the story; this is an estimate, not a phonetic pronunciation score. Results vary by browser, and audio may be processed online.',
+      ? 'আগে নমুনা উচ্চারণ শুনুন, তারপর বাক্যটি বলুন। আপনার বলা শব্দের মিল দেখে পরামর্শ পাবেন।'
+      : 'Listen to the example, then say the sentence. You will see which words matched.',
+    practiceProgress: isBn ? 'বাক্য' : 'Sentence',
+    practiceProgressLabel: isBn ? 'অনুশীলনের অগ্রগতি' : 'Practice progress',
+    attemptCount: (current, total) => isBn ? `${current} / ${total} বার চেষ্টা` : `${current} of ${total} tries`,
     microphonePermissionTitle: isBn ? 'মাইক্রোফোন ব্যবহারের অনুমতি' : 'Microphone permission',
     microphonePermissionHelp: isBn
       ? 'আপনার বলা ইংরেজি শব্দের সঙ্গে বাক্যটি মেলাতে মাইক্রোফোন দরকার। অডিও speech recognition-এর জন্য প্রক্রিয়াকৃত হবে; চালিয়ে গেলে ডিভাইসের অনুমতি চাওয়া হবে।'
@@ -228,9 +241,10 @@ export function AudioDramaPlayer({
     microphonePermissionFailed: isBn
       ? 'মাইক্রোফোন ব্যবহার করা যায়নি। অনুমতি পরীক্ষা করে আবার চেষ্টা করুন।'
       : 'Microphone access failed. Check the permission and try again.',
-    speakLine: isBn ? '🎤 পড়ে যাচাই করুন' : '🎤 Read and check',
-    stopSpeaking: isBn ? '⏹ থামান' : '⏹ Stop',
-    retrySpeaking: isBn ? '🔁 আবার চেষ্টা' : '🔁 Try again',
+    speakLine: isBn ? 'পড়ে যাচাই করুন' : 'Read and check',
+    listenExample: isBn ? 'নমুনা উচ্চারণ শুনুন' : 'Listen to example',
+    stopSpeaking: isBn ? 'থামান' : 'Stop',
+    retrySpeaking: isBn ? 'আবার চেষ্টা' : 'Try again',
     listening: isBn ? 'শুনছি—এখন লাইনটি পড়ুন…' : 'Listening—read the line aloud…',
     recognized: isBn ? 'আপনার বলা কথা' : 'What we heard',
     wordMatch: isBn ? 'শব্দের মিল' : 'Word match',
@@ -260,29 +274,11 @@ export function AudioDramaPlayer({
     chunkProgress: (current, total) => isBn ? `অংশ ${current} / ${total}` : `Chunk ${current} / ${total}`,
   };
 
-  useEffect(() => {
-    let active = true;
-    setOfflineAudio(null);
-    setOfflineAudioStatus('');
-    setOfflineAudioError('');
-    if (!slug || !content || typeof globalThis.indexedDB === 'undefined') return () => { active = false; };
-    getOfflineStoryAudio(slug, content)
-      .then((audio) => {
-        if (active && audio) {
-          setOfflineAudio(audio);
-          setOfflineAudioStatus(copy.offlineAudioSaved);
-        }
-      })
-      .catch((error) => {
-        if (active) setOfflineAudioError(error.message || copy.offlineAudioSaveFailed);
-      });
-    return () => { active = false; };
-  }, [copy.offlineAudioSaveFailed, copy.offlineAudioSaved, content, slug]);
-
-  const handleWordLookup = async (rawWord, keyId) => {
+  const handleWordLookup = async (rawWord, keyId, contextText = '') => {
     const clean = normalizeWord(rawWord);
     if (!clean) return;
 
+    handleSpeakWord(clean, contextText);
     setSelectedWord((prev) => (prev?.keyId === keyId && prev?.meaning ? prev : {
       keyId,
       term: clean,
@@ -304,26 +300,35 @@ export function AudioDramaPlayer({
     }
   };
 
-  const handleSpeakWord = (word) => {
-    const speechSynthesis = globalThis.window?.speechSynthesis;
-    const Utterance = globalThis.SpeechSynthesisUtterance;
-    if (!speechSynthesis || typeof Utterance !== 'function') {
+  const handleSpeakText = (text, rate = 0.88) => {
+    try {
+      pronunciationRef.current?.stop?.();
+      pronunciationRef.current = speakWithVoice(text, {
+        lang: 'en-US',
+        rate,
+        onError: () => setError(copy.pronunciationUnavailable),
+      });
+      setError('');
+    } catch {
       setError(copy.pronunciationUnavailable);
-      return;
     }
-    speechSynthesis.cancel();
-    const utterance = new Utterance(word);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.78;
-    utterance.pitch = 1;
-    utterance.onerror = () => setError(copy.pronunciationUnavailable);
-    pronunciationRef.current = utterance;
-    setError('');
-    speechSynthesis.speak(utterance);
   };
 
-  const saveAudioOffline = async () => {
-    if (!slug || !content || offlineAudioSaving) return;
+  const handleSpeakWord = (word, contextText = '') => {
+    const spokenText = contextText
+      ? `${word}. In this conversation: ${contextText}`
+      : word;
+    handleSpeakText(spokenText, 0.78);
+  };
+
+  const cacheStoryAudioAutomatically = useCallback(async () => {
+    if (
+      !slug
+      || !content
+      || typeof globalThis.indexedDB === 'undefined'
+      || offlineAudioSaveInFlightRef.current
+    ) return;
+    offlineAudioSaveInFlightRef.current = true;
     setOfflineAudioSaving(true);
     setOfflineAudioStatus(copy.offlineAudioSaving);
     setOfflineAudioError('');
@@ -333,15 +338,21 @@ export function AudioDramaPlayer({
           ? 'অডিও ডাউনলোড করতে আগে ইন্টারনেটে যুক্ত হতে হবে।'
           : 'Connect to the internet before downloading story audio.');
       }
-      const buffer = await apiRequestAudio('/api/speech/audio-drama/offline', {
-        body: { content },
-        locale: lang,
-      });
+      const buffer = audioUrl
+        ? await fetch(audioUrl).then((response) => {
+          if (!response.ok) throw new Error('Saved story audio could not be downloaded.');
+          return response.arrayBuffer();
+        })
+        : await apiRequestAudio('/api/speech/audio-drama/offline', {
+          body: { content },
+          locale: lang,
+        });
       const audio = new Blob([buffer], { type: 'audio/mpeg' });
       await saveOfflineStoryAudio(slug, content, audio);
+      offlineAudioRef.current = audio;
       setOfflineAudio(audio);
       setOfflineAudioStatus(copy.offlineAudioSaved);
-    } catch (saveError) {
+    } catch {
       setOfflineAudioStatus('');
       setOfflineAudioError(globalThis.navigator?.onLine === false
         ? (isBn
@@ -350,8 +361,45 @@ export function AudioDramaPlayer({
         : copy.offlineAudioSaveFailed);
     } finally {
       setOfflineAudioSaving(false);
+      offlineAudioSaveInFlightRef.current = false;
     }
-  };
+  }, [audioUrl, content, copy.offlineAudioSaveFailed, copy.offlineAudioSaved, copy.offlineAudioSaving, isBn, lang, slug]);
+
+  useEffect(() => {
+    let active = true;
+    offlineAudioRef.current = null;
+    setOfflineAudio(null);
+    setOfflineAudioStatus(copy.offlineAudioHint);
+    setOfflineAudioError('');
+    if (!slug || !content) return () => { active = false; };
+    if (typeof globalThis.indexedDB === 'undefined') {
+      setOfflineAudioStatus(copy.offlineAudioUnavailable);
+      return () => { active = false; };
+    }
+    getOfflineStoryAudio(slug, content)
+      .then((audio) => {
+        if (!active) return;
+        if (audio) {
+          offlineAudioRef.current = audio;
+          setOfflineAudio(audio);
+          setOfflineAudioStatus(copy.offlineAudioSaved);
+        } else if (globalThis.navigator?.onLine === false) {
+          setOfflineAudioStatus(copy.offlineAudioConnect);
+        }
+      })
+      .catch(() => {
+        if (active) setOfflineAudioError(copy.offlineAudioSaveFailed);
+      });
+    return () => { active = false; };
+  }, [
+    content,
+    copy.offlineAudioConnect,
+    copy.offlineAudioHint,
+    copy.offlineAudioSaveFailed,
+    copy.offlineAudioSaved,
+    copy.offlineAudioUnavailable,
+    slug,
+  ]);
 
   const startPlayback = useCallback(async (startAt = 0) => {
     controllerRef.current?.close();
@@ -359,10 +407,16 @@ export function AudioDramaPlayer({
     if (!savedAudio && slug && typeof globalThis.indexedDB !== 'undefined') {
       try {
         savedAudio = await getOfflineStoryAudio(slug, content);
-        if (savedAudio) setOfflineAudio(savedAudio);
+        if (savedAudio) {
+          offlineAudioRef.current = savedAudio;
+          setOfflineAudio(savedAudio);
+        }
       } catch (cacheError) {
         setOfflineAudioError(cacheError.message || copy.offlineAudioSaveFailed);
       }
+    }
+    if (!savedAudio && globalThis.navigator?.onLine !== false) {
+      void cacheStoryAudioAutomatically();
     }
     setError('');
     isPlayingRef.current = true;
@@ -387,6 +441,7 @@ export function AudioDramaPlayer({
         setReadingChunkIndex(0);
         setIsPlaying(false);
         setIsPaused(false);
+        onComplete?.();
       },
       {
         lang,
@@ -402,6 +457,16 @@ export function AudioDramaPlayer({
           setIsPaused(false);
           setError(message || copy.friendlyError);
         },
+        onStop: () => {
+          isPlayingRef.current = false;
+          pausedRef.current = false;
+          positionRef.current = 0;
+          setPosition(0);
+          setReadingChunkIndex(0);
+          setIsPlaying(false);
+          setIsPaused(false);
+          setIsFullscreen(false);
+        },
       },
     );
     controllerRef.current.play(startAt);
@@ -410,9 +475,11 @@ export function AudioDramaPlayer({
     content,
     copy.friendlyError,
     copy.offlineAudioSaveFailed,
+    cacheStoryAudioAutomatically,
     lang,
     lines,
     offlineAudio,
+    onComplete,
     slug,
   ]);
 
@@ -440,10 +507,11 @@ export function AudioDramaPlayer({
     isPlayingRef.current = false;
     controllerRef.current?.close();
     controllerRef.current = null;
+    pronunciationRef.current?.stop?.();
+    pronunciationRef.current = null;
     activeRecognitionRef.current = false;
     recognitionRef.current?.abort();
     recognitionRef.current = null;
-    globalThis.window?.speechSynthesis?.cancel();
   }, []);
 
   const handlePlayPause = () => {
@@ -750,6 +818,7 @@ export function AudioDramaPlayer({
   };
 
   const advancePracticeLine = (lineIndex, completed = false) => {
+    const pronunciationSucceeded = completed && speechPractice.comparison?.accuracy >= 80;
     if (lineIndex >= practiceLines.length - 1) {
       setSpeechPractice({
         lineIndex,
@@ -758,9 +827,10 @@ export function AudioDramaPlayer({
         comparison: null,
         message: '',
       });
-      if (completed) {
+      if (pronunciationSucceeded) {
+        playCongratulationsSound();
         setPracticeFeedback(copy.practiceFeedback);
-        globalThis.window?.setTimeout(() => setPracticeFeedback(''), 1600);
+        globalThis.window?.setTimeout(() => setPracticeFeedback(''), 2200);
       }
       return;
     }
@@ -772,16 +842,36 @@ export function AudioDramaPlayer({
       message: '',
     });
     setMicrophoneConsentLine(null);
-    if (completed) {
+    if (pronunciationSucceeded) {
+      playCongratulationsSound();
       setPracticeFeedback(copy.practiceFeedback);
-      globalThis.window?.setTimeout(() => setPracticeFeedback(''), 1600);
+      globalThis.window?.setTimeout(() => setPracticeFeedback(''), 2200);
     }
   };
 
   const currentLineIndex = Math.min(Math.floor(position), Math.max(lines.length - 1, 0));
   const currentLineFraction = Math.min(1, Math.max(0, position - currentLineIndex));
   const practiceFullscreen = startInPracticeMode && speechPracticeOpen;
+  const fullScreenReaderOpen = practiceFullscreen || isFullscreen;
   const activePracticeLineIndex = Math.max(0, speechPractice.lineIndex);
+  const offlineAudioNotice = offlineAudioSaving
+    ? copy.offlineAudioSaving
+    : offlineAudioStatus || (!offlineAudioError && slug ? copy.offlineAudioHint : '');
+
+  useEffect(() => {
+    if (!fullScreenReaderOpen || typeof document === 'undefined') return undefined;
+
+    const { body, documentElement } = document;
+    const bodyOverflow = body.style.overflow;
+    const documentOverflow = documentElement.style.overflow;
+    body.style.overflow = 'hidden';
+    documentElement.style.overflow = 'hidden';
+
+    return () => {
+      body.style.overflow = bodyOverflow;
+      documentElement.style.overflow = documentOverflow;
+    };
+  }, [fullScreenReaderOpen]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -793,34 +883,38 @@ export function AudioDramaPlayer({
       aria-label={copy.title}
       className={
         practiceFullscreen
-          ? 'speech-practice-fullscreen fixed inset-0 z-[100] overflow-y-auto bg-paper'
+          ? 'audio-drama-player speech-practice-fullscreen fixed inset-0 z-[100] overflow-y-auto overscroll-y-contain bg-paper'
           : isFullscreen
-          ? 'fixed inset-0 z-50 overflow-y-auto bg-paper p-4 sm:p-8'
-          : 'w-full'
+          ? 'audio-drama-player fixed inset-0 z-[100] overflow-y-auto overscroll-y-contain bg-paper p-4 sm:p-8'
+          : 'audio-drama-player w-full'
       }
     >
-      <div className={practiceFullscreen ? 'mx-auto min-h-screen max-w-4xl space-y-4 p-0 sm:p-6' : isFullscreen ? 'mx-auto max-w-4xl space-y-4 p-4 sm:p-8' : 'space-y-3'}>
+      <div className={`audio-drama-player-content ${practiceFullscreen ? 'mx-auto min-h-screen max-w-4xl space-y-4 p-0 sm:p-6' : isFullscreen ? 'mx-auto max-w-4xl space-y-4 p-4 sm:p-8' : 'space-y-3'}`}>
+        {practiceFullscreen ? (
+          <div className="sticky z-40 flex justify-end bg-paper/95 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:px-6" style={{ top: 0 }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!cancelSpeechPractice()) return;
+                setSpeechPracticeOpen(false);
+              }}
+              className="secondary-button min-h-[44px] px-4 py-2 text-sm font-bold"
+            >
+              ← {isBn ? 'বের হন' : 'Exit practice'}
+            </button>
+          </div>
+        ) : null}
         {!practiceFullscreen ? (
-        <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-gold/40 bg-paper/95 p-3 shadow-lg">
-          <div className="flex items-center gap-2">
+        <div className="audio-drama-toolbar sticky top-2 z-30 grid grid-cols-2 items-center gap-2 rounded-2xl border border-gold/40 bg-paper/95 p-3 shadow-lg lg:flex lg:flex-wrap">
+          <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-auto">
             <button
               type="button"
               onClick={handlePlayPause}
               disabled={!lines.length}
-              className="primary-button min-h-[44px] bg-sapphire px-4 py-1.5 text-xs font-extrabold text-on-sapphire sm:text-sm"
+              className="primary-button min-h-11 flex-1 bg-sapphire px-3 py-2 text-xs font-extrabold text-on-sapphire sm:flex-none sm:px-4 sm:text-sm"
             >
               {isPaused ? copy.resume : isPlaying ? copy.pause : copy.play}
             </button>
-            {slug ? (
-              <button
-                type="button"
-                onClick={saveAudioOffline}
-                disabled={offlineAudioSaving || Boolean(offlineAudio)}
-                className="secondary-button min-h-[44px] px-3 py-1.5 text-xs font-bold sm:text-sm"
-              >
-                {offlineAudioSaving ? copy.offlineAudioSaving : offlineAudio ? copy.offlineAudioSaved : copy.saveOfflineAudio}
-              </button>
-            ) : null}
             {(isPlaying || isPaused || isFullscreen) ? (
               <button
                 type="button"
@@ -829,7 +923,7 @@ export function AudioDramaPlayer({
                   onClose?.();
                 }}
                 aria-label={copy.close}
-                className="secondary-button min-h-[44px] px-3.5 py-1.5 text-xs font-bold sm:text-sm"
+                className="secondary-button min-h-11 flex-1 px-3.5 py-2 text-xs font-bold sm:flex-none sm:text-sm"
               >
                 {copy.close}
               </button>
@@ -845,7 +939,7 @@ export function AudioDramaPlayer({
               value={Math.min(position, lines.length)}
               onChange={(event) => handleSeek(event.target.value)}
               aria-label={copy.seek}
-              className="h-2 w-full cursor-pointer accent-gold"
+              className="order-last col-span-2 h-3 w-full cursor-pointer accent-gold lg:basis-full"
             />
           ) : null}
 
@@ -853,7 +947,7 @@ export function AudioDramaPlayer({
             <button
               type="button"
               onClick={() => setSelectedWord(null)}
-              className="rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-soft"
+              className="min-h-11 w-full rounded-xl border border-gold/40 bg-gold/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
             >
               ✕ {isBn ? 'অর্থ লুকান' : 'Hide meaning'}
             </button>
@@ -861,7 +955,7 @@ export function AudioDramaPlayer({
           <button
             type="button"
             onClick={() => setChunkMode((prev) => !prev)}
-            className="rounded-lg border border-sapphire/40 bg-sapphire/10 px-2.5 py-1 text-xs font-bold text-sapphire"
+            className="min-h-11 w-full rounded-xl border border-sapphire/40 bg-sapphire/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
           >
             {chunkMode
               ? (isBn ? '📄 পুরো গল্প দেখুন' : '📄 Show full story')
@@ -882,7 +976,7 @@ export function AudioDramaPlayer({
                 }
               }}
               aria-expanded={speechPracticeOpen}
-              className="rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-soft"
+              className="min-h-11 w-full rounded-xl border border-gold/40 bg-gold/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
             >
               {speechPracticeOpen ? copy.closePractice : copy.practice}
             </button>
@@ -893,31 +987,17 @@ export function AudioDramaPlayer({
         {speechPracticeOpen ? (
           <section
             aria-label={copy.practiceTitle}
-            className={`relative isolate space-y-4 overflow-hidden rounded-[1.75rem] border border-gold/35 bg-gradient-to-br from-sapphire/15 via-paper to-gold/15 p-4 shadow-xl sm:p-6${practiceFullscreen ? ' min-h-[100dvh] rounded-none border-0 pt-[calc(1rem+env(safe-area-inset-top))] sm:min-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]' : ''}`}
+            className={`relative isolate mx-auto w-full max-w-3xl space-y-5 overflow-hidden rounded-[1.75rem] border border-gold/35 bg-gradient-to-br from-sapphire/15 via-paper to-gold/15 p-5 shadow-xl sm:p-8${practiceFullscreen ? ' min-h-[100dvh] max-w-4xl rounded-none border-0 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:min-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]' : ''}`}
           >
             <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 -z-10 size-40 rounded-full bg-gold/15 blur-3xl" />
-            {practiceFullscreen ? (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!cancelSpeechPractice()) return;
-                    setSpeechPracticeOpen(false);
-                  }}
-                  className="secondary-button min-h-[44px] px-4 py-2 text-sm font-bold"
-                >
-                  ← {isBn ? 'বের হন' : 'Exit practice'}
-                </button>
-              </div>
-            ) : null}
-            <div className="flex items-start gap-3">
-              <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl border border-gold/30 bg-gold/15 text-2xl shadow-inner sm:size-14 sm:text-3xl">🎙️</span>
+            <div className="flex items-start gap-4">
+              <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl border border-gold/30 bg-gold/15 text-2xl sm:size-14 sm:text-3xl">🎙️</span>
               <div className="min-w-0 flex-1">
-                <span className="inline-flex rounded-full border border-sapphire/25 bg-sapphire/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-sapphire">
+                <span className="inline-flex rounded-full border border-sapphire/25 bg-sapphire/10 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-ink">
                   {isBn ? 'শুনুন · বলুন · শিখুন' : 'Listen · Speak · Grow'}
                 </span>
-                <h3 className="mt-2 text-lg font-black tracking-tight text-ink sm:text-xl">{copy.practiceTitle}</h3>
-                <p className="mt-1 text-xs leading-relaxed text-ink/75 sm:text-sm">{copy.practiceHelp}</p>
+                <h2 className="mt-3 text-xl font-black leading-snug tracking-tight text-ink sm:text-2xl">{copy.practiceTitle}</h2>
+                <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink/85 sm:text-base">{copy.practiceHelp}</p>
               </div>
             </div>
             {speechPractice.status === 'complete' ? (
@@ -927,10 +1007,10 @@ export function AudioDramaPlayer({
             ) : null}
             {practiceFeedback ? (
               <p role="status" className="practice-completion-feedback rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-center font-bold text-emerald-800">
-                {practiceFeedback}
+                🎉 {practiceFeedback}
               </p>
             ) : null}
-            {speechPractice.status !== 'complete' ? <div className="space-y-3">
+            {speechPractice.status !== 'complete' ? <div className="space-y-5">
               {practiceLines.slice(activePracticeLineIndex, activePracticeLineIndex + 1).map((line, visiblePracticeIndex) => {
                 const lineIndex = activePracticeLineIndex + visiblePracticeIndex;
                 const isCurrentPractice = speechPractice.lineIndex === lineIndex;
@@ -939,48 +1019,83 @@ export function AudioDramaPlayer({
                 const attempts = attemptsByLine[lineIndex] || 0;
                 const attemptsExhausted = !canAttemptSpeechPractice(attempts);
                 const hasResult = isCurrentPractice && speechPractice.status === 'result';
+                const progress = Math.round(((lineIndex + 1) / practiceLines.length) * 100);
                 return (
-                  <article
-                    key={`practice-${lineIndex}-${line.character}`}
-                    className={`relative space-y-3 rounded-2xl border p-4 shadow-sm transition-all duration-300 sm:p-5 ${
+                  <div key={`practice-step-${lineIndex}-${line.character}`} className="space-y-3">
+                    <div className="space-y-2 px-1" aria-label={copy.practiceProgressLabel}>
+                      <div className="flex items-center justify-between gap-3 text-sm font-semibold text-ink">
+                        <span>{copy.practiceProgress} {lineIndex + 1} / {practiceLines.length}</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div
+                        role="progressbar"
+                        aria-label={copy.practiceProgressLabel}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress}
+                        className="h-2.5 overflow-hidden rounded-full bg-ink/15"
+                      >
+                        <div className="h-full rounded-full bg-sapphire transition-[width] duration-300" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+                    <article
+                    className={`relative space-y-5 rounded-3xl border p-5 shadow-sm transition-colors duration-300 sm:p-7 ${
                       isListening
                         ? 'border-sapphire/60 bg-sapphire/10 shadow-lg shadow-sapphire/10'
                         : hasResult
                           ? 'border-emerald-500/35 bg-emerald-500/5'
-                          : 'border-gold/20 bg-paper/75 hover:-translate-y-0.5 hover:border-gold/45 hover:shadow-md'
+                          : 'border-gold/20 bg-paper/75'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="inline-flex min-h-7 items-center rounded-full bg-gold/15 px-2.5 text-[10px] font-extrabold uppercase tracking-wider text-gold-soft">
-                        {isBn ? `লাইন ${lineIndex + 1}` : `Line ${lineIndex + 1}`}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="inline-flex min-h-8 items-center rounded-full bg-gold/15 px-3 text-xs font-extrabold uppercase tracking-wide text-ink">
+                        {isBn ? `বাক্য ${lineIndex + 1}` : `Sentence ${lineIndex + 1}`}
                       </span>
-                      <div className="flex items-center gap-1.5" aria-label={`${copy.attempts}: ${attempts}/${MAX_SPEECH_PRACTICE_ATTEMPTS}`}>
+                      <div className="flex items-center gap-2" aria-label={`${copy.attempts}: ${attempts}/${MAX_SPEECH_PRACTICE_ATTEMPTS}`}>
                         {Array.from({ length: MAX_SPEECH_PRACTICE_ATTEMPTS }, (_, attemptIndex) => (
                           <span
                             key={attemptIndex}
                             aria-hidden="true"
-                            className={`size-2.5 rounded-full transition-colors ${attemptIndex < attempts ? 'bg-gold' : 'bg-ink/15'}`}
+                            className={`size-3 rounded-full transition-colors ${attemptIndex < attempts ? 'bg-gold' : 'bg-ink/20'}`}
                           />
                         ))}
-                        <span className="ml-1 text-[10px] font-bold text-ink/60">{attempts}/{MAX_SPEECH_PRACTICE_ATTEMPTS}</span>
+                        <span className="text-sm font-semibold text-ink/85">{copy.attemptCount(attempts, MAX_SPEECH_PRACTICE_ATTEMPTS)}</span>
                       </div>
                     </div>
-                    <p className="text-base font-bold leading-relaxed text-ink sm:text-lg">
-                      {spokenTextParts(line.text, 0, false, handleWordLookup, selectedWord, `practice-${lineIndex}`, handleSpeakWord, copy.pronunciationLabel)}
+                    <p className="max-w-[46ch] text-xl font-bold leading-[1.8] text-ink sm:text-2xl">
+                      {spokenTextParts(
+                        line.text,
+                        0,
+                        false,
+                        (word, keyId) => handleWordLookup(word, keyId, line.text),
+                        selectedWord,
+                        `practice-${lineIndex}`,
+                        handleSpeakWord,
+                        copy.pronunciationLabel,
+                      )}
                     </p>
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => handleSpeakText(line.text)}
+                        className="secondary-button min-h-12 w-full px-5 py-3 text-sm font-extrabold sm:w-auto"
+                      >
+                        🔊 {copy.listenExample}
+                      </button>
                       <button
                         type="button"
                         onClick={() => { void practiceLine(lineIndex); }}
                         aria-pressed={isListening}
                         disabled={attemptsExhausted && !isListening}
-                        className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold shadow-md transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold shadow-md transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${
                           isListening
                             ? 'bg-red-600 text-white shadow-red-600/20'
                             : 'bg-gradient-to-r from-sapphire-deep to-sapphire text-white shadow-sapphire/20'
                         }`}
                       >
-                        <span aria-hidden="true" className="text-base">{isListening ? '■' : '🎤'}</span>
+                        <span aria-hidden="true" className="text-base">
+                          {isListening ? '■' : isCurrentPractice && speechPractice.status === 'result' ? '↻' : '🎤'}
+                        </span>
                         {isListening
                           ? copy.stopSpeaking
                           : isCurrentPractice && speechPractice.status === 'result'
@@ -989,7 +1104,7 @@ export function AudioDramaPlayer({
                       </button>
                     </div>
                     {isListening ? (
-                      <p role="status" className="flex items-center gap-2 rounded-xl border border-sapphire/25 bg-sapphire/10 px-3 py-2 text-xs font-bold text-sapphire">
+                      <p role="status" className="flex items-center gap-3 rounded-xl border border-sapphire/25 bg-sapphire/10 px-4 py-3 text-sm font-bold text-ink">
                         <span className="relative inline-flex h-4 items-center gap-0.5" aria-hidden="true">
                           <span className="h-2 w-1 animate-pulse rounded-full bg-sapphire" />
                           <span className="h-4 w-1 animate-pulse rounded-full bg-sapphire [animation-delay:120ms]" />
@@ -1000,12 +1115,12 @@ export function AudioDramaPlayer({
                       </p>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'error' ? (
-                      <p role="alert" className="text-xs font-semibold text-rose-400">{speechPractice.message}</p>
+                      <p role="alert" className="rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm font-semibold leading-relaxed text-ink">{speechPractice.message}</p>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'result' && comparison ? (
-                      <div role="status" aria-live="polite" className="space-y-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs text-ink">
-                        <p className="flex items-center gap-2 font-extrabold text-sapphire">
-                          <span aria-hidden="true" className="grid size-7 place-items-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">✓</span>
+                      <div role="status" aria-live="polite" className="space-y-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm leading-relaxed text-ink sm:p-5">
+                        <p className="flex items-center gap-3 font-extrabold text-ink">
+                          <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-emerald-500/15 font-bold text-ink">✓</span>
                           {copy.wordMatch}: {comparison.accuracy}%
                         </p>
                         <p>
@@ -1017,10 +1132,10 @@ export function AudioDramaPlayer({
                             <span
                               key={`${word}-${wordIndex}`}
                               aria-label={comparison.matchedWords[wordIndex] ? copy.matchedWord : copy.missedWord}
-                              className={`rounded px-1.5 py-0.5 font-semibold ${
+                              className={`rounded-md px-2 py-1 font-semibold text-ink ${
                                 comparison.matchedWords[wordIndex]
-                                  ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-300'
-                                  : 'border border-rose-500/30 bg-rose-500/20 text-rose-300'
+                                  ? 'border border-emerald-500/30 bg-emerald-500/20'
+                                  : 'border border-rose-500/30 bg-rose-500/20'
                               }`}
                             >
                               {word}
@@ -1028,21 +1143,21 @@ export function AudioDramaPlayer({
                           ))}
                         </p>
                         <p className="flex flex-wrap gap-x-3 gap-y-1">
-                          <span className="font-semibold text-emerald-400">✓ {copy.matchedWord}</span>
-                          <span className="font-semibold text-rose-400">✕ {copy.missedWord}</span>
+                          <span className="font-semibold text-ink">✓ {copy.matchedWord}</span>
+                          <span className="font-semibold text-ink">✕ {copy.missedWord}</span>
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-col gap-3 sm:flex-row">
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex, true)}
-                            className="primary-button min-h-[44px] px-4 py-2 text-xs font-bold"
+                            className="primary-button min-h-12 w-full px-5 py-3 text-sm font-bold sm:w-auto"
                           >
                             {copy.completeLine}
                           </button>
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex)}
-                            className="secondary-button min-h-[44px] px-4 py-2 text-xs font-bold"
+                            className="secondary-button min-h-12 w-full px-5 py-3 text-sm font-bold sm:w-auto"
                           >
                             {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
                           </button>
@@ -1054,12 +1169,13 @@ export function AudioDramaPlayer({
                         type="button"
                         onClick={() => advancePracticeLine(lineIndex)}
                         disabled={isListening}
-                        className="secondary-button min-h-[44px] px-4 py-2 text-xs font-bold"
+                        className="secondary-button min-h-12 w-full px-5 py-3 text-sm font-bold sm:w-auto"
                       >
                         {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
                       </button>
                     ) : null}
-                  </article>
+                    </article>
+                  </div>
                 );
               })}
             </div> : null}
@@ -1078,14 +1194,27 @@ export function AudioDramaPlayer({
           </section>
         ) : null}
 
-        {!practiceFullscreen && offlineAudioStatus ? <p role="status" className="text-sm text-ink/80">{offlineAudioStatus}</p> : null}
-        {!practiceFullscreen && offlineAudioError ? <p role="alert" className="text-sm text-red-700">{offlineAudioError}</p> : null}
+        {!practiceFullscreen && offlineAudioNotice ? (
+          <p role="status" className="offline-audio-notice text-center text-xs leading-relaxed text-ink/70">
+            {offlineAudioNotice}
+          </p>
+        ) : null}
+        {!practiceFullscreen && offlineAudioError ? (
+          <div role="alert" className="flex flex-wrap items-center justify-center gap-2 text-sm text-red-700">
+            <span>{offlineAudioError}</span>
+            {globalThis.navigator?.onLine !== false ? (
+              <button type="button" onClick={() => { void cacheStoryAudioAutomatically(); }} className="underline underline-offset-2">
+                {copy.retryOfflineAudio}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {!practiceFullscreen ? <div
           role="list"
           aria-label={copy.story}
           tabIndex={0}
-          className="w-full space-y-3"
+          className="audio-drama-story-stage w-full"
         >
           {(chunkMode
             ? lines.slice(readingChunkIndex, readingChunkIndex + 1)
@@ -1122,7 +1251,16 @@ export function AudioDramaPlayer({
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-gold-soft">{line.character}</p>
                   <p className="mt-1 text-base leading-relaxed">
-                    {spokenTextParts(line.text, fraction, isCompletedLine, handleWordLookup, selectedWord, lineIndex, handleSpeakWord, copy.pronunciationLabel)}
+                    {spokenTextParts(
+                      line.text,
+                      fraction,
+                      isCompletedLine,
+                      (word, keyId) => handleWordLookup(word, keyId, line.text),
+                      selectedWord,
+                      lineIndex,
+                      handleSpeakWord,
+                      copy.pronunciationLabel,
+                    )}
                   </p>
                 </div>
               </div>

@@ -88,7 +88,9 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('aria-label="Seek through the story"');
     expect(markup).toContain('Learn English by Story');
     expect(markup).toContain('Practice pronunciation');
-    expect(markup).toContain('Save audio offline');
+    expect(markup).toContain('Play this story once online');
+    expect(markup).toContain('audio-drama-story-stage');
+    expect(markup).not.toContain('Save audio offline');
     expect(markup).not.toContain('Cloudinary');
     expect(markup).not.toContain('ElevenLabs');
     expect(markup).not.toContain('Google TTS');
@@ -117,9 +119,12 @@ describe('Cloudinary audio drama', () => {
 
     expect(markup).toContain('Listen · Speak · Grow');
     expect(markup).toContain('Practice speaking story lines');
-    expect(markup).toContain('Line 1');
+    expect(markup).toContain('Sentence 1');
+    expect(markup).toContain('aria-valuenow="100"');
+    expect(markup).toContain('0 of 3 tries');
+    expect(markup).toContain('Listen to example');
     expect(markup).toContain('Read and check');
-    expect(markup).toContain('0/3');
+    expect(markup).toContain('Listen to the example, then say the sentence.');
   });
 
   it('shows only the current sentence in full-screen practice before asking for microphone access', () => {
@@ -131,11 +136,25 @@ describe('Cloudinary audio drama', () => {
     }));
     const visibleText = markup.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
 
-    expect(markup).toContain('class="speech-practice-fullscreen');
+    expect(markup).toContain('class="audio-drama-player speech-practice-fullscreen');
     expect(visibleText).toContain('The first sentence is short.');
     expect(visibleText).not.toContain('The second sentence stays hidden.');
     expect(markup).not.toContain('Microphone permission');
     expect(markup).toContain('Exit practice');
+  });
+
+  it('announces sentence progress in Bengali pronunciation practice', () => {
+    const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
+      content: '[Narrator]: গল্প শুরু হলো।',
+      practiceContent: '[Narrator]: The first sentence.\n[Narrator]: The second sentence.',
+      startInPracticeMode: true,
+      lang: 'bn',
+    }));
+
+    expect(markup).toContain('অনুশীলনের অগ্রগতি');
+    expect(markup).toContain('বাক্য 1 / 2');
+    expect(markup).toContain('aria-valuenow="50"');
+    expect(markup).toContain('0 / 3 বার চেষ্টা');
   });
 
   it('does not offer English pronunciation practice for Bengali-only daily stories', () => {
@@ -259,6 +278,30 @@ describe('Cloudinary audio drama', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(onNotice).toHaveBeenCalledWith('গল্পের অডিও চালানো হচ্ছে…');
     player.close();
+  });
+
+  it('stops the previous story player before starting another one', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = FakeAudio;
+    globalThis.fetch = vi.fn(async (url) => (url === '/api/auth/csrf'
+      ? { ok: true, json: async () => ({ csrfToken: 'test-token' }) }
+      : { ok: true, json: async () => ({ audioUrl: 'https://res.cloudinary.com/test/audio.mp3' }) }));
+
+    const onStop = vi.fn();
+    const firstPlayer = playDrama(parseStoryScript('[Narrator]: First story.'), vi.fn(), vi.fn(), { onStop });
+    firstPlayer.play();
+    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
+    const firstAudio = FakeAudio.instances[0];
+
+    const secondPlayer = playDrama(parseStoryScript('[Narrator]: Second story.'), vi.fn(), vi.fn());
+    secondPlayer.play();
+    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(2));
+
+    expect(firstAudio.pause).toHaveBeenCalledOnce();
+    expect(onStop).toHaveBeenCalledOnce();
+    expect(FakeAudio.instances[1].play).toHaveBeenCalledOnce();
+    firstPlayer.close();
+    secondPlayer.close();
   });
 
   it('plays downloaded story audio without making a network request while offline', async () => {

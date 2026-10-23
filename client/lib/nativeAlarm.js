@@ -33,6 +33,8 @@ export async function scheduleNativeAlarm(alarm, lang = 'bn') {
     at: alarm.at,
     label: alarm.label || '',
     lang,
+    repeatDaily: Boolean(alarm.repeatDaily),
+    timeZone: typeof alarm.timeZone === 'string' ? alarm.timeZone : '',
   });
 }
 

@@ -40,4 +40,22 @@ describe('learning points feedback', () => {
       'smart-routine:learning-activity',
     ]);
   });
+
+  it('marks points whose success sound already played from the user action', () => {
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal('window', { dispatchEvent });
+    vi.stubGlobal('CustomEvent', class CustomEvent {
+      constructor(type, options) {
+        this.type = type;
+        this.detail = options.detail;
+      }
+    });
+
+    announceLearningActivity(30, { soundAlreadyPlayed: true });
+
+    expect(dispatchEvent.mock.calls[1][0].detail).toEqual({
+      points: 30,
+      soundAlreadyPlayed: true,
+    });
+  });
 });

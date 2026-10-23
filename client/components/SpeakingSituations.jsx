@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SPEAKING_SITUATIONS } from '../lib/speakingSituations.js';
 import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
 import { Card } from './ui/Card.jsx';
 
-export function SpeakingSituations({ lang = 'bn', dailyLesson = null }) {
+export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryComplete }) {
   const isBn = lang === 'bn';
   const situations = useMemo(() => {
     const dailyDialogue = typeof dailyLesson?.body === 'string'
@@ -21,15 +21,18 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null }) {
         id: `daily-story-${dailyLesson.date || dailyLesson.slug || 'today'}`,
         icon: '✨',
         title: {
-          en: typeof dailyLesson.title === 'string' ? `Today's story: ${dailyLesson.title}` : "Today's AI story",
-          bn: 'আজকের গল্পভিত্তিক কথোপকথন',
+          en: typeof dailyLesson.title === 'string' ? dailyLesson.title : "Today's story",
+          bn: 'আজকের গল্প',
         },
         category: { en: 'Daily story · New today', bn: 'আজকের নতুন গল্প' },
         description: {
-          en: 'Practise speaking with the newest daily story. Fresh story sentences also join sentence practice.',
-          bn: 'আজকের নতুন গল্প দিয়ে কথা বলার অনুশীলন করুন। গল্পের বাক্যগুলো sentence practice-এও যোগ হয়।',
+          en: "Practise speaking with today's story.",
+          bn: 'আজকের গল্প দিয়ে কথা বলার অনুশীলন করুন।',
         },
         dialogue: dailyDialogue,
+        slug: dailyLesson.slug || '',
+        audioUrl: dailyLesson.audio?.status === 'ready' ? dailyLesson.audio.url : '',
+        completionId: dailyLesson._id,
       },
     ];
   }, [dailyLesson]);
@@ -38,12 +41,42 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null }) {
       ? situations[situations.length - 1].id
       : SPEAKING_SITUATIONS[0].id
   ));
+  const [autoPlaySignal, setAutoPlaySignal] = useState(0);
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [mobilePlayerVisible, setMobilePlayerVisible] = useState(false);
+  const practiceRef = useRef(null);
+  const hasSelectedSituation = useRef(false);
   const selectedSituation = situations.find((item) => item.id === selectedSituationId)
     || situations[0];
 
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 639px)');
+    const updateViewport = () => setIsMobileView(query.matches);
+    updateViewport();
+    query.addEventListener('change', updateViewport);
+    return () => query.removeEventListener('change', updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!hasSelectedSituation.current) {
+      hasSelectedSituation.current = true;
+      return;
+    }
+
+    if (window.matchMedia?.('(max-width: 639px)').matches) return;
+
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    practiceRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }, [selectedSituationId]);
+
   return (
-    <section className="space-y-4" aria-labelledby="speaking-situations-heading">
-      <Card className="surface-card space-y-5 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/30 via-paper to-gold/10 p-5 shadow-xl sm:p-7">
+    <section className="speaking-situations-section space-y-4" aria-labelledby="speaking-situations-heading">
+      <Card className={`surface-card space-y-4 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/30 via-paper to-gold/10 p-3 shadow-xl sm:space-y-5 sm:p-7 ${
+        isMobileView && mobilePlayerVisible ? 'mobile-speaking-practice-open' : ''
+      }`}>
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gold/15 text-3xl shadow-inner">🗣️</span>
@@ -67,43 +100,83 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null }) {
               {isBn ? `${situations.length}টি পরিস্থিতি` : `${situations.length} situations`}
             </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" role="group" aria-label={isBn ? 'অনুশীলনের পরিস্থিতি' : 'Speaking practice situations'}>
+          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3" role="group" aria-label={isBn ? 'অনুশীলনের পরিস্থিতি' : 'Speaking practice situations'}>
             {situations.map((situation) => {
               const selected = selectedSituationId === situation.id;
               return (
-                <button
+                <div
                   key={situation.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setSelectedSituationId(situation.id)}
-                  className={`group flex min-h-28 items-start gap-4 rounded-2xl border-2 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/40 ${
+                  className={`rounded-xl border-2 transition-colors duration-200 sm:rounded-2xl ${
+                    selected && isMobileView && mobilePlayerVisible ? 'overflow-visible' : 'overflow-hidden'
+                  } ${
                     selected
                       ? 'border-gold bg-gold/15 shadow-md'
-                      : 'border-sapphire/15 bg-paper/75 hover:border-gold/70'
+                      : 'border-sapphire/15 bg-paper/75'
                   }`}
                 >
-                  <span aria-hidden="true" className="grid size-14 shrink-0 place-items-center rounded-2xl bg-sapphire/10 text-3xl transition-transform group-hover:scale-105">
-                    {situation.icon}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[0.68rem] font-bold uppercase tracking-wider text-ink/60">
-                      {situation.category[lang] || situation.category.en}
+                  <button
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setSelectedSituationId(situation.id);
+                      setMobilePlayerVisible(false);
+                    }}
+                    className="group flex min-h-0 w-full items-start gap-2 p-2 text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-gold/40 sm:min-h-28 sm:gap-4 sm:p-4"
+                  >
+                    <span aria-hidden="true" className="grid size-[4.5rem] shrink-0 place-items-center rounded-2xl bg-sapphire/10 text-5xl sm:size-16 sm:text-4xl">
+                      {situation.icon}
                     </span>
-                    <span className="mt-1 block text-base font-extrabold leading-snug text-ink">
-                      {situation.title[lang] || situation.title.en}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.68rem] font-bold uppercase tracking-wider text-ink/60">
+                        {situation.category[lang] || situation.category.en}
+                      </span>
+                      <span className="mt-1 block text-base font-extrabold leading-snug text-ink">
+                        {situation.title[lang] || situation.title.en}
+                      </span>
+                      <span className="mt-1 line-clamp-1 block text-sm leading-snug text-ink/75 sm:mt-1.5 sm:line-clamp-none sm:leading-relaxed">
+                        {situation.description[lang] || situation.description.en}
+                      </span>
                     </span>
-                    <span className="mt-1.5 block text-sm leading-relaxed text-ink/75">
-                      {situation.description[lang] || situation.description.en}
-                    </span>
-                  </span>
-                </button>
+                  </button>
+                  {selected ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobilePlayerVisible(true);
+                        setAutoPlaySignal((signal) => signal + 1);
+                      }}
+                      className="mx-3 mb-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-sapphire px-4 py-2 text-sm font-bold text-on-sapphire focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/40 sm:hidden"
+                    >
+                      <span aria-hidden="true">▶</span>
+                      {isBn ? 'শুরু' : 'Start'}
+                    </button>
+                  ) : null}
+                  {selected && isMobileView && mobilePlayerVisible ? (
+                    <div className="px-3 pb-3">
+                      <AudioDramaPlayer
+                        key={`speaking-situation-${selectedSituation.id}`}
+                        title={selectedSituation.title.en}
+                        slug={selectedSituation.slug || ''}
+                        content={selectedSituation.dialogue}
+                        practiceContent={selectedSituation.dialogue}
+                        audioUrl={selectedSituation.audioUrl || ''}
+                        lang={lang}
+                        autoPlaySignal={autoPlaySignal}
+                        startInPracticeMode
+                        onComplete={selectedSituation.completionId && onStoryComplete
+                          ? () => onStoryComplete(selectedSituation.completionId)
+                          : undefined}
+                      />
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </div>
         </div>
 
-        <div className="space-y-3 border-t border-gold/20 pt-5">
-          <div className="flex items-start gap-3">
+        <div id="speaking-practice-panel" ref={practiceRef} className="hidden scroll-mt-24 space-y-3 border-t border-gold/20 pt-5 sm:block">
+          <div className="hidden items-start gap-3 sm:flex">
             <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-xl bg-gold/15 text-2xl">
               {selectedSituation.icon}
             </span>
@@ -122,9 +195,15 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null }) {
           <AudioDramaPlayer
             key={`speaking-situation-${selectedSituation.id}`}
             title={selectedSituation.title.en}
+            slug={selectedSituation.slug || ''}
             content={selectedSituation.dialogue}
             practiceContent={selectedSituation.dialogue}
+            audioUrl={selectedSituation.audioUrl || ''}
             lang={lang}
+            autoPlaySignal={autoPlaySignal}
+            onComplete={selectedSituation.completionId && onStoryComplete
+              ? () => onStoryComplete(selectedSituation.completionId)
+              : undefined}
           />
         </div>
       </Card>

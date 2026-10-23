@@ -28,7 +28,7 @@ export async function ensureAlarmPushSubscription() {
         applicationServerKey: base64UrlToBytes(publicKey),
       });
     } catch (error) {
-      if (/push service not available/i.test(error?.message || '')) {
+      if (/push service not available|registration failed.*permission denied|notallowederror/i.test(`${error?.name || ''} ${error?.message || ''}`)) {
         throw new Error('push-service-unavailable', { cause: error });
       }
       throw error;

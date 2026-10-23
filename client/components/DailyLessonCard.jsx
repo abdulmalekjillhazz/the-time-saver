@@ -57,6 +57,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
     csrfFailed: isBn ? 'নিরাপত্তা যাচাই ব্যর্থ হয়েছে। পেজ রিলোড করে আবার চেষ্টা করুন।' : 'Security check failed. Reload the page and try again.',
     curatedFallback: isBn ? 'সংরক্ষিত বিকল্প গল্প' : 'Curated fallback story',
     storyPoints: isBn ? 'গল্প পড়ার জন্য +৫০ পয়েন্ট' : '+50 points for reading',
+    storyPointsAlreadyEarned: isBn ? 'এই গল্পের পয়েন্ট আগেই পেয়েছেন।' : 'You already earned points for this story.',
     completeStory: isBn ? 'গল্প পড়া শেষ করেছি' : 'Mark story complete',
     storyCompleted: isBn ? 'গল্প সম্পন্ন—শেখার দিন হিসেবে সংরক্ষিত হয়েছে' : 'Story completed and saved as a learning day',
     trackingError: isBn ? 'গল্প সম্পন্ন হিসেবে সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।' : 'Could not save the completed story. Please try again.',
@@ -324,6 +325,9 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
           </Button>
           {storyAward?.lessonId === String(dailyLesson._id) && storyAward.earnedPoints > 0 ? (
             <span className="text-sm font-bold text-sapphire">+{storyAward.earnedPoints} ⭐</span>
+          ) : null}
+          {storyAward?.lessonId === String(dailyLesson._id) && storyAward.earnedPoints === 0 ? (
+            <span role="status" className="text-sm text-ink/70">{copy.storyPointsAlreadyEarned}</span>
           ) : null}
         </div>
       ) : null}
