@@ -123,7 +123,7 @@ test.describe('mobile header and home page at 360px', () => {
     const apkResponse = await page.request.head(new URL(downloadUrl, page.url()).href);
     expect(apkResponse.ok()).toBeTruthy();
     expect(apkResponse.headers()['content-type']).toContain('application/vnd.android.package-archive');
-    expect(apkResponse.headers()['content-disposition']).toContain('Smart-Routine-Android-v1.3.apk');
+    expect(apkResponse.headers()['content-disposition']).toContain('Smart-Routine-Android-v1.5.apk');
 
     await page.getByRole('button', { name: 'Menu' }).click();
     const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app' });

@@ -1,4 +1,4 @@
-const CLOUDINARY_APK_URL = 'https://res.cloudinary.com/fnxzbafx/raw/upload/v1792685048/smart-routine/downloads/smart-routine-android-v1-3-20261022-rebuild.zip';
+const CLOUDINARY_APK_URL = 'https://res.cloudinary.com/fnxzbafx/raw/upload/v1792756043/smart-routine/downloads/smart-routine-android-v1-5-20261023.zip';
 
 export const runtime = 'nodejs';
 
@@ -14,7 +14,7 @@ export async function GET() {
 
   const headers = new Headers({
     'Content-Type': 'application/vnd.android.package-archive',
-    'Content-Disposition': 'attachment; filename="Smart-Routine-Android-v1.3.apk"',
+    'Content-Disposition': 'attachment; filename="Smart-Routine-Android-v1.5.apk"',
     'Cache-Control': 'public, max-age=3600',
   });
   const contentLength = upstream.headers.get('content-length');
