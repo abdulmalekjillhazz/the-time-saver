@@ -141,7 +141,6 @@ jobs:
 
   seo:
     name: Public site SEO checks (built site)
-    if: ${{ hashFiles('client/package.json') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -166,7 +165,6 @@ jobs:
 
   web-budgets:
     name: Performance budgets (runs once client exists)
-    if: ${{ hashFiles('client/package.json') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
