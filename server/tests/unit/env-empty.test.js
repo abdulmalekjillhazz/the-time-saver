@@ -32,8 +32,9 @@ describe('loadEnv with empty optional values', () => {
     expect(loadEnv(copiedExample).SCHEDULER_ENABLED).toBe(true);
   });
 
-  it('defaults ElevenLabs to a model that supports Bengali', () => {
+  it('defaults ElevenLabs to the configured model and English narration voices', () => {
     expect(loadEnv(copiedExample).ELEVENLABS_MODEL).toBe('eleven_v3');
+    expect(loadEnv(copiedExample).ELEVENLABS_SON_VOICE_ID).toBe('TxGEqnHWrfWFTfGW9XjX');
   });
 
   it('an empty required value is still refused and named', () => {

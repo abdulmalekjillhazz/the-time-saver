@@ -53,7 +53,7 @@ const schema = z
     ELEVENLABS_MODEL: z.string().trim().min(1).default('eleven_v3'),
     ELEVENLABS_FATHER_VOICE_ID: z.string().trim().min(1).default('pNInz6obpgDQGcFmaJgB'),
     ELEVENLABS_MOTHER_VOICE_ID: z.string().trim().min(1).default('EXAVITQu4vr4xnSDxMaL'),
-    ELEVENLABS_SON_VOICE_ID: z.string().trim().min(1).default('IKne3meq5aSn9XLyUdCD'),
+    ELEVENLABS_SON_VOICE_ID: z.string().trim().min(1).default('TxGEqnHWrfWFTfGW9XjX'),
     ELEVENLABS_STORYTELLER_VOICE_ID: z.string().trim().min(1).default('JBFqnCBsd6RMkjVDRZzb'),
     ELEVENLABS_STABILITY: z.coerce.number().min(0).max(1).default(0.5),
     ELEVENLABS_SIMILARITY_BOOST: z.coerce.number().min(0).max(1).default(0.75),

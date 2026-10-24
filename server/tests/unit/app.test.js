@@ -122,6 +122,34 @@ describe('app guards (no database needed)', () => {
     expect(res.status).toBe(403);
   });
 
+  it.each([
+    'https://localhost',
+    'capacitor://localhost',
+    'ionic://localhost',
+    'http://127.0.0.1:3001',
+    'http://10.0.2.2:8080',
+  ])('accepts Capacitor/local origin %s when the CSRF token matches', async (origin) => {
+    const token = 'f'.repeat(48);
+    const res = await request(app)
+      .post('/api/auth/login')
+      .set('Origin', origin)
+      .set('Cookie', `sr_csrf=${token}`)
+      .set('X-CSRF-Token', token)
+      .send({});
+    expect(res.status).not.toBe(403);
+  });
+
+  it('does not treat a hostname beginning with localhost as a trusted local origin', async () => {
+    const token = 'g'.repeat(48);
+    const res = await request(app)
+      .post('/api/auth/login')
+      .set('Origin', 'http://localhost.attacker.example')
+      .set('Cookie', `sr_csrf=${token}`)
+      .set('X-CSRF-Token', token)
+      .send({});
+    expect(res.status).toBe(403);
+  });
+
   it('data routes return 503 when the database is not connected', async () => {
     const res = await request(app).get('/api/routines');
     expect(res.status).toBe(503);

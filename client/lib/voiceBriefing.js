@@ -173,7 +173,17 @@ export function pickSpeechVoice(voices, lang = 'en-US') {
     || (prefix === 'bn' ? undefined : list.find((voice) => voice.default) || list[0]);
 }
 
-export function speakWithVoice(text, { lang = 'en-US', rate = 0.96, onEnd, onError, onStop, errorMessage } = {}) {
+export function getMicrosoftEnglishVoices(voices) {
+  return (Array.isArray(voices) ? voices : []).filter((voice) => (
+    /^en(?:-|$)/i.test(String(voice?.lang || ''))
+    && /microsoft/i.test(String(voice?.name || ''))
+  ));
+}
+
+export function speakWithVoice(
+  text,
+  { lang = 'en-US', rate = 0.96, voice: preferredVoice, onEnd, onError, onStop, errorMessage } = {}
+) {
   const speechSynthesis = globalThis.window?.speechSynthesis;
   const Utterance = globalThis.SpeechSynthesisUtterance;
   if (!speechSynthesis || typeof Utterance !== 'function') {
@@ -184,7 +194,10 @@ export function speakWithVoice(text, { lang = 'en-US', rate = 0.96, onEnd, onErr
   utterance.lang = lang;
   utterance.rate = rate;
   utterance.pitch = 1;
-  const voice = pickSpeechVoice(speechSynthesis.getVoices(), lang);
+  const prefix = String(lang || 'en').split('-')[0].toLowerCase();
+  const voice = preferredVoice?.lang?.toLowerCase().startsWith(prefix)
+    ? preferredVoice
+    : pickSpeechVoice(speechSynthesis.getVoices(), lang);
   if (String(lang).toLowerCase().startsWith('bn') && !voice) {
     throw new Error('No Bengali text-to-speech voice is installed on this device.');
   }
@@ -223,121 +236,11 @@ export function speakWithVoice(text, { lang = 'en-US', rate = 0.96, onEnd, onErr
   };
 }
 
-const pronounceAudioCache = new Map();
-
 export function speakNaturalSpeech(
   text,
-  { lang = 'en-US', rate = 0.88, speaker = 'storyteller', onEnd, onStop, onError, errorMessage } = {}
+  { lang = 'en-US', rate = 0.88, voice, onEnd, onStop, onError, errorMessage } = {}
 ) {
-  const normalizedLang = String(lang).toLowerCase().startsWith('bn') ? 'bn' : 'en';
-  const cacheKey = `${normalizedLang}:${speaker}:${text}`;
-  const isOnline = globalThis.navigator?.onLine !== false;
-  const hasAudioElement = typeof globalThis.Audio === 'function' && typeof globalThis.URL?.createObjectURL === 'function';
-
-  if (isOnline && hasAudioElement) {
-    const requestController = new AbortController();
-    let audio = null;
-    let objectUrl = null;
-    let stopped = false;
-    let releasePlayback = () => {};
-
-    const cleanup = () => {
-      if (audio) {
-        audio.pause();
-        audio.onended = null;
-        audio.onerror = null;
-        audio.removeAttribute?.('src');
-        audio = null;
-      }
-      if (objectUrl) {
-        globalThis.URL?.revokeObjectURL?.(objectUrl);
-        objectUrl = null;
-      }
-      releasePlayback();
-      releasePlayback = () => {};
-    };
-
-    const stop = () => {
-      if (stopped) return;
-      stopped = true;
-      requestController.abort();
-      cleanup();
-      onStop?.();
-    };
-
-    globalThis.window?.speechSynthesis?.cancel();
-    releasePlayback = claimAudioPlayback(stop);
-
-    const playBlob = async (blob) => {
-      if (stopped) return;
-      objectUrl = globalThis.URL.createObjectURL(blob);
-      audio = new globalThis.Audio(objectUrl);
-      audio.playbackRate = Math.max(0.7, Math.min(1.2, rate || 1));
-      audio.onended = () => {
-        if (stopped) return;
-        stopped = true;
-        cleanup();
-        onEnd?.();
-      };
-      audio.onerror = () => {
-        if (stopped) return;
-        cleanup();
-        try {
-          speakWithVoice(text, { lang, rate, onEnd, onStop, onError, errorMessage });
-        } catch (fallbackErr) {
-          onError?.(fallbackErr);
-        }
-      };
-      try {
-        await audio.play();
-      } catch {
-        if (stopped) return;
-        cleanup();
-        try {
-          speakWithVoice(text, { lang, rate, onEnd, onStop, onError, errorMessage });
-        } catch (fallbackErr) {
-          onError?.(fallbackErr);
-        }
-      }
-    };
-
-    if (pronounceAudioCache.has(cacheKey)) {
-      void playBlob(pronounceAudioCache.get(cacheKey));
-    } else {
-      void apiRequestAudio('/api/speech/pronounce', {
-        body: { text, lang: normalizedLang, speaker },
-        locale: normalizedLang,
-        signal: requestController.signal,
-      })
-        .then((buf) => {
-          if (stopped) return;
-          const blob = new Blob([buf], { type: 'audio/mpeg' });
-          pronounceAudioCache.set(cacheKey, blob);
-          if (pronounceAudioCache.size > 150) {
-            pronounceAudioCache.delete(pronounceAudioCache.keys().next().value);
-          }
-          void playBlob(blob);
-        })
-        .catch(() => {
-          if (stopped) return;
-          cleanup();
-          try {
-            speakWithVoice(text, { lang, rate, onEnd, onStop, onError, errorMessage });
-          } catch (fallbackErr) {
-            onError?.(fallbackErr);
-          }
-        });
-    }
-
-    return {
-      pause: () => audio?.pause(),
-      resume: () => { void audio?.play(); },
-      stop,
-      close: stop,
-    };
-  }
-
-  return speakWithVoice(text, { lang, rate, onEnd, onStop, onError, errorMessage });
+  return speakWithVoice(text, { lang, rate, voice, onEnd, onStop, onError, errorMessage });
 }
 
 export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, onError } = {}) {

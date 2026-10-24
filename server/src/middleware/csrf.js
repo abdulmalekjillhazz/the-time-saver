@@ -2,6 +2,23 @@ import { AppError, MSG } from '../lib/AppError.js';
 import { CSRF_COOKIE, CSRF_HEADER } from '../lib/cookies.js';
 import { safeEqual } from '../lib/crypto.js';
 
+function isAllowedLocalOrigin(origin) {
+  let url;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (url.username || url.password || !['', '/'].includes(url.pathname) || url.search || url.hash) return false;
+
+  const hostname = url.hostname.toLowerCase();
+  if (url.protocol === 'http:') {
+    return ['localhost', '127.0.0.1', '10.0.2.2'].includes(hostname);
+  }
+  if (url.protocol === 'https:') return hostname === 'localhost';
+  return ['capacitor:', 'ionic:'].includes(url.protocol) && hostname === 'localhost';
+}
+
 export function csrfProtection(config) {
   const allowedOrigin = String(config?.CLIENT_ORIGIN || '').replace(/\/+$/, '');
   return (req, _res, next) => {
@@ -12,12 +29,7 @@ export function csrfProtection(config) {
       !origin ||
       origin === allowedOrigin ||
       origin.endsWith('.vercel.app') ||
-      origin.startsWith('http://localhost') ||
-      origin.startsWith('https://localhost') ||
-      origin.startsWith('capacitor://localhost') ||
-      origin.startsWith('ionic://localhost') ||
-      origin.startsWith('http://127.0.0.1') ||
-      origin.startsWith('http://10.0.2.2');
+      isAllowedLocalOrigin(origin);
     if (!isAllowed) {
       return next(new AppError(403, 'CSRF_FAILED', MSG.csrf));
     }

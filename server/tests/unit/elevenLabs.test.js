@@ -7,6 +7,7 @@ import {
 import { audioDramaError, elevenLabsError } from '../../src/routes/speech.js';
 import {
   ElevenLabsApiError,
+  DEFAULT_ELEVENLABS_VOICES,
   buildElevenLabsDialogueRequest,
   generateAndUploadLessonAudio,
   generateAndUploadAudioDrama,
@@ -14,8 +15,10 @@ import {
   generateElevenLabsAudioWithTimestamps,
   generateNarrationAudio,
   hasCompleteNarrationVoiceConfig,
+  isBengaliStoryContent,
   parseNarrationSegments,
   resolveNarrationVoice,
+  withDefaultNarrationVoices,
 } from '../../src/services/elevenLabs.js';
 import { hasCompleteStoryScript } from '../../src/services/geminiLessons.js';
 import { parseStoryNarration } from '@smart-routine/shared';
@@ -97,6 +100,89 @@ describe('ElevenLabs provider errors', () => {
       },
     });
     expect(providerRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('English-only cached ElevenLabs audio policy', () => {
+  it('detects Bengali text and fills the configured English voice defaults', () => {
+    expect(isBengaliStoryContent('[Storyteller]: গল্প শুরু হলো।')).toBe(true);
+    expect(isBengaliStoryContent('[Storyteller]: The story begins.')).toBe(false);
+    expect(withDefaultNarrationVoices({})).toMatchObject({
+      ELEVENLABS_FATHER_VOICE_ID: DEFAULT_ELEVENLABS_VOICES.father,
+      ELEVENLABS_MOTHER_VOICE_ID: DEFAULT_ELEVENLABS_VOICES.mother,
+      ELEVENLABS_SON_VOICE_ID: 'TxGEqnHWrfWFTfGW9XjX',
+      ELEVENLABS_STORYTELLER_VOICE_ID: DEFAULT_ELEVENLABS_VOICES.storyteller,
+    });
+  });
+
+  it('refuses Bengali before requesting provider or Cloudinary audio', async () => {
+    const providerRequest = vi.fn();
+    vi.stubGlobal('fetch', providerRequest);
+
+    const lessonError = await generateAndUploadLessonAudio({
+      lesson: { content: '[Storyteller]: বাংলা গল্প।' },
+      config,
+    }).catch((caught) => caught);
+    const dramaError = await generateAndUploadAudioDrama({
+      content: '[Storyteller]: বাংলা গল্প।',
+      config,
+    }).catch((caught) => caught);
+
+    expect(lessonError).toMatchObject({ status: 503, upstreamCode: 'english_only_policy' });
+    expect(dramaError).toMatchObject({ status: 503, upstreamCode: 'english_only_policy' });
+    expect(providerRequest).not.toHaveBeenCalled();
+  });
+
+  it('retries failed eleven_v3 timestamps with the lower-cost turbo model', async () => {
+    configureCloudinary(config);
+    const assets = new Map();
+    const uploadBuffer = vi.fn(async ({ publicId, folder, resourceType, format, buffer }) => {
+      const asset = {
+        secure_url: `https://media.example/${publicId}.${format}`,
+        public_id: `${folder}/${publicId}`,
+        duration: 1,
+        buffer,
+      };
+      assets.set(`${resourceType}/${folder}/${publicId}`, asset);
+      return asset;
+    });
+    setCloudinaryClient({
+      resourceInfo: vi.fn(async (publicId, resourceType) => assets.get(`${resourceType}/${publicId}`) || null),
+      uploadBuffer,
+    });
+    const modelIds = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, options = {}) => {
+      const { text, model_id: modelId } = JSON.parse(options.body);
+      modelIds.push(modelId);
+      if (modelId === 'eleven_v3') {
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({ detail: { status: 'model_error' } }),
+        };
+      }
+      const characters = [...text];
+      return {
+        ok: true,
+        json: async () => ({
+          audio_base64: Buffer.from([1, 2, 3]).toString('base64'),
+          alignment: {
+            characters,
+            character_start_times_seconds: characters.map((_, index) => index / 10),
+            character_end_times_seconds: characters.map((_, index) => (index + 1) / 10),
+          },
+        }),
+      };
+    }));
+
+    const result = await generateAndUploadAudioDrama({
+      content: '[Storyteller]: The story begins.',
+      config,
+    });
+
+    expect(modelIds).toEqual(['eleven_v3', 'eleven_turbo_v2_5']);
+    expect(result.cached).toBe(false);
+    expect(uploadBuffer).toHaveBeenCalledTimes(2);
   });
 });
 

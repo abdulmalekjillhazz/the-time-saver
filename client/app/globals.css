@@ -3159,3 +3159,249 @@ select:disabled {
     animation: none;
   }
 }
+
+.speech-practice-fullscreen {
+  perspective: 1050px;
+  background:
+    radial-gradient(ellipse at 50% 46%, rgb(var(--c-sapphire) / 0.13), transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgb(var(--c-gold) / 0.08), transparent 52%),
+    rgb(var(--c-paper));
+}
+
+.speech-practice-fullscreen::before {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 12% 24%, rgb(var(--c-gold-soft) / 0.72) 1px, transparent 1.8px),
+    radial-gradient(circle at 83% 19%, rgb(var(--c-sapphire) / 0.82) 1px, transparent 2px),
+    radial-gradient(circle at 76% 74%, rgb(var(--c-gold) / 0.58) 1px, transparent 2px),
+    radial-gradient(circle at 18% 82%, rgb(var(--c-sapphire) / 0.66) 1px, transparent 2px),
+    linear-gradient(145deg, transparent 49.8%, rgb(var(--c-gold) / 0.1) 50%, transparent 50.2%);
+  content: "";
+  opacity: 0.52;
+  pointer-events: none;
+}
+
+.speech-practice-layout {
+  position: relative;
+  z-index: 1;
+}
+
+.speech-practice-panel {
+  justify-content: center;
+  border-color: rgb(var(--c-gold) / 0.3);
+  background:
+    radial-gradient(ellipse at 50% 12%, rgb(var(--c-sapphire) / 0.14), transparent 55%),
+    linear-gradient(155deg, rgb(var(--c-paper) / 0.96), rgb(var(--c-paper) / 0.84));
+  box-shadow:
+    inset 0 1px rgb(255 255 255 / 0.06),
+    0 24px 70px -46px rgb(var(--c-gold) / 0.44);
+}
+
+.speech-practice-step {
+  width: min(100%, 40rem);
+  margin-inline: auto;
+}
+
+.speech-practice-constellation {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--practice-node-count), minmax(0, 1fr));
+  align-items: center;
+  width: 100%;
+  min-height: 1rem;
+  padding-inline: 0.2rem;
+}
+
+.speech-practice-constellation::before {
+  position: absolute;
+  right: 0.45rem;
+  left: 0.45rem;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgb(var(--c-gold) / 0.9) 0 var(--practice-progress),
+    rgb(var(--c-sapphire) / 0.38) var(--practice-progress) 100%
+  );
+  content: "";
+}
+
+.speech-practice-constellation-node {
+  z-index: 1;
+  justify-self: center;
+  width: 0.48rem;
+  height: 0.48rem;
+  border: 1px solid rgb(var(--c-sapphire) / 0.68);
+  border-radius: 50%;
+  background: rgb(var(--c-paper));
+}
+
+.speech-practice-constellation-node.is-lit {
+  border-color: rgb(var(--c-gold-soft));
+  background: rgb(var(--c-gold));
+  box-shadow: 0 0 6px rgb(var(--c-gold) / 0.56);
+}
+
+.speech-practice-constellation-node.is-current {
+  width: 0.68rem;
+  height: 0.68rem;
+  box-shadow: 0 0 0 3px rgb(var(--c-gold) / 0.14), 0 0 11px rgb(var(--c-gold) / 0.74);
+}
+
+.speech-practice-card {
+  transform: perspective(1050px) rotateX(0.8deg);
+  transform-style: preserve-3d;
+  border-color: rgb(var(--c-gold) / 0.32);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(var(--c-sapphire) / 0.17), transparent 62%),
+    linear-gradient(150deg, rgb(var(--c-paper) / 0.99), rgb(var(--c-paper) / 0.91));
+  box-shadow:
+    0 5px 0 rgb(var(--c-gold) / 0.24),
+    0 22px 44px -32px rgb(0 0 0 / 0.82),
+    inset 0 1px rgb(255 255 255 / 0.07);
+  animation: practice-page-illumination 640ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+.speech-practice-action-dock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  align-self: center;
+  border: 1px solid rgb(var(--c-gold) / 0.32);
+  border-radius: 1.4rem;
+  background: linear-gradient(145deg, rgb(var(--c-sapphire) / 0.13), rgb(var(--c-paper) / 0.94));
+  padding: 0.35rem;
+  box-shadow: inset 0 1px rgb(255 255 255 / 0.06);
+}
+
+.speech-practice-action {
+  display: grid;
+  width: 3.35rem;
+  height: 3.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgb(var(--c-gold) / 0.38);
+  border-radius: 1.05rem;
+  background: rgb(var(--c-paper) / 0.9);
+  color: rgb(var(--c-gold-soft));
+  transition: transform 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.speech-practice-action:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 14px rgb(var(--c-gold) / 0.18);
+}
+
+.speech-practice-action:focus-visible {
+  outline: 2px solid rgb(var(--c-gold-soft));
+  outline-offset: 3px;
+}
+
+.speech-practice-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.speech-practice-action svg {
+  width: 1.45rem;
+  height: 1.45rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.speech-practice-speak {
+  width: 3.55rem;
+  height: 3.55rem;
+  border-color: rgb(var(--c-gold-soft) / 0.76);
+  background: linear-gradient(145deg, rgb(var(--c-sapphire)), rgb(var(--c-sapphire-deep)));
+  color: rgb(var(--c-ink));
+  box-shadow: 0 3px 0 rgb(var(--c-gold) / 0.38), 0 8px 18px rgb(var(--c-sapphire-deep) / 0.3);
+}
+
+.speech-practice-speak.is-listening {
+  border-color: rgb(var(--c-gold-soft));
+  background: linear-gradient(145deg, rgb(var(--c-gold-soft)), rgb(var(--c-gold)));
+  color: rgb(var(--c-paper));
+  box-shadow: 0 3px 0 rgb(var(--c-gold) / 0.34), 0 0 22px rgb(var(--c-gold) / 0.18);
+}
+
+.speech-practice-stop-mark {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 0.2rem;
+  background: currentColor;
+}
+
+.speech-practice-voice-picker {
+  display: flex;
+  width: min(100%, 23rem);
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-inline: auto;
+  color: rgb(var(--c-ink) / 0.7);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.speech-practice-voice-picker select {
+  min-width: 0;
+  max-width: 68%;
+  min-height: 2.5rem;
+  border: 1px solid rgb(var(--c-gold) / 0.32);
+  border-radius: 0.75rem;
+  background: rgb(var(--c-paper));
+  color: rgb(var(--c-ink));
+  padding: 0.4rem 0.65rem;
+  font: inherit;
+}
+
+@keyframes practice-page-illumination {
+  0% {
+    opacity: 0.7;
+    transform: perspective(1050px) rotateX(7deg) translateY(0.7rem) scale(0.99);
+    box-shadow: 0 0 0 rgb(var(--c-gold) / 0), inset 0 1px rgb(255 255 255 / 0.06);
+  }
+
+  65% {
+    opacity: 1;
+    transform: perspective(1050px) rotateX(-0.6deg) translateY(-0.1rem) scale(1.005);
+    box-shadow: 0 0 34px -20px rgb(var(--c-gold) / 0.52), inset 0 1px rgb(255 255 255 / 0.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(1050px) rotateX(0.8deg);
+    box-shadow:
+      0 5px 0 rgb(var(--c-gold) / 0.24),
+      0 22px 44px -32px rgb(0 0 0 / 0.82),
+      inset 0 1px rgb(255 255 255 / 0.07);
+  }
+}
+
+@media (max-width: 640px) {
+  .speech-practice-layout > .speech-practice-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    justify-content: center;
+  }
+
+  .speech-practice-card {
+    padding: clamp(0.9rem, 4vw, 1.25rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speech-practice-card {
+    animation: none;
+    transform: none;
+  }
+
+  .speech-practice-action {
+    transition: none;
+  }
+}

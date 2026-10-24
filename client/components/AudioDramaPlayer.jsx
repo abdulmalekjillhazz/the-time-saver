@@ -15,12 +15,16 @@ import {
   saveOfflineMeanings,
   saveOfflineStoryAudio,
 } from '../lib/offlineStoryCache.js';
-import { speakNaturalSpeech } from '../lib/voiceBriefing.js';
+import { getMicrosoftEnglishVoices, speakNaturalSpeech } from '../lib/voiceBriefing.js';
 
 const STORY_AUDIO_CACHE_VERSION = 'story-audio-v3-sentence-alignment';
 
 function offlineAudioContentKey(content) {
   return `${STORY_AUDIO_CACHE_VERSION}\n${content}`;
+}
+
+function speechVoiceKey(voice) {
+  return voice.voiceURI || `${voice.name}:${voice.lang}`;
 }
 
 function characterIcon(role) {
@@ -189,6 +193,8 @@ export function AudioDramaPlayer({
   const [microphoneConsentAccepted, setMicrophoneConsentAccepted] = useState(false);
   const [practiceFeedback, setPracticeFeedback] = useState('');
   const [attemptsByLine, setAttemptsByLine] = useState({});
+  const [microsoftVoices, setMicrosoftVoices] = useState([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
   const [speechPractice, setSpeechPractice] = useState({
     lineIndex: startInPracticeMode && practiceLines.length ? 0 : -1,
     status: 'idle',
@@ -196,6 +202,17 @@ export function AudioDramaPlayer({
     comparison: null,
     message: '',
   });
+
+  useEffect(() => {
+    const synthesis = globalThis.window?.speechSynthesis;
+    if (!synthesis) return undefined;
+    const updateVoices = () => {
+      setMicrosoftVoices(getMicrosoftEnglishVoices(synthesis.getVoices()));
+    };
+    updateVoices();
+    synthesis.addEventListener?.('voiceschanged', updateVoices);
+    return () => synthesis.removeEventListener?.('voiceschanged', updateVoices);
+  }, []);
 
   useEffect(() => {
     if (vocabulary?.length) {
@@ -243,9 +260,6 @@ export function AudioDramaPlayer({
     practice: isBn ? '🎙 উচ্চারণ অনুশীলন' : '🎙 Practice pronunciation',
     closePractice: isBn ? '✕ অনুশীলন বন্ধ' : '✕ Close practice',
     practiceTitle: isBn ? 'গল্পের লাইন পড়ে উচ্চারণ অনুশীলন করুন' : 'Practice speaking story lines',
-    practiceHelp: isBn
-      ? 'আগে নমুনা উচ্চারণ শুনুন, তারপর বাক্যটি বলুন। আপনার বলা শব্দের মিল দেখে পরামর্শ পাবেন।'
-      : 'Listen to the example, then say the sentence. You will see which words matched.',
     practiceProgress: isBn ? 'বাক্য' : 'Sentence',
     practiceProgressLabel: isBn ? 'অনুশীলনের অগ্রগতি' : 'Practice progress',
     attemptCount: (current, total) => isBn ? `${current} / ${total} বার চেষ্টা` : `${current} of ${total} tries`,
@@ -285,6 +299,9 @@ export function AudioDramaPlayer({
     practiceFinished: isBn ? 'অনুশীলন শেষ হয়েছে।' : 'Practice session finished.',
     practiceFeedback: isBn ? 'চমৎকার—পরের বাক্য!' : 'Nice work—next sentence!',
     speakingAnimation: isBn ? 'মাইক্রোফোন শুনছে' : 'Microphone listening',
+    voiceChoice: isBn ? 'উচ্চারণের কণ্ঠ' : 'Example voice',
+    defaultVoice: isBn ? 'ডিভাইসের স্বাভাবিক কণ্ঠ' : 'Device default',
+    practiceActions: isBn ? 'শোনা ও বলা' : 'Listen and speak',
     pronunciationUnavailable: isBn ? 'এই ডিভাইসে ইংরেজি উচ্চারণ শোনা যাচ্ছে না।' : 'English pronunciation is unavailable on this device.',
     pronunciationLabel: isBn ? 'শব্দটি শুনুন' : 'Hear pronunciation',
     previousChunk: isBn ? '← আগের অংশ' : '← Previous chunk',
@@ -340,6 +357,7 @@ export function AudioDramaPlayer({
       const playback = speakNaturalSpeech(text, {
         lang: 'en-US',
         rate,
+        voice: microsoftVoices.find((voice) => speechVoiceKey(voice) === selectedVoiceURI),
         onEnd: () => {
           if (pronunciationRef.current?.playbackId !== playbackId) return;
           pronunciationRef.current = null;
@@ -1115,7 +1133,6 @@ export function AudioDramaPlayer({
                   {isBn ? 'শুনুন · বলুন · শিখুন' : 'Listen · Speak · Grow'}
                 </span>
                 <h2 className="speech-practice-title mt-2 text-lg font-black leading-snug tracking-tight text-ink sm:text-2xl">{copy.practiceTitle}</h2>
-                <p className="speech-practice-help mt-1.5 max-w-prose text-sm leading-relaxed text-ink/85 sm:text-base">{copy.practiceHelp}</p>
               </div>
             </div>
             {speechPractice.status === 'complete' ? (
@@ -1141,9 +1158,8 @@ export function AudioDramaPlayer({
                 return (
                   <div key={`practice-step-${lineIndex}-${line.character}`} className="space-y-3">
                     <div className="space-y-2 px-1" aria-label={copy.practiceProgressLabel}>
-                      <div className="flex items-center justify-between gap-3 text-sm font-semibold text-ink">
+                      <div className="text-sm font-semibold text-ink">
                         <span>{copy.practiceProgress} {lineIndex + 1} / {practiceLines.length}</span>
-                        <span>{progress}%</span>
                       </div>
                       <div
                         role="progressbar"
@@ -1151,9 +1167,19 @@ export function AudioDramaPlayer({
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={progress}
-                        className="duo-progress-track h-3 overflow-hidden rounded-full bg-ink/15"
+                        className="speech-practice-constellation"
+                        style={{
+                          '--practice-progress': `${progress}%`,
+                          '--practice-node-count': practiceLines.length,
+                        }}
                       >
-                        <div className="duo-progress-fill h-full rounded-full bg-sapphire transition-[width] duration-300" style={{ width: `${progress}%` }} />
+                        {practiceLines.map((_, nodeIndex) => (
+                          <span
+                            key={`practice-node-${nodeIndex}`}
+                            aria-hidden="true"
+                            className={`speech-practice-constellation-node${nodeIndex <= lineIndex ? ' is-lit' : ''}${nodeIndex === lineIndex ? ' is-current' : ''}`}
+                          />
+                        ))}
                       </div>
                     </div>
                     <article
@@ -1192,7 +1218,24 @@ export function AudioDramaPlayer({
                         copy.pronunciationLabel,
                       )}
                     </p>
-                    <div className="flex items-center justify-center gap-2 sm:justify-start sm:gap-2.5">
+                    {microsoftVoices.length ? (
+                      <label className="speech-practice-voice-picker">
+                        <span>{copy.voiceChoice}</span>
+                        <select
+                          aria-label={copy.voiceChoice}
+                          value={selectedVoiceURI}
+                          onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                        >
+                          <option value="">{copy.defaultVoice}</option>
+                          {microsoftVoices.map((voice) => (
+                            <option key={speechVoiceKey(voice)} value={speechVoiceKey(voice)}>
+                              {voice.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    <div className="speech-practice-action-dock" role="group" aria-label={copy.practiceActions}>
                       <button
                         type="button"
                         onClick={() => {
@@ -1201,9 +1244,16 @@ export function AudioDramaPlayer({
                         }}
                         aria-label={pronunciationPlaying ? copy.stopExample : copy.listenExample}
                         aria-pressed={pronunciationPlaying}
-                        className="secondary-button grid size-12 min-h-12 shrink-0 place-items-center p-0 text-xl"
+                        className="speech-practice-action speech-practice-listen"
                       >
-                        <span aria-hidden="true">{pronunciationPlaying ? '■' : '🔊'}</span>
+                        {pronunciationPlaying ? (
+                          <span aria-hidden="true" className="speech-practice-stop-mark" />
+                        ) : (
+                          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                            <path d="M4 10v4h4l5 4V6l-5 4H4Z" />
+                            <path d="M16 9a5 5 0 0 1 0 6m2.5-8.5a8.5 8.5 0 0 1 0 11" />
+                          </svg>
+                        )}
                       </button>
                       <button
                         type="button"
@@ -1217,13 +1267,16 @@ export function AudioDramaPlayer({
                         }
                         aria-pressed={isListening}
                         disabled={attemptsExhausted && !isListening}
-                        className={`inline-flex size-12 min-h-12 shrink-0 items-center justify-center rounded-xl text-xl shadow-md transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-not-allowed disabled:opacity-60 ${
-                          isListening
-                            ? 'bg-red-600 text-white shadow-red-600/20'
-                            : 'bg-gradient-to-r from-sapphire-deep to-sapphire text-white shadow-sapphire/20'
-                        }`}
+                        className={`speech-practice-action speech-practice-speak${isListening ? ' is-listening' : ''}`}
                       >
-                        <span aria-hidden="true">{isListening ? '■' : '🎤'}</span>
+                        {isListening ? (
+                          <span aria-hidden="true" className="speech-practice-stop-mark" />
+                        ) : (
+                          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                            <rect x="9" y="3" width="6" height="12" rx="3" />
+                            <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                     {isListening ? (

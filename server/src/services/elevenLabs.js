@@ -7,7 +7,7 @@ export const ELEVEN_LABS_BASE_URL = 'https://api.elevenlabs.io/v1';
 export const DEFAULT_ELEVENLABS_VOICES = Object.freeze({
   father: 'pNInz6obpgDQGcFmaJgB',
   mother: 'EXAVITQu4vr4xnSDxMaL',
-  son: 'IKne3meq5aSn9XLyUdCD',
+  son: 'TxGEqnHWrfWFTfGW9XjX',
   storyteller: 'JBFqnCBsd6RMkjVDRZzb',
 });
 
@@ -18,6 +18,10 @@ export class ElevenLabsApiError extends Error {
     this.status = status;
     this.upstreamCode = code || 'unknown';
   }
+}
+
+export function isBengaliStoryContent(text = '') {
+  return /[\u0980-\u09FF]/u.test(String(text ?? ''));
 }
 
 const DEFAULT_VOICE_SETTINGS = {
@@ -138,6 +142,9 @@ export function buildElevenLabsTimestampRequest({ text, speaker, config }) {
 }
 
 export async function generateElevenLabsAudio({ text, speaker, config, signal }) {
+  if (isBengaliStoryContent(text)) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   if (!config.ELEVENLABS_API_KEY) {
     throw new Error('ELEVENLABS_API_KEY is not configured.');
   }
@@ -168,6 +175,9 @@ export async function generateElevenLabsAudio({ text, speaker, config, signal })
 }
 
 export async function generateElevenLabsAudioWithTimestamps({ text, speaker, config, signal }) {
+  if (isBengaliStoryContent(text)) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   if (!config.ELEVENLABS_API_KEY) {
     throw new Error('ELEVENLABS_API_KEY is not configured.');
   }
@@ -310,6 +320,9 @@ async function requestElevenLabsAudio(request, signal) {
 }
 
 export async function generateElevenLabsDialogue({ segments, config, signal }) {
+  if (segments.some(({ text }) => isBengaliStoryContent(text))) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   if (!config.ELEVENLABS_API_KEY) {
     throw new Error('ELEVENLABS_API_KEY is not configured.');
   }
@@ -322,6 +335,9 @@ export async function generateElevenLabsDialogue({ segments, config, signal }) {
 }
 
 export async function generateNarrationAudio({ lesson, config, signal }) {
+  if (isBengaliStoryContent(lesson?.content)) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   const segments = parseNarrationSegments(lesson?.content || '');
   if (!segments.length) {
     throw new Error('The lesson content does not contain any narration segments.');
@@ -337,6 +353,9 @@ export async function generateNarrationAudio({ lesson, config, signal }) {
 }
 
 export async function generateDirectElevenLabsSpeech({ text, speaker = 'storyteller', config = {}, signal }) {
+  if (isBengaliStoryContent(text)) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   const effectiveConfig = withDefaultNarrationVoices(config);
   try {
     const buffer = await generateElevenLabsAudio({
@@ -361,6 +380,9 @@ export async function generateDirectElevenLabsSpeech({ text, speaker = 'storytel
 }
 
 export async function generateDirectElevenLabsStoryAudio({ content, config = {}, signal }) {
+  if (isBengaliStoryContent(content)) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   const effectiveConfig = withDefaultNarrationVoices(config);
   const segments = parseNarrationSegments(content);
   if (!segments.length) {
@@ -389,6 +411,9 @@ export async function generateDirectElevenLabsStoryAudio({ content, config = {},
 }
 
 export async function generateAndUploadLessonAudio({ lesson, config, signal }) {
+  if (isBengaliStoryContent(lesson?.content)) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   if (!config?.ELEVENLABS_API_KEY || !hasCompleteNarrationVoiceConfig(config) || !config?.CLOUDINARY_CLOUD_NAME || !config?.CLOUDINARY_API_KEY || !config?.CLOUDINARY_API_SECRET) {
     throw new Error('ElevenLabs, all four narration voices, and Cloudinary must be configured to generate lesson narration.');
   }
@@ -445,6 +470,9 @@ export async function generateAndUploadLessonAudio({ lesson, config, signal }) {
 const audioDramaRequests = new Map();
 
 async function createAudioDramaAsset({ content, config, signal }) {
+  if (isBengaliStoryContent(content)) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   if (!hasCompleteNarrationVoiceConfig(config) || !config?.CLOUDINARY_CLOUD_NAME || !config?.CLOUDINARY_API_KEY || !config?.CLOUDINARY_API_SECRET) {
     throw new Error('All four narration voices and Cloudinary must be configured to save audio dramas.');
   }
@@ -483,11 +511,15 @@ async function createAudioDramaAsset({ content, config, signal }) {
         signal,
       });
     } catch (err) {
-      if (config.ELEVENLABS_MODEL && config.ELEVENLABS_MODEL !== 'eleven_multilingual_v2') {
+      const model = config.ELEVENLABS_MODEL || 'eleven_v3';
+      const retryWithTurbo = model === 'eleven_v3'
+        && err?.name !== 'AbortError'
+        && !(err instanceof ElevenLabsApiError && [402, 429].includes(err.status));
+      if (retryWithTurbo) {
         generated = await generateElevenLabsAudioWithTimestamps({
           text: segment.text,
           speaker: segment.speaker,
-          config: { ...config, ELEVENLABS_MODEL: 'eleven_multilingual_v2' },
+          config: { ...config, ELEVENLABS_MODEL: 'eleven_turbo_v2_5' },
           signal,
         });
       } else {
@@ -532,6 +564,9 @@ async function createAudioDramaAsset({ content, config, signal }) {
 }
 
 export async function generateAndUploadAudioDrama({ content, config, signal }) {
+  if (isBengaliStoryContent(content)) {
+    throw new ElevenLabsApiError(503, 'english_only_policy');
+  }
   const key = crypto.createHash('sha256')
     .update(`${getNarrationVoiceConfigVersion(config)}\n${content}`)
     .digest('hex');

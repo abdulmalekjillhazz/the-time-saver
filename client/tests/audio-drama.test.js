@@ -150,7 +150,10 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('aria-label="Read and check"');
     expect(markup).not.toContain('🔊 Listen to example');
     expect(markup).not.toContain('Read and check</button>');
-    expect(markup).toContain('Listen to the example, then say the sentence.');
+    expect(markup).not.toContain('Listen to the example, then say the sentence.');
+    expect(markup).toContain('speech-practice-constellation');
+    expect(markup).toContain('speech-practice-action-dock');
+    expect(markup).toContain('aria-label="Listen and speak"');
   });
 
   it('shows only the current sentence in full-screen practice before asking for microphone access', () => {

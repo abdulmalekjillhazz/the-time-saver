@@ -4,19 +4,23 @@ import {
   buildVoiceBriefing,
   buildMissedAnnouncement,
   createFreeEnglishSpeech,
+  getMicrosoftEnglishVoices,
   getNextRoutineTitle,
   pickSpeechVoice,
+  speakNaturalSpeech,
   speakWithVoice,
 } from '../lib/voiceBriefing.js';
 
 const originalWindow = globalThis.window;
 const originalUtterance = globalThis.SpeechSynthesisUtterance;
+const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   if (originalWindow === undefined) delete globalThis.window;
   else globalThis.window = originalWindow;
   if (originalUtterance === undefined) delete globalThis.SpeechSynthesisUtterance;
   else globalThis.SpeechSynthesisUtterance = originalUtterance;
+  globalThis.fetch = originalFetch;
 });
 
 describe('personalized English voice briefing', () => {
@@ -107,6 +111,15 @@ describe('personalized English voice briefing', () => {
 });
 
 describe('Google voice preference', () => {
+  it('offers Microsoft English voices without including other vendors or languages', () => {
+    const voices = [
+      { name: 'Microsoft David', lang: 'en-US', voiceURI: 'microsoft-david' },
+      { name: 'Microsoft Heami', lang: 'ko-KR', voiceURI: 'microsoft-heami' },
+      { name: 'Google US English', lang: 'en-US', voiceURI: 'google-en' },
+    ];
+    expect(getMicrosoftEnglishVoices(voices)).toEqual([voices[0]]);
+  });
+
   it('prefers a Google voice in the requested language', () => {
     const voices = [
       { name: 'Microsoft David', lang: 'en-US', localService: true },
@@ -126,6 +139,23 @@ describe('Google voice preference', () => {
     expect(pickSpeechVoice(voices, 'bn-BD')).toBe(voices[1]);
   });
 
+  it('uses a selected Microsoft English voice when provided', () => {
+    const selectedVoice = { name: 'Microsoft Aria', lang: 'en-US' };
+    const engine = {
+      getVoices: () => [{ name: 'Google US English', lang: 'en-US' }],
+      cancel: vi.fn(),
+      speak: vi.fn(),
+    };
+    globalThis.window = { speechSynthesis: engine };
+    globalThis.SpeechSynthesisUtterance = class {
+      constructor(text) { this.text = text; }
+    };
+
+    speakNaturalSpeech('Hello there.', { lang: 'en-US', voice: selectedVoice });
+
+    expect(engine.speak.mock.calls[0][0].voice).toBe(selectedVoice);
+  });
+
   it('returns undefined when no voices are available', () => {
     expect(pickSpeechVoice([], 'en-US')).toBeUndefined();
   });
@@ -133,6 +163,29 @@ describe('Google voice preference', () => {
   it('does not substitute an English/default voice when Bengali is unavailable', () => {
     const voices = [{ name: 'Microsoft David', lang: 'en-US', localService: true, default: true }];
     expect(pickSpeechVoice(voices, 'bn-BD')).toBeUndefined();
+  });
+});
+
+describe('free local word pronunciation', () => {
+  it('uses the installed browser voice without making an audio API request', () => {
+    const engine = {
+      getVoices: () => [{ name: 'Google US English', lang: 'en-US' }],
+      cancel: vi.fn(),
+      speak: vi.fn(),
+    };
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+    globalThis.window = { speechSynthesis: engine };
+    globalThis.SpeechSynthesisUtterance = class {
+      constructor(text) { this.text = text; }
+    };
+
+    speakNaturalSpeech('Hello there.', { lang: 'en-US', rate: 0.82 });
+
+    const [utterance] = engine.speak.mock.calls[0];
+    expect(utterance.text).toBe('Hello there.');
+    expect(utterance.rate).toBe(0.82);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

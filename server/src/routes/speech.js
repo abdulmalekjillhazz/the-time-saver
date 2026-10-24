@@ -7,9 +7,8 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import {
   ElevenLabsApiError,
   generateAndUploadAudioDrama,
-  generateDirectElevenLabsSpeech,
-  generateDirectElevenLabsStoryAudio,
   hasCompleteNarrationVoiceConfig,
+  isBengaliStoryContent,
   withDefaultNarrationVoices,
 } from '../services/elevenLabs.js';
 import { CloudinaryApiError, isCloudinaryConfigured } from '../services/cloudinary.js';
@@ -49,6 +48,12 @@ export const googleTtsError = (error) => {
 };
 
 export const elevenLabsError = (error) => {
+  if (error instanceof ElevenLabsApiError && error.upstreamCode === 'english_only_policy') {
+    return new AppError(400, 'VALIDATION_FAILED', {
+      en: 'ElevenLabs-backed saved story audio supports English only.',
+      bn: 'ElevenLabs-এ সংরক্ষিত গল্পের অডিও শুধু ইংরেজি ভাষার জন্য উপলভ্য।',
+    });
+  }
   if (error instanceof ElevenLabsApiError && error.status === 503) {
     return new AppError(503, 'UNAVAILABLE', {
       en: 'This story audio is not saved yet. Configure ElevenLabs to generate and save it.',
@@ -106,24 +111,6 @@ export function speechRouter({ config = {} } = {}) {
     validate({ body: pronounceRequest }),
     async (req, res, next) => {
       try {
-        if (effectiveConfig.ELEVENLABS_API_KEY) {
-          try {
-            const audio = await generateDirectElevenLabsSpeech({
-              text: req.body.text,
-              speaker: req.body.speaker || 'storyteller',
-              config: effectiveConfig,
-            });
-            res.set({
-              'Cache-Control': 'private, max-age=3600',
-              'Content-Length': String(audio.length),
-              'Content-Type': 'audio/mpeg',
-              'X-Audio-Source': 'elevenlabs',
-            });
-            return res.send(audio);
-          } catch (elevenErr) {
-            logger.warn({ errName: elevenErr.name, status: elevenErr.status }, 'ElevenLabs pronounce failed, falling back to Google TTS');
-          }
-        }
         const audio = await generateGoogleTtsAudio({
           text: req.body.text,
           lang: req.body.lang,
@@ -148,24 +135,6 @@ export function speechRouter({ config = {} } = {}) {
     validate({ body: briefingRequest }),
     async (req, res, next) => {
       try {
-        if (effectiveConfig.ELEVENLABS_API_KEY) {
-          try {
-            const audio = await generateDirectElevenLabsSpeech({
-              text: req.body.text,
-              speaker: 'storyteller',
-              config: effectiveConfig,
-            });
-            res.set({
-              'Cache-Control': 'private, no-store',
-              'Content-Length': String(audio.length),
-              'Content-Type': 'audio/mpeg',
-              'X-Audio-Source': 'elevenlabs',
-            });
-            return res.send(audio);
-          } catch (elevenErr) {
-            logger.warn({ errName: elevenErr.name, status: elevenErr.status }, 'ElevenLabs briefing synthesis failed, falling back to Google TTS');
-          }
-        }
         const audio = await generateGoogleTtsAudio({
           text: req.body.text,
           lang: req.body.lang,
@@ -194,24 +163,6 @@ export function speechRouter({ config = {} } = {}) {
     validate({ body: freeAudioDramaRequest }),
     async (req, res, next) => {
       try {
-        if (effectiveConfig.ELEVENLABS_API_KEY) {
-          try {
-            const audio = await generateDirectElevenLabsStoryAudio({
-              content: req.body.content,
-              config: effectiveConfig,
-            });
-            logger.info({ audioSource: 'elevenlabs-direct', storyAudio: true }, 'story audio generated via ElevenLabs direct');
-            res.set({
-              'Cache-Control': 'private, no-store',
-              'Content-Length': String(audio.length),
-              'Content-Type': 'audio/mpeg',
-              'X-Audio-Source': 'elevenlabs',
-            });
-            return res.send(audio);
-          } catch (elevenErr) {
-            logger.warn({ errName: elevenErr.name, status: elevenErr.status }, 'Direct ElevenLabs story synthesis failed, falling back to Google TTS');
-          }
-        }
         const audio = await generateGoogleTtsAudio({
           text: parseStoryNarration(req.body.content).map(({ text }) => text).join('\n'),
           lang: req.body.lang,
@@ -241,6 +192,12 @@ export function speechRouter({ config = {} } = {}) {
     validate({ body: audioDramaRequest }),
     async (req, res, next) => {
       try {
+        if (isBengaliStoryContent(req.body.content)) {
+          throw new AppError(400, 'VALIDATION_FAILED', {
+            en: 'ElevenLabs-backed saved story audio supports English only.',
+            bn: 'ElevenLabs-এ সংরক্ষিত গল্পের অডিও শুধু ইংরেজি ভাষার জন্য উপলভ্য।',
+          });
+        }
         if (!hasCompleteNarrationVoiceConfig(effectiveConfig) || !isCloudinaryConfigured()) {
           throw new AppError(503, 'UNAVAILABLE', {
             en: 'Configure all four narration voices and Cloudinary to look up saved story audio.',
