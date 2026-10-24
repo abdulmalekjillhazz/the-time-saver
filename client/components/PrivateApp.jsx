@@ -17,6 +17,7 @@ import {
   setOfflineCacheConsent,
 } from '../lib/offlineStoryCache.js';
 import { cacheOfflineUser, clearOfflineUser, isOfflineFailure, readOfflineUser } from '../lib/offlineSession.js';
+import { requireUserProfile } from '../lib/userProfile.js';
 import { clearCachedRoutines, loadCachedRoutinesForOffline, saveCachedRoutines } from '../lib/routineCache.js';
 import { buildRoutineAlarms } from '../lib/routineAlarms.js';
 import { base64UrlToBytes, bengaliCalendarMonthRange, buildCalendarDays } from '../lib/calendar.js';
@@ -76,6 +77,7 @@ const COPY = {
     name: 'Display name', locale: 'Language', create: 'Create account', signIn: 'Sign in', switchRegister: 'Need an account?',
     googleSignIn: 'Continue with Google',
     profile: 'Your profile', profileName: 'Name shown in the app', profileAvatar: 'Profile avatar', editProfile: 'View or edit your profile', saveProfile: 'Save profile', profileSaved: 'Your profile was updated.',
+    invalidUserResponse: 'The server did not return a valid user profile. Please try signing in again.',
     passwordHint: 'Choose any password you like (up to 128 characters).',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
@@ -146,6 +148,7 @@ const COPY = {
     name: 'নাম', locale: 'ভাষা', create: 'অ্যাকাউন্ট তৈরি', signIn: 'সাইন ইন', switchRegister: 'অ্যাকাউন্ট নেই?',
     googleSignIn: 'Google দিয়ে চালিয়ে যান',
     profile: 'আপনার প্রোফাইল', profileName: 'অ্যাপে দেখানো নাম', profileAvatar: 'প্রোফাইল অবতার', editProfile: 'প্রোফাইল দেখুন বা সম্পাদনা করুন', saveProfile: 'প্রোফাইল সংরক্ষণ', profileSaved: 'আপনার প্রোফাইল আপডেট হয়েছে।',
+    invalidUserResponse: 'সার্ভার থেকে সঠিক ব্যবহারকারী প্রোফাইল আসেনি। আবার সাইন ইন করার চেষ্টা করুন।',
     passwordHint: 'আপনার পছন্দমতো যেকোনো password দিন (সর্বোচ্চ ১২৮ অক্ষর)।',
     showPassword: 'পাসওয়ার্ড দেখান',
     hidePassword: 'পাসওয়ার্ড লুকান',
@@ -254,6 +257,9 @@ function PasswordField({ label, copy, hint, ...inputProps }) {
 }
 
 function messageFrom(error, lang) {
+  if (error?.code === 'INVALID_USER_RESPONSE') {
+    return COPY[lang]?.invalidUserResponse || COPY.en.invalidUserResponse;
+  }
   const message = error?.body?.error?.message ?? error?.error?.message ?? error?.message;
   if (typeof message === 'string') return message;
   if (message && typeof message === 'object') return message[lang] || message.en || message.bn || 'Request failed.';
@@ -611,9 +617,10 @@ export function PrivateApp() {
         method: 'PATCH',
         body: { displayName: profileName, avatarId: profileAvatarId },
       });
-      setUser(result.user);
-      setProfileName(result.user.displayName);
-      setProfileAvatarId(result.user.avatarId || 'sunrise');
+      const updatedUser = requireUserProfile(result);
+      setUser(updatedUser);
+      setProfileName(updatedUser.displayName);
+      setProfileAvatarId(updatedUser.avatarId || 'sunrise');
       setNotice(copy.profileSaved);
     } catch (err) {
       reportError(err);
@@ -798,8 +805,9 @@ export function PrivateApp() {
   useEffect(() => {
     let active = true;
     request('/api/me')
-      .then(({ user: currentUser }) => {
+      .then((result) => {
         if (!active) return;
+        const currentUser = requireUserProfile(result);
         setUser(currentUser);
         cacheOfflineUser(currentUser);
         setProfileName(currentUser.displayName);
@@ -1591,11 +1599,12 @@ export function PrivateApp() {
     }
     try {
       const result = await request(`/api/auth/${registering ? 'register' : 'login'}`, { method: 'POST', body: payload });
-      setUser(result.user);
-      setProfileName(result.user.displayName);
-      setProfileAvatarId(result.user.avatarId || 'sunrise');
+      const authenticatedUser = requireUserProfile(result);
+      setUser(authenticatedUser);
+      setProfileName(authenticatedUser.displayName);
+      setProfileAvatarId(authenticatedUser.avatarId || 'sunrise');
       if (registering) setStoredLanguage(String(form.get('locale') || 'bn'));
-      else if (!useAppStore.getState().language) setStoredLanguage(result.user.locale === 'en' ? 'en' : 'bn');
+      else if (!useAppStore.getState().language) setStoredLanguage(authenticatedUser.locale === 'en' ? 'en' : 'bn');
       setNotice('');
     } catch (err) {
       reportError(err);
@@ -1616,10 +1625,11 @@ export function PrivateApp() {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Dhaka',
         },
       });
-      setUser(result.user);
-      setProfileName(result.user.displayName);
-      setProfileAvatarId(result.user.avatarId || 'sunrise');
-      if (!useAppStore.getState().language) setStoredLanguage(result.user.locale === 'en' ? 'en' : 'bn');
+      const authenticatedUser = requireUserProfile(result);
+      setUser(authenticatedUser);
+      setProfileName(authenticatedUser.displayName);
+      setProfileAvatarId(authenticatedUser.avatarId || 'sunrise');
+      if (!useAppStore.getState().language) setStoredLanguage(authenticatedUser.locale === 'en' ? 'en' : 'bn');
       setNotice('');
     } catch (err) {
       reportError(err);
@@ -1746,7 +1756,7 @@ export function PrivateApp() {
         body: { granted, version: TRAINING_CONSENT_VERSION },
       });
       const result = await request('/api/me');
-      setUser(result.user);
+      setUser(requireUserProfile(result));
       setNotice('');
     } catch (err) {
       reportError(err);
