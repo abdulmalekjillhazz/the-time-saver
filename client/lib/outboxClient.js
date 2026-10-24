@@ -1,31 +1,56 @@
 import { createOutbox } from '@smart-routine/shared';
 import { createIndexedDbStore } from './idbStore.js';
+import { getStoredSessionToken, resolveApiUrl } from './apiClient.js';
 
 const instances = new Map();
 const stores = new Map();
 const listeners = new Map();
+let cachedCsrfToken = '';
 
-async function getCsrfToken() {
-  if (typeof globalThis.document !== 'undefined') {
+async function getCsrfToken(forceRefresh = false) {
+  if (!forceRefresh && typeof globalThis.document !== 'undefined') {
     const cookie = globalThis.document.cookie.split('; ').find((item) => item.startsWith('sr_csrf='));
     if (cookie) return decodeURIComponent(cookie.slice('sr_csrf='.length));
   }
-  const response = await fetch('/api/auth/csrf', { credentials: 'same-origin' });
+  if (!forceRefresh && cachedCsrfToken) return cachedCsrfToken;
+
+  const sessionToken = getStoredSessionToken();
+  const csrfUrl = resolveApiUrl('/api/auth/csrf');
+  const credentialsMode = csrfUrl.startsWith('http') ? 'include' : 'same-origin';
+  const response = await fetch(csrfUrl, {
+    credentials: credentialsMode,
+    cache: 'no-store',
+    ...(sessionToken ? { headers: { Authorization: `Bearer ${sessionToken}` } } : {}),
+  });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok || typeof body.csrfToken !== 'string') {
-    throw new Error('Could not establish a security token for this request.');
-  }
+  if (!response.ok) throw new Error(`Security token request failed (HTTP ${response.status}).`);
+  if (typeof body.csrfToken !== 'string') throw new Error('The security token response was invalid.');
+  cachedCsrfToken = body.csrfToken;
   return body.csrfToken;
 }
 
 async function sendBatch(ops) {
-  const token = await getCsrfToken();
-  const response = await fetch('/api/sync', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
-    body: JSON.stringify({ ops }),
-  });
+  let token = await getCsrfToken();
+  const sessionToken = getStoredSessionToken();
+  const syncUrl = resolveApiUrl('/api/sync');
+  const credentialsMode = syncUrl.startsWith('http') ? 'include' : 'same-origin';
+
+  const doPost = (csrf) => {
+    const headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf };
+    if (sessionToken) headers.Authorization = `Bearer ${sessionToken}`;
+    return fetch(syncUrl, {
+      method: 'POST',
+      credentials: credentialsMode,
+      headers,
+      body: JSON.stringify({ ops }),
+    });
+  };
+
+  let response = await doPost(token);
+  if (response.status === 403) {
+    token = await getCsrfToken(true);
+    response = await doPost(token);
+  }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(body?.error?.message?.en || 'Sync request failed.');

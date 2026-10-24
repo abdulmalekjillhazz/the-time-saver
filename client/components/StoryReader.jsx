@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { resolveApiUrl } from '../lib/apiClient.js';
 import {
   getOfflineCacheConsent,
   getOfflineMeanings,
@@ -46,7 +47,7 @@ export async function fetchOnlineWordMeaning(rawWord, lang = 'bn') {
   }
 
   const response = await fetch(
-    `/api/word-meaning?word=${encodeURIComponent(clean)}&lang=${encodeURIComponent(lang)}`,
+    resolveApiUrl(`/api/word-meaning?word=${encodeURIComponent(clean)}&lang=${encodeURIComponent(lang)}`),
     { signal: AbortSignal.timeout(5000) },
   );
   if (!response.ok) throw new Error(`শব্দার্থ আনা যায়নি (HTTP ${response.status})।`);
@@ -143,11 +144,11 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
   };
 
   return (
-    <div className="w-full space-y-2.5">
+    <div className="w-full space-y-3">
       {lines.map((line, index) => (
-        <div key={index} className="rounded-xl border border-gold/20 bg-paper/70 px-3.5 py-3 text-base leading-relaxed">
+        <div key={index} className="duo-dialogue-bubble rounded-2xl border-2 border-gold/25 bg-paper/85 px-4 py-3.5 text-base leading-loose shadow-sm">
           {line.speaker ? (
-            <span className="mr-2 inline-block rounded-full border border-gold/40 bg-gold/15 px-2.5 py-0.5 text-xs font-bold text-gold-soft">
+            <span className="mr-2 inline-block rounded-full border border-gold/40 bg-gold/15 px-2.5 py-0.5 text-xs font-extrabold text-gold-soft">
               {line.speaker}
             </span>
           ) : null}
@@ -163,12 +164,12 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
                 {isSelected ? (
                   <span
                     role="status"
-                    className="absolute bottom-full left-1/2 z-50 mb-2 min-w-[170px] max-w-[min(260px,85vw)] -translate-x-1/2 rounded-xl border-2 border-gold bg-paper px-3 py-2 text-xs font-semibold text-ink shadow-2xl"
+                    className="word-meaning-popover absolute bottom-full left-1/2 z-50 mb-2 min-w-[190px] max-w-[min(280px,88vw)] -translate-x-1/2 rounded-2xl border-2 border-gold bg-paper px-3.5 py-2.5 text-xs font-semibold text-ink shadow-2xl"
                   >
                     <span className="flex items-start justify-between gap-2">
                       <span className="min-w-0 flex-1">
-                        <strong className="block text-gold-soft">{selected.term}</strong>
-                        <span className="mt-0.5 block leading-snug text-ink">{selected.meaning}</span>
+                        <strong className="block text-sm font-extrabold text-gold-soft">{selected.term}</strong>
+                        <span className="mt-1 block leading-snug text-ink">{selected.meaning}</span>
                       </span>
                       <button
                         type="button"
@@ -176,7 +177,7 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
                           e.stopPropagation();
                           setSelected(null);
                         }}
-                        className="inline-flex min-h-[32px] min-w-[32px] items-center justify-center rounded px-1.5 py-0.5 text-xs font-bold text-gold-soft hover:bg-gold/20"
+                        className="inline-flex min-h-[32px] min-w-[32px] items-center justify-center rounded-lg px-1.5 py-0.5 text-xs font-bold text-gold-soft hover:bg-gold/20"
                         aria-label="Close"
                       >
                         ✕
@@ -187,8 +188,8 @@ export function StoryReader({ lines = [], vocabulary = [], lang = 'bn' }) {
                 <button
                   type="button"
                   onClick={() => handleWordClick(part, keyId)}
-                  className={`inline-flex min-h-[32px] cursor-pointer items-center rounded px-1.5 py-0.5 transition hover:bg-gold/30 ${
-                    isSelected ? 'bg-gold font-extrabold text-on-gold ring-2 ring-gold' : ''
+                  className={`duo-tappable-word inline-flex min-h-[32px] cursor-pointer items-center rounded-lg border-b-2 border-dotted border-gold/45 px-1.5 py-0.5 transition hover:bg-gold/25 ${
+                    isSelected ? 'border-solid border-gold bg-gold font-extrabold text-on-gold ring-2 ring-gold' : ''
                   }`}
                 >
                   {part}

@@ -4,6 +4,13 @@ import { cloudinary, uploadBufferToCloudinary } from './cloudinary.js';
 
 export const ELEVEN_LABS_BASE_URL = 'https://api.elevenlabs.io/v1';
 
+export const DEFAULT_ELEVENLABS_VOICES = Object.freeze({
+  father: 'pNInz6obpgDQGcFmaJgB',
+  mother: 'EXAVITQu4vr4xnSDxMaL',
+  son: 'IKne3meq5aSn9XLyUdCD',
+  storyteller: 'JBFqnCBsd6RMkjVDRZzb',
+});
+
 export class ElevenLabsApiError extends Error {
   constructor(status, code) {
     super(`ElevenLabs request failed (${status}, ${code || 'unknown'}).`);
@@ -45,6 +52,16 @@ export function hasCompleteNarrationVoiceConfig(config) {
   ];
   return voiceIds.every((voiceId) => typeof voiceId === 'string' && voiceId.length > 0)
     && new Set(voiceIds).size === voiceIds.length;
+}
+
+export function withDefaultNarrationVoices(config = {}) {
+  return {
+    ...config,
+    ELEVENLABS_FATHER_VOICE_ID: config.ELEVENLABS_FATHER_VOICE_ID || DEFAULT_ELEVENLABS_VOICES.father,
+    ELEVENLABS_MOTHER_VOICE_ID: config.ELEVENLABS_MOTHER_VOICE_ID || DEFAULT_ELEVENLABS_VOICES.mother,
+    ELEVENLABS_SON_VOICE_ID: config.ELEVENLABS_SON_VOICE_ID || DEFAULT_ELEVENLABS_VOICES.son,
+    ELEVENLABS_STORYTELLER_VOICE_ID: config.ELEVENLABS_STORYTELLER_VOICE_ID || DEFAULT_ELEVENLABS_VOICES.storyteller,
+  };
 }
 
 export function parseNarrationSpeakerName(value) {
@@ -195,7 +212,9 @@ function splitNarrationSentences(text) {
 
 function wordTimingsFromAlignment(text, alignment) {
   const characters = [...text];
-  if (characters.length !== alignment.characters.length) return [];
+  const sourceChars = characters.length === alignment.characters.length
+    ? characters
+    : alignment.characters;
 
   const timings = [];
   let word = '';
@@ -208,7 +227,7 @@ function wordTimingsFromAlignment(text, alignment) {
     end = null;
   };
 
-  characters.forEach((character, index) => {
+  sourceChars.forEach((character, index) => {
     if (/\s/u.test(character)) {
       finishWord();
       return;
@@ -220,6 +239,18 @@ function wordTimingsFromAlignment(text, alignment) {
     if (Number.isFinite(charEnd)) end = end === null ? charEnd : Math.max(end, charEnd);
   });
   finishWord();
+
+  if (!timings.length && text.trim()) {
+    const fallbackWords = text.trim().split(/\s+/);
+    const maxEnd = Math.max(1, ...(alignment.character_end_times_seconds || []).filter(Number.isFinite));
+    const step = maxEnd / fallbackWords.length;
+    return fallbackWords.map((w, idx) => ({
+      text: w,
+      start: Number((idx * step).toFixed(3)),
+      end: Number(((idx + 1) * step).toFixed(3)),
+    }));
+  }
+
   return timings;
 }
 
@@ -303,6 +334,58 @@ export async function generateNarrationAudio({ lesson, config, signal }) {
     count: segments.length,
     audioBuffer,
   };
+}
+
+export async function generateDirectElevenLabsSpeech({ text, speaker = 'storyteller', config = {}, signal }) {
+  const effectiveConfig = withDefaultNarrationVoices(config);
+  try {
+    const buffer = await generateElevenLabsAudio({
+      text,
+      speaker,
+      config: effectiveConfig,
+      signal,
+    });
+    return Buffer.from(buffer);
+  } catch (err) {
+    if (effectiveConfig.ELEVENLABS_MODEL && effectiveConfig.ELEVENLABS_MODEL !== 'eleven_multilingual_v2') {
+      const retryBuffer = await generateElevenLabsAudio({
+        text,
+        speaker,
+        config: { ...effectiveConfig, ELEVENLABS_MODEL: 'eleven_multilingual_v2' },
+        signal,
+      });
+      return Buffer.from(retryBuffer);
+    }
+    throw err;
+  }
+}
+
+export async function generateDirectElevenLabsStoryAudio({ content, config = {}, signal }) {
+  const effectiveConfig = withDefaultNarrationVoices(config);
+  const segments = parseNarrationSegments(content);
+  if (!segments.length) {
+    throw new Error('The story does not contain any narration segments.');
+  }
+  try {
+    const audio = await generateElevenLabsDialogue({
+      segments,
+      config: effectiveConfig,
+      signal,
+    });
+    return Buffer.from(await audio);
+  } catch {
+    const buffers = [];
+    for (const seg of segments) {
+      const buf = await generateDirectElevenLabsSpeech({
+        text: seg.text,
+        speaker: seg.speaker,
+        config: { ...effectiveConfig, ELEVENLABS_MODEL: 'eleven_multilingual_v2' },
+        signal,
+      });
+      buffers.push(buf);
+    }
+    return Buffer.concat(buffers);
+  }
 }
 
 export async function generateAndUploadLessonAudio({ lesson, config, signal }) {
@@ -391,12 +474,26 @@ async function createAudioDramaAsset({ content, config, signal }) {
 
   const timedSegments = [];
   for (const [index, segment] of sentences.entries()) {
-    const generated = await generateElevenLabsAudioWithTimestamps({
-      text: segment.text,
-      speaker: segment.speaker,
-      config,
-      signal,
-    });
+    let generated;
+    try {
+      generated = await generateElevenLabsAudioWithTimestamps({
+        text: segment.text,
+        speaker: segment.speaker,
+        config,
+        signal,
+      });
+    } catch (err) {
+      if (config.ELEVENLABS_MODEL && config.ELEVENLABS_MODEL !== 'eleven_multilingual_v2') {
+        generated = await generateElevenLabsAudioWithTimestamps({
+          text: segment.text,
+          speaker: segment.speaker,
+          config: { ...config, ELEVENLABS_MODEL: 'eleven_multilingual_v2' },
+          signal,
+        });
+      } else {
+        throw err;
+      }
+    }
     const words = wordTimingsFromAlignment(segment.text, generated.alignment);
     if (!words.length) throw new Error(`ElevenLabs returned no word timings for story sentence ${index + 1}.`);
     const segmentPublicId = `${publicId}-sentence-${index + 1}`;

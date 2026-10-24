@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { apiRequest } from '../lib/apiClient.js';
+import { apiRequest, getStoredSessionToken, resolveApiUrl } from '../lib/apiClient.js';
 import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
 import { Card } from './ui/Card.jsx';
@@ -112,18 +112,27 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
     setLoginRequired(false);
     setSubmitting(true);
     try {
-      const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin' });
+      const sessionToken = getStoredSessionToken();
+      const csrfUrl = resolveApiUrl('/api/auth/csrf');
+      const attemptsUrl = resolveApiUrl('/api/lessons/today/attempts');
+      const credentialsMode = attemptsUrl.startsWith('http') ? 'include' : 'same-origin';
+      const csrfResponse = await fetch(csrfUrl, {
+        credentials: credentialsMode,
+        ...(sessionToken ? { headers: { Authorization: `Bearer ${sessionToken}` } } : {}),
+      });
       const csrfBody = await csrfResponse.json().catch(() => ({}));
       if (!csrfResponse.ok || typeof csrfBody.csrfToken !== 'string') {
         throw new Error(copy.csrfFailed);
       }
-      const res = await fetch('/api/lessons/today/attempts', {
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfBody.csrfToken,
+      };
+      if (sessionToken) headers.Authorization = `Bearer ${sessionToken}`;
+      const res = await fetch(attemptsUrl, {
         method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfBody.csrfToken,
-        },
+        credentials: credentialsMode,
+        headers,
         body: JSON.stringify({ answers }),
       });
       const data = await res.json().catch(() => ({}));
@@ -155,14 +164,14 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
   const handleFeedback = async (helpful, accurate) => {
     setFeedbackSent(true);
     try {
-      await fetch('/api/lessons/today/feedback', {
+      await apiRequest('/api/lessons/today/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           helpful,
           accurate,
           rating: helpful ? 5 : 2,
-        }),
+        },
+        locale: lang,
       });
     } catch {}
   };
@@ -173,7 +182,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
       if (navigator?.clipboard) {
         await navigator.clipboard.writeText(window.location.href);
       }
-      await fetch('/api/lessons/today/share', { method: 'POST' });
+      await apiRequest('/api/lessons/today/share', { method: 'POST', locale: lang });
     } catch {}
     setTimeout(() => setShared(false), 3000);
   };
@@ -182,26 +191,26 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
     if (!quiz?._id || reportedQuestion[qIndex]) return;
     setReportedQuestion((prev) => ({ ...prev, [qIndex]: true }));
     try {
-      await fetch(`/api/quizzes/${quiz._id}/report`, {
+      await apiRequest(`/api/quizzes/${quiz._id}/report`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           questionIndex: qIndex,
           reason: 'User flagged question/answer as incorrect',
-        }),
+        },
+        locale: lang,
       });
     } catch {}
   };
 
   if (collapsible && !expanded) {
     return (
-      <Card id="daily-lesson-full-content" className="surface-card story-reading-card overflow-hidden border border-gold/30 p-0">
-        <div className="flex flex-col gap-4 bg-gradient-to-r from-sapphire/10 via-paper to-gold/10 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+      <Card id="daily-lesson-full-content" className="surface-card story-reading-card duo-card overflow-hidden border-2 border-gold/35 p-0">
+        <div className="flex flex-col gap-4 bg-gradient-to-r from-sapphire/15 via-paper to-gold/10 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="min-w-0">
-            <p className="text-xs font-extrabold uppercase tracking-wider text-sapphire">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sapphire/30 bg-sapphire/15 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-sapphire">
               📖 {copy.lessonType} · {dailyLesson.date}
-            </p>
-            <h2 className="mt-1 text-xl font-extrabold text-ink sm:text-2xl">{dailyLesson.title}</h2>
+            </span>
+            <h2 className="mt-2 text-xl font-extrabold text-ink sm:text-2xl">{dailyLesson.title}</h2>
             {dailyLesson.description ? (
               <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink/75">{dailyLesson.description}</p>
             ) : null}
@@ -211,7 +220,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
             onClick={() => setExpanded(true)}
             aria-expanded="false"
             aria-controls="daily-lesson-full-content"
-            className="shrink-0"
+            className="min-h-12 shrink-0 px-5 font-extrabold"
           >
             {copy.openLesson}
           </Button>
@@ -221,27 +230,33 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
   }
 
   const questionCount = quiz?.questions?.length || 3;
+  const answeredCount = Object.keys(selectedAnswers).length;
+  const quizProgressPct = questionCount > 0 ? Math.round((answeredCount / questionCount) * 100) : 0;
 
   return (
     <Card
       id={collapsible ? 'daily-lesson-full-content' : undefined}
-      className={`surface-card story-reading-card space-y-6 p-4 sm:p-6 ${collapsible ? 'daily-lesson-reader-screen' : ''}`}
+      className={`surface-card story-reading-card duo-card space-y-5 p-4 sm:p-6 ${collapsible ? 'daily-lesson-reader-screen' : ''} ${storyAward?.lessonId === String(dailyLesson._id) || submission ? 'lesson-illuminated' : ''}`}
     >
       {collapsible ? (
         <header className="daily-lesson-reader-header">
-          <p className="min-w-0 truncate font-bold text-ink">{dailyLesson.title}</p>
-          {storyAward?.lessonId === String(dailyLesson._id) && storyAward.earnedPoints > 0 ? (
-            <span className="shrink-0 text-xs font-extrabold text-sapphire">+{storyAward.earnedPoints} ⭐</span>
-          ) : null}
           <Button type="button" variant="secondary" className="reader-back-button" onClick={() => setExpanded(false)} aria-label={copy.closeLesson} title={copy.closeLesson}>
             <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 12H5m7 7-7-7 7-7" />
             </svg>
           </Button>
+          <p className="min-w-0 flex-1 truncate text-base font-extrabold text-ink">{dailyLesson.title}</p>
+          {storyAward?.lessonId === String(dailyLesson._id) && storyAward.earnedPoints > 0 ? (
+            <span className="shrink-0 rounded-full bg-gold/20 px-2.5 py-1 text-xs font-extrabold text-gold-soft">+{storyAward.earnedPoints} ⭐</span>
+          ) : (
+            <span className="shrink-0 rounded-full border border-gold/35 bg-gold/10 px-2.5 py-1 text-xs font-extrabold text-gold-soft">
+              +50 XP
+            </span>
+          )}
         </header>
       ) : null}
-      {storyTrackingError ? <p role="alert" className="text-sm text-rose-700">{storyTrackingError}</p> : null}
-      <div className="rounded-2xl border-2 border-gold/45 bg-paper p-4 sm:p-5">
+      {storyTrackingError ? <p role="alert" className="text-sm text-rose-400">{storyTrackingError}</p> : null}
+      <div className="duo-card rounded-2xl border-2 border-gold/40 bg-paper/90 p-4 sm:p-5">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-gold/30 bg-gold/10 p-3.5">
             <p className="text-xs font-extrabold uppercase tracking-wider text-gold-soft">
@@ -262,7 +277,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           <button
             type="button"
             onClick={() => setAutoPlaySignal((n) => n + 1)}
@@ -308,6 +323,28 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
           autoPlaySignal={autoPlaySignal}
         />
       </div>
+
+      {Array.isArray(dailyLesson.vocabulary) && dailyLesson.vocabulary.length > 0 ? (
+        <div className="rounded-2xl border border-gold/30 bg-paper/75 p-4">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-gold-soft">
+            ✨ {copy.vocab}
+          </h3>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {dailyLesson.vocabulary.map((item, idx) => {
+              const term = item.term || item.word || '';
+              const rawMeaning = item.definition || item.meaning || '';
+              const meaning = typeof rawMeaning === 'string' ? rawMeaning : (rawMeaning?.[lang] || rawMeaning?.bn || rawMeaning?.en || '');
+              if (!term) return null;
+              return (
+                <span key={`${term}-${idx}`} className="inline-flex items-center gap-1.5 rounded-xl border border-sapphire/30 bg-sapphire/10 px-3 py-1.5 text-xs font-bold text-ink">
+                  <strong className="text-gold-soft">{term}</strong>
+                  {meaning ? <span className="text-ink/80">· {meaning}</span> : null}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       {trackLearning && !dailyLesson.isOffline ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -366,20 +403,31 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
 
       {quiz && quiz.questions && quiz.questions.length > 0 && (
         <section id="daily-lesson-quiz-box" className="scroll-mt-6 border-t border-gold/25 pt-6">
-          <div className="rounded-xl border border-gold/35 bg-paper p-3.5 mb-4">
-            <h3 className="text-lg font-extrabold text-gold-soft">
-              🧩 {copy.quizTitle}: {dailyLesson.title}
-            </h3>
+          <div className="duo-card mb-4 space-y-2.5 rounded-2xl border-2 border-gold/35 bg-paper p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-lg font-extrabold text-gold-soft">
+                🧩 {copy.quizTitle}: {dailyLesson.title}
+              </h3>
+              <span className="rounded-full bg-sapphire/15 px-3 py-1 text-xs font-extrabold text-sapphire">
+                {answeredCount} / {questionCount}
+              </span>
+            </div>
+            <div className="duo-progress-track h-2.5 w-full overflow-hidden rounded-full bg-ink/15">
+              <div
+                className="duo-progress-fill h-full rounded-full bg-gradient-to-r from-sapphire-deep via-sapphire to-gold transition-[width] duration-300"
+                style={{ width: `${quizProgressPct}%` }}
+              />
+            </div>
           </div>
 
           <div className="space-y-5">
             {quiz.questions.map((q, qIndex) => {
               const result = submission?.results?.[qIndex];
               return (
-                <fieldset key={qIndex} className="rounded-xl border border-sapphire/25 bg-paper p-4 shadow-sm sm:p-5">
+                <fieldset key={qIndex} className="duo-card rounded-2xl border-2 border-sapphire/25 bg-paper p-4 shadow-sm sm:p-5">
                   <div className="flex items-start justify-between gap-3">
-                    <legend className="text-base font-semibold leading-relaxed text-ink sm:text-lg">
-                      <span className="mr-2 inline-grid h-8 w-8 place-items-center rounded-full bg-sapphire text-sm font-bold text-on-sapphire">
+                    <legend className="text-base font-extrabold leading-relaxed text-ink sm:text-lg">
+                      <span className="mr-2 inline-grid h-8 w-8 place-items-center rounded-xl bg-sapphire text-sm font-black text-on-sapphire">
                         {qIndex + 1}
                       </span>
                       {q.text}
@@ -395,19 +443,19 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
                     </button>
                   </div>
 
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3.5 space-y-2.5">
                     {q.options.map((opt, oIndex) => {
                       const isSelected = selectedAnswers[qIndex] === oIndex;
                       const isCorrect = result?.correctIndex === oIndex;
                       const isWrongSelected = isSelected && result && !result.correct;
 
-                      let buttonClass = 'border-sapphire/20 bg-paper text-ink hover:border-sapphire/50 hover:bg-sapphire/5';
+                      let buttonClass = 'border-sapphire/25 bg-paper text-ink hover:border-sapphire/60 hover:bg-sapphire/10';
                       if (submission) {
-                        if (isCorrect) buttonClass = 'border-sapphire bg-sapphire/10 text-sapphire font-semibold';
-                        else if (isWrongSelected) buttonClass = 'border-gold bg-gold/20 text-ink font-semibold';
+                        if (isCorrect) buttonClass = 'border-emerald-500 bg-emerald-500/15 text-ink font-extrabold';
+                        else if (isWrongSelected) buttonClass = 'border-rose-500 bg-rose-500/15 text-ink font-semibold';
                         else buttonClass = 'border-sapphire/10 bg-paper text-ink/55';
                       } else if (isSelected) {
-                        buttonClass = 'border-sapphire bg-sapphire text-on-sapphire font-semibold shadow-md ring-2 ring-gold/70';
+                        buttonClass = 'border-sapphire bg-sapphire text-on-sapphire font-extrabold shadow-md ring-2 ring-gold/70';
                       }
 
                       return (
@@ -417,9 +465,9 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
                           disabled={Boolean(submission)}
                           aria-pressed={isSelected}
                           onClick={() => handleSelect(qIndex, oIndex)}
-                          className={`flex min-h-12 w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-base leading-relaxed transition-all disabled:cursor-default ${buttonClass}`}
+                          className={`duo-choice-tile flex min-h-12 w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-base leading-relaxed transition-all disabled:cursor-default ${buttonClass}`}
                         >
-                          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border text-xs font-bold ${
+                          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border text-xs font-extrabold ${
                             isSelected && !submission
                               ? 'border-white/60 bg-white/15 text-white'
                               : 'border-current/30'
@@ -434,14 +482,14 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
                   </div>
 
                   {result && (
-                    <div className={`mt-3 rounded-lg border p-3 text-sm ${
-                      result.correct ? 'border-sapphire/20 bg-sapphire/5' : 'border-gold/40 bg-gold/10'
+                    <div className={`mt-3.5 rounded-xl border-2 p-3.5 text-sm ${
+                      result.correct ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-gold/40 bg-gold/10'
                     }`}>
-                      <p className="font-semibold text-ink">
+                      <p className="font-extrabold text-ink">
                         {result.correct ? `✓ ${copy.correct}` : `✗ ${copy.incorrect}`}
                       </p>
-                      <p className="mt-1 text-ink/75">
-                        <span className="font-medium">{copy.explanation}:</span> {result.explanation}
+                      <p className="mt-1 text-ink/80">
+                        <span className="font-bold">{copy.explanation}:</span> {result.explanation}
                       </p>
                     </div>
                   )}
@@ -458,21 +506,21 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
 
           {!submission ? (
             <div className="mt-6">
-              <Button onClick={handleSubmit} disabled={submitting || dailyLesson.isOffline} className="min-h-[48px] w-full text-base font-bold">
+              <Button onClick={handleSubmit} disabled={submitting || dailyLesson.isOffline} className="min-h-[50px] w-full text-base font-extrabold">
                 {submitting ? copy.submitting : copy.submitQuiz}
               </Button>
               {dailyLesson.isOffline ? <p role="status" className="mt-2 text-sm text-ink/70">{copy.offlineSubmit}</p> : null}
             </div>
           ) : (
-            <div className="mt-6 rounded-xl border border-sapphire/20 bg-sapphire/5 p-4 text-center">
-              <p className="text-sm font-semibold uppercase tracking-wider text-sapphire">
+            <div className="duo-card mt-6 rounded-2xl border-2 border-sapphire/30 bg-sapphire/10 p-5 text-center">
+              <p className="text-sm font-extrabold uppercase tracking-wider text-sapphire">
                 {copy.scoreTitle}
               </p>
-              <p className="mt-1 text-2xl font-bold text-ink">
+              <p className="mt-1 text-3xl font-black text-ink">
                 {submission.score} / {submission.total}
               </p>
               {submission.earnedPoints > 0 ? (
-                <p className="mt-2 font-bold text-sapphire">+{submission.earnedPoints} ⭐ {copy.quizPoints}</p>
+                <p className="mt-2 font-extrabold text-gold-soft">+{submission.earnedPoints} ⭐ {copy.quizPoints}</p>
               ) : null}
             </div>
           )}

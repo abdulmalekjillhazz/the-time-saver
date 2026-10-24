@@ -4,11 +4,11 @@
 export function PageHero({ eyebrow, title, lead }) {
   return (
     <section
-      className="app-hero glass-panel glow-border relative isolate overflow-hidden rounded-3xl border border-gold/60 p-6 sm:p-10"
+      className="page-hero-banner app-hero glass-panel glow-border relative isolate overflow-hidden rounded-3xl border border-gold/60 p-6 sm:p-10"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-sapphire/25 blur-3xl float-soft"
+        className="pointer-events-none absolute right-0 -top-20 h-56 w-56 rounded-full bg-sapphire/25 blur-3xl float-soft"
       />
       <div
         aria-hidden="true"

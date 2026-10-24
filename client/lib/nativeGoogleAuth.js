@@ -33,9 +33,13 @@ export async function signInWithGoogleNative(webClientId) {
       },
     });
 
-    // রেসপন্স যাচাইকরণ
-    const result = response?.result;
-    const idToken = result?.idToken || result?.authentication?.idToken;
+    // রেসপন্স যাচাইকরণ (সব সম্ভাব্য শেপ সাপোর্ট করে)
+    const result = response?.result || response;
+    const idToken =
+      result?.idToken ||
+      result?.authentication?.idToken ||
+      result?.accessToken?.idToken ||
+      response?.idToken;
 
     if (!idToken || typeof idToken !== 'string') {
       throw new Error(
@@ -45,7 +49,7 @@ export async function signInWithGoogleNative(webClientId) {
 
     return idToken;
   } catch (error) {
-    if (error?.message?.includes('cancel') || error?.code === 'canceled') {
+    if (error?.message?.includes('cancel') || error?.code === 'canceled' || error?.code === '12501') {
       throw new Error('Google sign-in was canceled.');
     }
     throw error;

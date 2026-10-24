@@ -54,9 +54,11 @@ export function TemplatePicker({ lang = 'en', userId, onRoutineAdded }) {
   }, [userId, copy.error]);
 
   async function addTemplate(template) {
-    if (!userId || busyId) return;
+    if (!userId || addedIds.has(template.id)) return;
     setError('');
-    setBusyId(template.id);
+    // 0ms Optimistic mark as added
+    setAddedIds((prev) => new Set(prev).add(template.id));
+    const clientId = getTemplateClientId(userId, template.id);
     try {
       const result = await enqueueAndFlush(userId, {
         type: 'routine.create',
@@ -67,14 +69,13 @@ export function TemplatePicker({ lang = 'en', userId, onRoutineAdded }) {
           category: template.category,
           priority: template.priority,
           isFrog: template.isFrog,
-          clientId: getTemplateClientId(userId, template.id),
+          clientId,
         },
       });
       if (result.operationStatus === 'failed') throw new Error('Routine was rejected by the server.');
       if (!(result.operationStatus === 'pending' || result.retryable || result.busy)) {
         clearTemplateClientId(userId, template.id);
       }
-      setAddedIds((prev) => new Set(prev).add(template.id));
       if (result.operationStatus === 'pending' || result.retryable || result.busy) {
         setQueuedIds((prev) => new Set(prev).add(template.id));
       }
@@ -83,9 +84,12 @@ export function TemplatePicker({ lang = 'en', userId, onRoutineAdded }) {
       }
       onRoutineAdded?.();
     } catch (requestError) {
+      setAddedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(template.id);
+        return next;
+      });
       setError(requestError?.message ? `${copy.error} (${requestError.message})` : copy.error);
-    } finally {
-      setBusyId('');
     }
   }
 

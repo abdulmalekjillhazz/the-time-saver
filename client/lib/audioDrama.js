@@ -309,7 +309,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     cleanupAudio();
     audioObjectUrl = globalThis.URL.createObjectURL(offlineAudio);
     onNotice(lang === 'bn' ? 'এই ডিভাইসে রাখা অডিও চালানো হচ্ছে।' : 'Playing audio saved on this device.');
-    configureAudio(id, audioObjectUrl, 'offline', false);
+    configureAudio(id, audioObjectUrl, 'offline', true);
     return true;
   };
 
@@ -383,7 +383,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       }
 
       onNotice(lang === 'bn' ? 'গল্পের অডিও চালানো হচ্ছে…' : 'Playing story audio…');
-      configureAudio(id, result.audioUrl, 'cloudinary', false);
+      configureAudio(id, result.audioUrl, 'cloudinary', true);
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
       if (playOfflineAudio(id)) return;
@@ -403,8 +403,8 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
         }
         cleanupAudio();
         audioObjectUrl = globalThis.URL.createObjectURL(fallbackAudio);
-        onNotice(lang === 'bn' ? 'Google-এর স্বাভাবিক কণ্ঠে গল্প শোনা হচ্ছে।' : 'Playing the story with Google voice.');
-        configureAudio(id, audioObjectUrl, 'offline', false);
+        onNotice(lang === 'bn' ? 'স্বাভাবিক কণ্ঠে গল্প শোনা হচ্ছে…' : 'Playing story audio…');
+        configureAudio(id, audioObjectUrl, 'offline', true);
       } catch {
         fail(lang === 'bn'
           ? 'গল্পের অডিও চালানো যাচ্ছে না। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'

@@ -5,7 +5,7 @@ import { getSentenceDifficultyLevel } from '@smart-routine/shared';
 import { apiRequest } from '../lib/apiClient.js';
 import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { playCongratulationsSound } from '../lib/notificationSound.js';
-import { speakWithVoice } from '../lib/voiceBriefing.js';
+import { speakNaturalSpeech } from '../lib/voiceBriefing.js';
 import { Card } from './ui/Card.jsx';
 
 const LEVELS = ['basic', 'intermediate', 'advanced'];
@@ -351,9 +351,9 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
       speechRef.current?.stop();
       setSpeakingWord(word);
       setPronunciationError('');
-      speechRef.current = speakWithVoice(word, {
+      speechRef.current = speakNaturalSpeech(word, {
         lang: 'en-US',
-        rate: 0.82,
+        rate: 0.85,
         onEnd: clearSpeakingWord,
         onStop: clearSpeakingWord,
         onError: () => {
@@ -369,11 +369,13 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     }
   };
 
+  const milestonePct = Math.min(100, Math.round((Math.min(completedSentenceCount, 10) / 10) * 100));
+
   return (
     <section className="space-y-4" aria-label={isBn ? 'ইংরেজি বাক্য গঠন' : 'English sentence builder'}>
-      <Card className="surface-card space-y-5 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/20 via-paper to-gold/10 p-5 shadow-xl sm:p-7">
+      <Card className="surface-card duo-card space-y-5 overflow-hidden rounded-3xl border-2 border-gold/30 bg-gradient-to-br from-sapphire-deep/20 via-paper to-gold/10 p-4 shadow-xl sm:p-7">
         <div className="flex items-start gap-3">
-          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gold/15 text-3xl shadow-inner">🧩</span>
+          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl border border-gold/35 bg-gold/15 text-3xl shadow-inner">🧩</span>
           <div>
             <span className="inline-flex rounded-full border border-sapphire/25 bg-sapphire/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-sapphire">
               Grammar · Sentence structure
@@ -391,11 +393,20 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
 
         {exercises.length ? (
           <>
-            <p className="rounded-xl border border-gold/25 bg-gold/10 px-3 py-2 text-sm font-extrabold text-ink">
-              {isBn
-                ? `গল্পের বাক্য: ${Math.min(completedSentenceCount, 10)} / 10 · ১০টি গল্পের বাক্যে ৩০ পয়েন্ট`
-                : `Story sentences: ${Math.min(completedSentenceCount, 10)} / 10 · Earn 30 points at 10`}
-            </p>
+            <div className="space-y-2 rounded-2xl border border-gold/30 bg-gold/10 p-3.5">
+              <p className="text-sm font-extrabold text-ink">
+                {isBn
+                  ? `গল্পের বাক্য: ${Math.min(completedSentenceCount, 10)} / 10 · ১০টি গল্পের বাক্যে ৩০ পয়েন্ট`
+                  : `Story sentences: ${Math.min(completedSentenceCount, 10)} / 10 · Earn 30 points at 10`}
+              </p>
+              <div className="duo-progress-track h-2.5 w-full overflow-hidden rounded-full bg-ink/15">
+                <div
+                  className="duo-progress-fill h-full rounded-full bg-gradient-to-r from-sapphire-deep via-sapphire to-gold transition-[width] duration-300"
+                  style={{ width: `${milestonePct}%` }}
+                />
+              </div>
+            </div>
+
             <div className="grid gap-2 sm:grid-cols-3" aria-label={isBn ? 'বাক্যের স্তর' : 'Sentence level'}>
               {LEVELS.map((item, levelIndex) => {
                 const unlocked = unlockedLevels.has(item);
@@ -411,14 +422,14 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     aria-pressed={level === item}
                     disabled={!unlocked}
                     onClick={() => chooseLevel(item)}
-                    className={`min-h-[44px] rounded-xl border px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                    className={`duo-word-chip min-h-[46px] rounded-2xl border-2 px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       level === item
-                        ? 'border-gold bg-gold/15 text-ink shadow-sm'
-                        : 'border-sapphire/20 bg-paper/65 text-ink/75 hover:border-gold/50'
+                        ? 'border-gold bg-gold/20 text-ink shadow-sm'
+                        : 'border-sapphire/25 bg-paper/75 text-ink/75 hover:border-gold/50'
                     }`}
                   >
                     <span className="block">{levelLabels[item]}</span>
-                    <span className="mt-1 block text-[10px] font-semibold opacity-65">
+                    <span className="mt-1 block text-[10px] font-semibold opacity-70">
                       {!unlocked
                         ? (isBn ? `আগের স্তর: ${progress} সম্পন্ন` : `Finish previous level: ${progress}`)
                         : `${levelCounts[item]} ${isBn ? 'টি বাক্য' : (levelCounts[item] === 1 ? 'sentence' : 'sentences')}`}
@@ -433,7 +444,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
               <select
                 value={storySlug}
                 onChange={(event) => chooseStory(event.target.value)}
-                className="mt-1.5 block min-h-[44px] w-full rounded-xl border border-sapphire/25 bg-paper px-3 py-2 text-sm text-ink"
+                className="mt-1.5 block min-h-[46px] w-full rounded-2xl border-2 border-sapphire/25 bg-paper px-3.5 py-2 text-sm font-semibold text-ink"
               >
                 <option value="all">{isBn ? 'সব গল্প' : 'All stories'}</option>
                 {availableStories.map((story) => (
@@ -443,9 +454,9 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
             </label>
 
             {exercise ? (
-              <div className="space-y-4 rounded-2xl border border-sapphire/20 bg-paper/70 p-4 sm:p-5">
+              <div className="duo-card space-y-4 rounded-2xl border-2 border-sapphire/25 bg-paper/85 p-4 sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-ink/60">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-ink/70">
                     {isBn ? `অনুশীলন ${exerciseIndex + 1} / ${filteredExercises.length}` : `Challenge ${exerciseIndex + 1} / ${filteredExercises.length}`}
                   </span>
                   <span className="rounded-full bg-gold/15 px-3 py-1 text-xs font-bold text-gold-soft">
@@ -453,14 +464,14 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                   </span>
                 </div>
 
-                <p className="text-xs font-semibold text-ink/65">
+                <p className="text-xs font-semibold text-ink/70">
                   {isBn
                     ? (exercise.storyBacked ? 'গল্প:' : 'অনুশীলন:')
                     : (exercise.storyBacked ? 'From story:' : 'Practice:')}{' '}
                   <span className="font-extrabold text-ink">{exercise.sourceTitle}</span>
                 </p>
 
-                <div className="flex min-h-20 flex-wrap items-center gap-2 rounded-xl border border-dashed border-gold/40 bg-paper/70 p-3" aria-live="polite">
+                <div className="duo-answer-tray flex min-h-24 flex-wrap items-center gap-2 rounded-2xl border-2 border-dashed border-gold/45 bg-paper/80 p-3.5" aria-live="polite">
                   {selected.length ? (
                     selected.map((wordIndex, position) => (
                       <button
@@ -470,13 +481,13 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                         disabled={result === 'correct'}
                         aria-label={isBn ? `${exercise.words[wordIndex]} বাদ দিতে ক্লিক করুন` : `Click to remove ${exercise.words[wordIndex]}`}
                         title={isBn ? 'বাদ দিতে ট্যাপ করুন' : 'Tap to remove'}
-                        className="inline-flex min-h-[44px] items-center rounded-lg border border-sapphire/40 bg-sapphire/15 px-3 py-2 text-sm font-bold text-ink transition hover:border-rose-400 hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sapphire disabled:cursor-default"
+                        className="duo-word-chip inline-flex min-h-[44px] items-center rounded-xl border-2 border-sapphire/50 bg-sapphire/20 px-3.5 py-2 text-sm font-extrabold text-ink transition hover:border-rose-400 hover:bg-rose-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sapphire disabled:cursor-default"
                       >
                         <span>{exercise.words[wordIndex]}</span>
                       </button>
                     ))
                   ) : (
-                    <span className="text-sm text-ink/50">{isBn ? 'নিচের শব্দগুলোতে ট্যাপ করে সঠিক ক্রমে বাক্য সাজাও…' : 'Tap the words below to build the sentence…'}</span>
+                    <span className="text-sm text-ink/55">{isBn ? 'নিচের শব্দগুলোতে ট্যাপ করে সঠিক ক্রমে বাক্য সাজাও…' : 'Tap the words below to build the sentence…'}</span>
                   )}
                 </div>
 
@@ -489,7 +500,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                           type="button"
                           disabled={used || result === 'correct'}
                           onClick={() => chooseWord(wordIndex)}
-                          className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gold/30 bg-gold/10 px-3.5 py-2 text-sm font-bold text-ink transition hover:-translate-y-0.5 hover:border-gold/70 hover:bg-gold/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-default disabled:opacity-35"
+                          className="duo-word-chip inline-flex min-h-[44px] items-center justify-center rounded-xl border-2 border-gold/35 bg-gold/15 px-3.5 py-2 text-sm font-extrabold text-ink transition hover:-translate-y-0.5 hover:border-gold/75 hover:bg-gold/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-default disabled:opacity-30"
                         >
                           {word}
                         </button>
@@ -498,7 +509,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                           onClick={() => speakWord(word)}
                           aria-label={`${isBn ? 'শব্দের উচ্চারণ শুনুন' : 'Hear pronunciation'}: ${word}`}
                           title={isBn ? 'শব্দের উচ্চারণ শুনুন' : 'Hear word pronunciation'}
-                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-sapphire/25 bg-sapphire/10 text-base text-sapphire transition hover:bg-sapphire/20 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sapphire/25"
+                          className="duo-word-chip inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border-2 border-sapphire/30 bg-sapphire/15 text-base text-sapphire transition hover:bg-sapphire/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sapphire/25"
                         >
                           <span className={speakingWord === word ? 'animate-pulse' : ''} aria-hidden="true">🔊</span>
                         </button>
@@ -506,14 +517,14 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     );
                   })}
                 </div>
-                {pronunciationError ? <p role="alert" className="text-sm font-semibold text-rose-700">{pronunciationError}</p> : null}
+                {pronunciationError ? <p role="alert" className="text-sm font-semibold text-rose-400">{pronunciationError}</p> : null}
 
                 <div className="flex flex-wrap gap-2.5 pt-1">
                   <button
                     type="button"
                     onClick={checkSentence}
                     disabled={!selected.length || result === 'correct' || completionBusy}
-                    className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-5 py-2 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="primary-button inline-flex min-h-[46px] items-center justify-center rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-5 py-2.5 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {completionBusy
                       ? (isBn ? 'সংরক্ষণ হচ্ছে…' : 'Saving…')
@@ -523,7 +534,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     type="button"
                     onClick={resetSentence}
                     disabled={!selected.length}
-                    className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-sapphire/25 bg-paper/70 px-4 py-2 text-sm font-bold text-ink transition hover:bg-sapphire/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="secondary-button inline-flex min-h-[46px] items-center justify-center rounded-xl border border-sapphire/25 bg-paper/70 px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-sapphire/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isBn ? 'সব মুছুন' : 'Reset all'}
                   </button>
@@ -531,7 +542,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     <button
                       type="button"
                       onClick={nextExercise}
-                      className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gold/40 bg-gold/15 px-4 py-2 text-sm font-extrabold text-gold-soft transition hover:bg-gold/25"
+                      className="secondary-button inline-flex min-h-[46px] items-center justify-center rounded-xl border-2 border-gold/45 bg-gold/15 px-4 py-2.5 text-sm font-extrabold text-gold-soft transition hover:bg-gold/25"
                     >
                       {exerciseIndex === shuffledExercises.length - 1
                         ? (isBn ? 'অনুশীলন শেষ করুন' : 'Finish practice')
@@ -544,15 +555,15 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                   <div
                     role="status"
                     aria-live="polite"
-                    className={`space-y-2 rounded-xl p-3.5 text-sm font-bold ${
+                    className={`space-y-2 rounded-2xl p-4 text-sm font-bold ${
                       result === 'correct'
-                        ? 'practice-completion-feedback border border-emerald-500/30 bg-emerald-500/15 text-emerald-800'
-                        : 'border border-gold/30 bg-gold/10 text-ink'
+                        ? 'practice-completion-feedback border-2 border-emerald-500/40 bg-emerald-500/15 text-ink'
+                        : 'border-2 border-gold/35 bg-gold/10 text-ink'
                     }`}
                   >
                     <p>
                       {result === 'correct'
-                        ? (isBn ? 'দারুণ! গল্পের বাক্যটি ঠিকভাবে সাজিয়েছ।' : 'Excellent! You rebuilt the story sentence correctly.')
+                        ? (isBn ? '✓ দারুণ! গল্পের বাক্যটি ঠিকভাবে সাজিয়েছ।' : '✓ Excellent! You rebuilt the story sentence correctly.')
                         : (isBn ? 'আরেকবার চেষ্টা করো—কর্তা দিয়ে শুরু করে ক্রিয়াটি খুঁজে দেখো।' : 'Try again. Look for the subject first, then find the verb.')}
                     </p>
                     {milestoneNotice ? <p className="font-extrabold text-gold-soft">{milestoneNotice}</p> : null}
@@ -574,12 +585,12 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
               </p>
             )}
             {sessionFinished ? (
-              <div role="status" aria-live="polite" className="practice-completion-feedback flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-bold text-ink">
+              <div role="status" aria-live="polite" className="practice-completion-feedback flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-emerald-500/35 bg-emerald-500/10 p-4 text-sm font-bold text-ink">
                 <span>{isBn ? 'এই গল্প ও স্তরের সব বাক্য শেষ।' : 'You have finished every sentence in this story and level.'}</span>
                 <button
                   type="button"
                   onClick={restartExercises}
-                  className="min-h-[44px] rounded-xl bg-sapphire px-4 py-2 font-extrabold text-white"
+                  className="primary-button min-h-[44px] rounded-xl bg-sapphire px-4 py-2 font-extrabold text-white"
                 >
                   {isBn ? 'আবার অনুশীলন' : 'Practice again'}
                 </button>

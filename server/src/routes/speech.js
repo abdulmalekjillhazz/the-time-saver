@@ -7,7 +7,10 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import {
   ElevenLabsApiError,
   generateAndUploadAudioDrama,
+  generateDirectElevenLabsSpeech,
+  generateDirectElevenLabsStoryAudio,
   hasCompleteNarrationVoiceConfig,
+  withDefaultNarrationVoices,
 } from '../services/elevenLabs.js';
 import { CloudinaryApiError, isCloudinaryConfigured } from '../services/cloudinary.js';
 import { generateGoogleTtsAudio, GoogleTtsApiError } from '../services/googleTts.js';
@@ -25,6 +28,11 @@ const freeAudioDramaRequest = z.object({
 const briefingRequest = z.object({
   text: z.string().trim().min(1).max(1500),
   lang: z.enum(['bn', 'en']),
+}).strict();
+const pronounceRequest = z.object({
+  text: z.string().trim().min(1).max(800),
+  lang: z.enum(['bn', 'en']).default('en'),
+  speaker: z.string().trim().max(40).optional(),
 }).strict();
 
 export const googleTtsError = (error) => {
@@ -76,14 +84,15 @@ export const audioDramaError = elevenLabsError;
 
 export function speechRouter({ config = {} } = {}) {
   const router = Router();
+  const effectiveConfig = config.ELEVENLABS_API_KEY ? withDefaultNarrationVoices(config) : config;
   router.use(rateLimit({ name: 'speech-api', limit: 60, windowMs: MINUTE }));
 
   router.get('/config', (_req, res) => {
     const voices = {
-      father: Boolean(config.ELEVENLABS_API_KEY && config.ELEVENLABS_FATHER_VOICE_ID),
-      mother: Boolean(config.ELEVENLABS_API_KEY && config.ELEVENLABS_MOTHER_VOICE_ID),
-      son: Boolean(config.ELEVENLABS_API_KEY && config.ELEVENLABS_SON_VOICE_ID),
-      storyteller: Boolean(config.ELEVENLABS_API_KEY && config.ELEVENLABS_STORYTELLER_VOICE_ID),
+      father: Boolean(effectiveConfig.ELEVENLABS_API_KEY && effectiveConfig.ELEVENLABS_FATHER_VOICE_ID),
+      mother: Boolean(effectiveConfig.ELEVENLABS_API_KEY && effectiveConfig.ELEVENLABS_MOTHER_VOICE_ID),
+      son: Boolean(effectiveConfig.ELEVENLABS_API_KEY && effectiveConfig.ELEVENLABS_SON_VOICE_ID),
+      storyteller: Boolean(effectiveConfig.ELEVENLABS_API_KEY && effectiveConfig.ELEVENLABS_STORYTELLER_VOICE_ID),
     };
     res.json({
       elevenLabsVoices: voices,
@@ -92,12 +101,29 @@ export function speechRouter({ config = {} } = {}) {
   });
 
   router.post(
-    '/briefing',
-    requireAuth,
-    rateLimit({ name: 'google-tts-briefing', limit: 20, windowMs: 15 * MINUTE, by: 'user' }),
-    validate({ body: briefingRequest }),
+    '/pronounce',
+    rateLimit({ name: 'speech-pronounce', limit: 40, windowMs: 15 * MINUTE }),
+    validate({ body: pronounceRequest }),
     async (req, res, next) => {
       try {
+        if (effectiveConfig.ELEVENLABS_API_KEY) {
+          try {
+            const audio = await generateDirectElevenLabsSpeech({
+              text: req.body.text,
+              speaker: req.body.speaker || 'storyteller',
+              config: effectiveConfig,
+            });
+            res.set({
+              'Cache-Control': 'private, max-age=3600',
+              'Content-Length': String(audio.length),
+              'Content-Type': 'audio/mpeg',
+              'X-Audio-Source': 'elevenlabs',
+            });
+            return res.send(audio);
+          } catch (elevenErr) {
+            logger.warn({ errName: elevenErr.name, status: elevenErr.status }, 'ElevenLabs pronounce failed, falling back to Google TTS');
+          }
+        }
         const audio = await generateGoogleTtsAudio({
           text: req.body.text,
           lang: req.body.lang,
@@ -106,6 +132,49 @@ export function speechRouter({ config = {} } = {}) {
           'Cache-Control': 'private, no-store',
           'Content-Length': String(audio.length),
           'Content-Type': 'audio/mpeg',
+          'X-Audio-Source': 'google-tts',
+        });
+        return res.send(audio);
+      } catch (error) {
+        return next(googleTtsError(error));
+      }
+    }
+  );
+
+  router.post(
+    '/briefing',
+    requireAuth,
+    rateLimit({ name: 'google-tts-briefing', limit: 20, windowMs: 15 * MINUTE, by: 'user' }),
+    validate({ body: briefingRequest }),
+    async (req, res, next) => {
+      try {
+        if (effectiveConfig.ELEVENLABS_API_KEY) {
+          try {
+            const audio = await generateDirectElevenLabsSpeech({
+              text: req.body.text,
+              speaker: 'storyteller',
+              config: effectiveConfig,
+            });
+            res.set({
+              'Cache-Control': 'private, no-store',
+              'Content-Length': String(audio.length),
+              'Content-Type': 'audio/mpeg',
+              'X-Audio-Source': 'elevenlabs',
+            });
+            return res.send(audio);
+          } catch (elevenErr) {
+            logger.warn({ errName: elevenErr.name, status: elevenErr.status }, 'ElevenLabs briefing synthesis failed, falling back to Google TTS');
+          }
+        }
+        const audio = await generateGoogleTtsAudio({
+          text: req.body.text,
+          lang: req.body.lang,
+        });
+        res.set({
+          'Cache-Control': 'private, no-store',
+          'Content-Length': String(audio.length),
+          'Content-Type': 'audio/mpeg',
+          'X-Audio-Source': 'google-tts',
         });
         return res.send(audio);
       } catch (error) {
@@ -121,10 +190,28 @@ export function speechRouter({ config = {} } = {}) {
 
   router.post(
     '/audio-drama/free',
-    rateLimit({ name: 'free-audio-drama', limit: 10, windowMs: 15 * MINUTE }),
+    rateLimit({ name: 'free-audio-drama', limit: 15, windowMs: 15 * MINUTE }),
     validate({ body: freeAudioDramaRequest }),
     async (req, res, next) => {
       try {
+        if (effectiveConfig.ELEVENLABS_API_KEY) {
+          try {
+            const audio = await generateDirectElevenLabsStoryAudio({
+              content: req.body.content,
+              config: effectiveConfig,
+            });
+            logger.info({ audioSource: 'elevenlabs-direct', storyAudio: true }, 'story audio generated via ElevenLabs direct');
+            res.set({
+              'Cache-Control': 'private, no-store',
+              'Content-Length': String(audio.length),
+              'Content-Type': 'audio/mpeg',
+              'X-Audio-Source': 'elevenlabs',
+            });
+            return res.send(audio);
+          } catch (elevenErr) {
+            logger.warn({ errName: elevenErr.name, status: elevenErr.status }, 'Direct ElevenLabs story synthesis failed, falling back to Google TTS');
+          }
+        }
         const audio = await generateGoogleTtsAudio({
           text: parseStoryNarration(req.body.content).map(({ text }) => text).join('\n'),
           lang: req.body.lang,
@@ -134,6 +221,7 @@ export function speechRouter({ config = {} } = {}) {
           'Cache-Control': 'private, no-store',
           'Content-Length': String(audio.length),
           'Content-Type': 'audio/mpeg',
+          'X-Audio-Source': 'google-tts',
         });
         return res.send(audio);
       } catch (error) {
@@ -153,7 +241,7 @@ export function speechRouter({ config = {} } = {}) {
     validate({ body: audioDramaRequest }),
     async (req, res, next) => {
       try {
-        if (!hasCompleteNarrationVoiceConfig(config) || !isCloudinaryConfigured()) {
+        if (!hasCompleteNarrationVoiceConfig(effectiveConfig) || !isCloudinaryConfigured()) {
           throw new AppError(503, 'UNAVAILABLE', {
             en: 'Configure all four narration voices and Cloudinary to look up saved story audio.',
             bn: 'সংরক্ষিত গল্পের অডিও খুঁজতে চারটি narration voice ও Cloudinary কনফিগার করুন।',
@@ -161,7 +249,7 @@ export function speechRouter({ config = {} } = {}) {
         }
         const result = await generateAndUploadAudioDrama({
           content: req.body.content,
-          config,
+          config: effectiveConfig,
         });
         logger.info({
           audioSource: 'cloudinary',
@@ -187,7 +275,7 @@ export function speechRouter({ config = {} } = {}) {
       try {
         const result = await generateAndUploadAudioDrama({
           content: req.body.content,
-          config,
+          config: effectiveConfig,
         });
         const response = await fetch(result.url, { signal: AbortSignal.timeout(30_000) });
         if (!response.ok) {

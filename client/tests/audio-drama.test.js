@@ -146,8 +146,10 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('Sentence 1');
     expect(markup).toContain('aria-valuenow="100"');
     expect(markup).toContain('0 of 3 tries');
-    expect(markup).toContain('Listen to example');
-    expect(markup).toContain('Read and check');
+    expect(markup).toContain('aria-label="Listen to example"');
+    expect(markup).toContain('aria-label="Read and check"');
+    expect(markup).not.toContain('🔊 Listen to example');
+    expect(markup).not.toContain('Read and check</button>');
     expect(markup).toContain('Listen to the example, then say the sentence.');
   });
 
@@ -283,6 +285,7 @@ describe('Cloudinary audio drama', () => {
     const [csrfUrl] = globalThis.fetch.mock.calls[0];
     const [requestUrl, requestOptions] = globalThis.fetch.mock.calls[1];
     expect(csrfUrl).toBe('/api/auth/csrf');
+    expect(globalThis.fetch.mock.calls[0][1]).toMatchObject({ cache: 'no-store' });
     expect(requestUrl).toBe('/api/speech/audio-drama');
     expect(requestOptions.headers['X-CSRF-Token']).toBe('test-token');
     expect(JSON.parse(requestOptions.body)).toEqual({

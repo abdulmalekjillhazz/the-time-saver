@@ -6,7 +6,13 @@ import { createUuidV4, predictMissProbability, routineFeatures, TRAINING_CONSENT
 import { enqueueAndFlush } from '../lib/outboxClient.js';
 import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { useAppStore } from '../lib/appStore.js';
-import { apiRequest } from '../lib/apiClient.js';
+import {
+  apiRequest,
+  clearStoredSessionToken,
+  getStoredSessionToken,
+  resolveApiUrl,
+  setStoredSessionToken,
+} from '../lib/apiClient.js';
 import { signInWithGoogleNative } from '../lib/nativeGoogleAuth.js';
 import {
   cacheOfflineLesson,
@@ -69,6 +75,16 @@ import { AddRoutineBuilderCard } from './AddRoutineBuilderCard.jsx';
 import { LeaderboardPanel } from './LeaderboardPanel.jsx';
 import { GamificationBar } from './GamificationBar.jsx';
 import { formatNaturalTime } from '../lib/prayerAnchors.js';
+
+const DESKTOP_CONSTELLATION_POINTS = [
+  [16, 49],
+  [47, 25],
+  [78, 54],
+  [109, 20],
+  [140, 48],
+  [171, 27],
+  [202, 52],
+];
 
 const COPY = {
   en: {
@@ -288,18 +304,28 @@ function LanguageFlag({ lang }) {
 
 async function request(path, { method = 'GET', body, raw = false } = {}) {
   const headers = {};
+  const sessionToken = getStoredSessionToken();
+  if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+
+  const resolvedCsrfUrl = resolveApiUrl('/api/auth/csrf');
+  const resolvedPath = resolveApiUrl(path);
+  const credentialsMode = resolvedPath.startsWith('http') ? 'include' : 'same-origin';
+
   if (method !== 'GET' && method !== 'HEAD') {
-    const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin' });
+    const csrfResponse = await fetch(resolvedCsrfUrl, {
+      credentials: credentialsMode,
+      cache: 'no-store',
+      ...(sessionToken ? { headers: { Authorization: `Bearer ${sessionToken}` } } : {}),
+    });
     const csrfBody = await csrfResponse.json().catch(() => ({}));
-    if (!csrfResponse.ok || typeof csrfBody.csrfToken !== 'string') {
-      throw new Error('Could not establish a security token for this request.');
-    }
+    if (!csrfResponse.ok) throw new Error(`Security token request failed (HTTP ${csrfResponse.status}).`);
+    if (typeof csrfBody.csrfToken !== 'string') throw new Error('The security token response was invalid.');
     headers['X-CSRF-Token'] = csrfBody.csrfToken;
   }
-  const response = await fetch(path, {
+  const response = await fetch(resolvedPath, {
     method,
-    credentials: 'same-origin',
+    credentials: credentialsMode,
     headers,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
@@ -314,10 +340,19 @@ async function request(path, { method = 'GET', body, raw = false } = {}) {
   }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 && path === '/api/me') {
+      clearStoredSessionToken();
+    }
     const error = new Error(`Request failed with status ${response.status}.`);
     error.status = response.status;
     error.body = payload;
     throw error;
+  }
+  if (typeof payload?.sessionToken === 'string' && payload.sessionToken) {
+    setStoredSessionToken(payload.sessionToken);
+  }
+  if (path === '/api/auth/logout') {
+    clearStoredSessionToken();
   }
   return payload;
 }
@@ -421,7 +456,12 @@ function GoogleSignInButton({ clientId, lang, disabled, nativeAndroid, onCredent
     if (nativeLoginPending || disabled) return;
     setNativeLoginPending(true);
     try {
-      const credential = await signInWithGoogleNative(clientId);
+      let resolvedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+      if (!resolvedClientId) {
+        const cfg = await request('/api/auth/google/config').catch(() => ({}));
+        resolvedClientId = typeof cfg?.clientId === 'string' ? cfg.clientId.trim() : '';
+      }
+      const credential = await signInWithGoogleNative(resolvedClientId);
       await credentialHandler.current(credential);
     } catch (err) {
       onError(err);
@@ -1663,6 +1703,7 @@ export function PrivateApp() {
     if (event?.preventDefault) event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const clientId = createUuidV4();
     const routine = {
       title: String(form.get('title') || '').trim(),
       startTime: String(form.get('startTime') || ''),
@@ -1672,73 +1713,97 @@ export function PrivateApp() {
       note: '',
       anchorHabit: String(form.get('anchorHabit') || '').trim(),
       isFrog: form.get('isFrog') === 'on',
-      clientId: createUuidV4(),
+      clientId,
     };
-    setBusy(true);
+    if (!routine.title) return;
+
+    // 0ms Optimistic UI update: immediately insert into state and reset form without freezing!
+    const optimisticItem = {
+      id: clientId,
+      ...routine,
+      completionStatus: null,
+    };
+    const previousRoutines = routines;
+    const nextRoutines = [...routines, optimisticItem].sort((a, b) =>
+      String(a.startTime || '').localeCompare(String(b.startTime || ''))
+    );
+    setRoutines(nextRoutines);
+    saveCachedRoutines(user.id, todayInZone(user.timezone), nextRoutines);
     setError('');
-    setNotice('');
-    try {
-      await enqueueAndFlush(user.id, { type: 'routine.create', data: routine });
-      await loadRoutines(user);
-      setNotice(lang === 'bn' ? `✅ সফলভাবে যোগ হয়েছে: "${routine.title}"` : `✅ Successfully added routine: "${routine.title}"`);
-      if (typeof onResetBuilder === 'function') onResetBuilder();
-      else formElement?.reset?.();
-      setRoutineStartTime('');
-      setRoutineEndTime('');
-      setAnchorHabitInput('');
-    } catch (err) {
-      reportError(err);
-    } finally {
-      setBusy(false);
-    }
+    setNotice(lang === 'bn' ? `✅ সফলভাবে যোগ হয়েছে: "${routine.title}"` : `✅ Successfully added routine: "${routine.title}"`);
+    if (typeof onResetBuilder === 'function') onResetBuilder();
+    else formElement?.reset?.();
+    setRoutineStartTime('');
+    setRoutineEndTime('');
+    setAnchorHabitInput('');
+
+    // Sync in the background without locking the UI
+    void enqueueAndFlush(user.id, { type: 'routine.create', data: routine })
+      .then(() => loadRoutines(user))
+      .catch((err) => {
+        setRoutines(previousRoutines);
+        reportError(err);
+      });
   }
 
   async function removeRoutine(routineId) {
-    setBusy(true);
+    // 0ms Optimistic UI removal: disappears immediately on tap!
+    const previousRoutines = routines;
+    const nextRoutines = routines.filter((r) => r.id !== routineId && r.clientId !== routineId);
+    setRoutines(nextRoutines);
+    saveCachedRoutines(user.id, todayInZone(user.timezone), nextRoutines);
     setError('');
-    try {
-      await enqueueAndFlush(user.id, { type: 'routine.delete', routineId });
-      if (nativeAndroid) void cancelNativeAlarm(`routine-${routineId}`).catch(() => {});
-      await loadRoutines(user);
-      setNotice(copy.routineDeleted);
-    } catch (err) {
-      reportError(err);
-    } finally {
-      setBusy(false);
-    }
+    setNotice(copy.routineDeleted);
+    if (nativeAndroid) void cancelNativeAlarm(`routine-${routineId}`).catch(() => {});
+
+    // Sync deletion in background
+    void enqueueAndFlush(user.id, { type: 'routine.delete', routineId })
+      .then(() => loadRoutines(user))
+      .catch((err) => {
+        setRoutines(previousRoutines);
+        reportError(err);
+      });
   }
 
   async function setRoutineStatus(routineId, status) {
-    setBusy(true);
+    // 0ms Optimistic UI status update
+    const previousRoutines = routines;
+    const previousStatus = routines.find((routine) => routine.id === routineId)?.completionStatus;
+    const nextRoutines = routines.map((routine) =>
+      routine.id === routineId ? { ...routine, completionStatus: status } : routine
+    );
+    setRoutines(nextRoutines);
+    saveCachedRoutines(user.id, todayInZone(user.timezone), nextRoutines);
     setError('');
-    setNotice('');
-    try {
-      if (nativeAndroid && (status === 'done' || status === 'skipped')) {
-        void cancelNativeAlarm(`routine-${routineId}`).catch(() => {});
-      }
-      const result = await enqueueAndFlush(user.id, {
-        type: 'completion.set',
-        data: { routineId, date: todayInZone(user.timezone), status },
-      });
-      const previousStatus = routines.find((routine) => routine.id === routineId)?.completionStatus;
-      await loadRoutines(user);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('smart-routine:sync', { detail: { userId: user.id } }));
-      }
-      if (result.operationStatus === 'failed') setError(copy.completionRejected);
-      else if (result.operationStatus === 'pending' || result.retryable || result.busy) setNotice(copy.completionPending);
-      else {
-        setNotice(copy.completionSaved);
-        if (status === 'done' && previousStatus !== 'done') announceLearningActivity(50);
-        return true;
-      }
-      return false;
-    } catch (err) {
-      reportError(err);
-      return false;
-    } finally {
-      setBusy(false);
+    setNotice(copy.completionSaved);
+    if (status === 'done' && previousStatus !== 'done') {
+      announceLearningActivity(50);
     }
+    if (nativeAndroid && (status === 'done' || status === 'skipped')) {
+      void cancelNativeAlarm(`routine-${routineId}`).catch(() => {});
+    }
+
+    // Background sync
+    void enqueueAndFlush(user.id, {
+      type: 'completion.set',
+      data: { routineId, date: todayInZone(user.timezone), status },
+    })
+      .then((result) => {
+        if (result.operationStatus === 'failed') {
+          setRoutines(previousRoutines);
+          setError(copy.completionRejected);
+          return;
+        }
+        if (result.operationStatus === 'pending' || result.retryable || result.busy) {
+          setNotice(copy.completionPending);
+        }
+        return loadRoutines(user);
+      })
+      .catch((err) => {
+        setRoutines(previousRoutines);
+        reportError(err);
+      });
+    return true;
   }
 
   async function finishRoutineTask(status) {
@@ -2054,7 +2119,7 @@ export function PrivateApp() {
             </p>
           </div>
 
-          {googleClientId ? (
+          {(googleClientId || nativeAndroid) ? (
             <div className="space-y-3 border-t border-gold/20 pt-4">
               <p className="text-center text-xs font-semibold uppercase tracking-wider text-ink/60">{copy.googleSignIn}</p>
               <GoogleSignInButton
@@ -2211,7 +2276,7 @@ export function PrivateApp() {
   );
 
   return (
-    <main className={`app-shell app-shell-main mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7${immersiveTab ? ' app-shell-immersive' : ''}`}>
+    <main lang={lang} className={`app-shell app-shell-main mx-auto my-5 max-w-6xl space-y-5 rounded-[2rem] p-3 sm:my-8 sm:p-7${immersiveTab ? ' app-shell-immersive' : ''}`}>
       {immersiveTab ? (
         <Button
           type="button"
@@ -2295,6 +2360,58 @@ export function PrivateApp() {
         </div>
       </nav>
 
+      <aside className="celestial-desktop-rail" aria-label={lang === 'bn' ? 'আজকের অভ্যাসের নক্ষত্রমণ্ডল' : "Today's habit constellation"}>
+        <h2>{lang === 'bn' ? 'আজকের ধারা' : 'Today’s chain'}</h2>
+        <p className="celestial-rail-caption">
+          {lang === 'bn' ? 'প্রতিটি সম্পন্ন কাজ একটি নক্ষত্র জ্বালায়' : 'Each completed routine lights a star.'}
+        </p>
+        {routines.length ? (
+          <svg
+            className="celestial-rail-map"
+            viewBox="0 0 218 72"
+            role="img"
+            aria-label={lang === 'bn'
+              ? `${routines.filter((routine) => routine.completionStatus === 'done').length} টি কাজ সম্পন্ন`
+              : `${routines.filter((routine) => routine.completionStatus === 'done').length} routines completed`}
+          >
+            {DESKTOP_CONSTELLATION_POINTS.slice(0, Math.min(routines.length, DESKTOP_CONSTELLATION_POINTS.length) - 1).map(([x1, y1], index) => {
+              const [x2, y2] = DESKTOP_CONSTELLATION_POINTS[index + 1];
+              const segmentLit = routines[index]?.completionStatus === 'done'
+                && routines[index + 1]?.completionStatus === 'done';
+              return (
+                <line
+                  key={`rail-link-${index}`}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  className={`constellation-link ${segmentLit ? 'is-lit' : ''}`}
+                />
+              );
+            })}
+            {routines.slice(0, DESKTOP_CONSTELLATION_POINTS.length).map((routine, index) => {
+              const [cx, cy] = DESKTOP_CONSTELLATION_POINTS[index];
+              return (
+                <circle
+                  key={routine.id}
+                  cx={cx}
+                  cy={cy}
+                  r="3.5"
+                  className={`constellation-node ${routine.completionStatus === 'done' ? 'is-lit' : ''}`}
+                />
+              );
+            })}
+          </svg>
+        ) : (
+          <div className="celestial-empty-map" aria-hidden="true">✧ · ✦ · ✧</div>
+        )}
+        <p className="celestial-rail-total">
+          {lang === 'bn'
+            ? `${routines.filter((routine) => routine.completionStatus === 'done').length} / ${routines.length} সম্পন্ন`
+            : `${routines.filter((routine) => routine.completionStatus === 'done').length} of ${routines.length} complete`}
+        </p>
+      </aside>
+
       {tab === 'leaderboard' ? <div className="tab-enter"><LeaderboardPanel lang={lang} /></div> : null}
 
       {tab === 'speaking' ? (
@@ -2321,7 +2438,7 @@ export function PrivateApp() {
       {tab === 'grammar' ? <div className="tab-enter"><GrammarLessons lang={lang} stories={grammarStorySources} /></div> : null}
 
       {tab === 'today' ? (
-        <section className="tab-enter space-y-4">
+        <section className="tab-enter today-screen space-y-4">
           <TodayProgressCard
             lang={lang}
             userId={user.id}

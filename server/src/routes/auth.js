@@ -3,10 +3,11 @@ import { OAuth2Client } from 'google-auth-library';
 import { registerSchema, loginSchema, googleLoginSchema } from '@smart-routine/shared';
 import { validate } from '../middleware/validate.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { extractSessionToken } from '../middleware/requireAuth.js';
 import { randomToken } from '../lib/crypto.js';
 import { AppError, MSG } from '../lib/AppError.js';
 import { logger } from '../lib/logger.js';
-import { SESSION_COOKIE, setCsrfCookie, setSessionCookies, clearSessionCookies } from '../lib/cookies.js';
+import { setCsrfCookie, setSessionCookies, clearSessionCookies } from '../lib/cookies.js';
 import { registerUser, loginUser, loginGoogleUser } from '../services/account.js';
 import {
   createSession,
@@ -20,19 +21,35 @@ import { toPublicUser } from '../services/dto.js';
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 
-export function authRouter(config) {
-  const r = Router();
-  const googleClient = config.GOOGLE_CLIENT_ID ? new OAuth2Client(config.GOOGLE_CLIENT_ID) : null;
+export function parseGoogleClientIds(config = {}) {
+  const rawList = [
+    ...(typeof config.GOOGLE_CLIENT_ID === 'string' ? config.GOOGLE_CLIENT_ID.split(/[,\s]+/) : []),
+    ...(typeof config.GOOGLE_ANDROID_CLIENT_ID === 'string' ? config.GOOGLE_ANDROID_CLIENT_ID.split(/[,\s]+/) : []),
+  ]
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return [...new Set(rawList)];
+}
 
-  // The browser calls this first to get a CSRF token for its state-changing requests.
-  r.get('/csrf', (_req, res) => {
+export function csrfRouter(config) {
+  const r = Router();
+  r.get('/', (_req, res) => {
     const csrfToken = randomToken(32);
     setCsrfCookie(res, config, csrfToken);
+    res.set('Cache-Control', 'no-store');
     res.json({ csrfToken });
   });
+  return r;
+}
+
+export function authRouter(config) {
+  const r = Router();
+  const googleClientIds = parseGoogleClientIds(config);
+  const primaryWebClientId = googleClientIds[0] || null;
+  const googleClient = primaryWebClientId ? new OAuth2Client(primaryWebClientId) : null;
 
   r.get('/google/config', (_req, res) => {
-    res.json({ clientId: config.GOOGLE_CLIENT_ID || null });
+    res.json({ clientId: primaryWebClientId });
   });
 
   r.post(
@@ -44,7 +61,7 @@ export function authRouter(config) {
         const user = await registerUser(req.body);
         const { token, csrf } = await createSession(user._id);
         setSessionCookies(res, config, token, csrf);
-        res.status(201).json({ user: toPublicUser(user), csrfToken: csrf });
+        res.status(201).json({ user: toPublicUser(user), csrfToken: csrf, sessionToken: token });
       } catch (err) {
         next(err);
       }
@@ -60,7 +77,7 @@ export function authRouter(config) {
         const user = await loginUser(req.body);
         const { token, csrf } = await createSession(user._id);
         setSessionCookies(res, config, token, csrf);
-        res.json({ user: toPublicUser(user), csrfToken: csrf });
+        res.json({ user: toPublicUser(user), csrfToken: csrf, sessionToken: token });
       } catch (err) {
         next(err);
       }
@@ -73,12 +90,12 @@ export function authRouter(config) {
     validate({ body: googleLoginSchema }),
     async (req, res, next) => {
       try {
-        if (!googleClient) throw new AppError(503, 'UNAVAILABLE', MSG.unavailable);
+        if (!googleClient || !googleClientIds.length) throw new AppError(503, 'UNAVAILABLE', MSG.unavailable);
         let claims;
         try {
           const ticket = await googleClient.verifyIdToken({
             idToken: req.body.credential,
-            audience: config.GOOGLE_CLIENT_ID,
+            audience: googleClientIds.length === 1 ? googleClientIds[0] : googleClientIds,
           });
           claims = ticket.getPayload();
         } catch (err) {
@@ -102,7 +119,7 @@ export function authRouter(config) {
         });
         const { token, csrf } = await createSession(user._id);
         setSessionCookies(res, config, token, csrf);
-        res.json({ user: toPublicUser(user), csrfToken: csrf });
+        res.json({ user: toPublicUser(user), csrfToken: csrf, sessionToken: token });
       } catch (err) {
         next(err);
       }
@@ -111,7 +128,7 @@ export function authRouter(config) {
 
   r.post('/logout', async (req, res, next) => {
     try {
-      await revokeSessionByToken(req.cookies?.[SESSION_COOKIE]);
+      await revokeSessionByToken(extractSessionToken(req));
       clearSessionCookies(res, config);
       res.json({ ok: true });
     } catch (err) {
@@ -122,11 +139,11 @@ export function authRouter(config) {
   // Rotates the session token. Presenting an old token later revokes the whole family.
   r.post('/refresh', rateLimit({ name: 'refresh', limit: 60, windowMs: MINUTE }), async (req, res, next) => {
     try {
-      const session = await loadSession(req.cookies?.[SESSION_COOKIE]);
+      const session = await loadSession(extractSessionToken(req));
       const user = await loadUserForSession(session);
       const { token, csrf } = await rotateSession(session);
       setSessionCookies(res, config, token, csrf);
-      res.json({ user: toPublicUser(user), csrfToken: csrf });
+      res.json({ user: toPublicUser(user), csrfToken: csrf, sessionToken: token });
     } catch (err) {
       next(err);
     }

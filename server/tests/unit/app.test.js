@@ -18,6 +18,13 @@ describe('app guards (no database needed)', () => {
     expect(res.body.ok).toBe(true);
   });
 
+  it('CSRF tokens are never cached', async () => {
+    const res = await request(app).get('/api/auth/csrf');
+    expect(res.status).toBe(200);
+    expect(res.body.csrfToken).toEqual(expect.any(String));
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
   it('a state-changing request without a CSRF token is refused', async () => {
     const res = await request(app).post('/api/auth/login').send({ email: 'a@example.com', password: 'x' });
     expect(res.status).toBe(403);

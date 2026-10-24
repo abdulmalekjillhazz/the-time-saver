@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getStoryWordWeights, parseStoryScript, playDrama } from '../lib/audioDrama.js';
-import { apiRequestAudio } from '../lib/apiClient.js';
 import {
   canAttemptSpeechPractice,
   compareSpeechText,
@@ -16,7 +15,7 @@ import {
   saveOfflineMeanings,
   saveOfflineStoryAudio,
 } from '../lib/offlineStoryCache.js';
-import { speakWithVoice } from '../lib/voiceBriefing.js';
+import { speakNaturalSpeech } from '../lib/voiceBriefing.js';
 
 const STORY_AUDIO_CACHE_VERSION = 'story-audio-v3-sentence-alignment';
 
@@ -91,7 +90,7 @@ export function spokenTextParts(
             {
               role: 'status',
               className:
-                'absolute bottom-full left-1/2 z-50 mb-2 min-w-[170px] max-w-[260px] -translate-x-1/2 rounded-xl border-2 border-gold bg-paper px-3 py-2 text-xs font-semibold text-ink shadow-2xl',
+                'word-meaning-popover absolute bottom-full left-1/2 z-50 mb-2 min-w-[185px] max-w-[270px] -translate-x-1/2 rounded-2xl border-2 border-gold bg-paper px-3.5 py-2.5 text-xs font-semibold text-ink shadow-2xl',
             },
             React.createElement(
               'span',
@@ -99,7 +98,7 @@ export function spokenTextParts(
               React.createElement(
                 'span',
                 { className: 'min-w-0 flex-1' },
-                React.createElement('strong', { className: 'block text-gold-soft' }, selectedWordState.term),
+                React.createElement('strong', { className: 'block text-sm font-extrabold text-gold-soft' }, selectedWordState.term),
                 React.createElement('span', { className: 'mt-0.5 block leading-snug text-ink' }, selectedWordState.meaning),
                 onSpeakWord
                   ? React.createElement(
@@ -111,7 +110,7 @@ export function spokenTextParts(
                           event.stopPropagation();
                           onSpeakWord(selectedWordState.term);
                         },
-                        className: 'mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-sapphire/25 bg-sapphire/10 px-2.5 py-1 text-[11px] font-bold text-sapphire hover:bg-sapphire/20',
+                        className: 'mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-sapphire/35 bg-sapphire/15 px-2.5 py-1 text-[11px] font-bold text-sapphire hover:bg-sapphire/25',
                       },
                       `🔊 ${pronunciationLabel}`,
                     )
@@ -133,9 +132,9 @@ export function spokenTextParts(
             }
           },
           className: [
-            baseClass || 'rounded px-1 py-0.5',
-            'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold',
-            isSelected ? 'bg-gold text-on-gold font-extrabold ring-2 ring-gold' : '',
+            baseClass || 'duo-tappable-word rounded-md border-b border-dotted border-gold/45 px-1 py-0.5',
+            'cursor-pointer transition-colors hover:bg-gold/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold',
+            isSelected ? 'border-solid border-gold bg-gold text-on-gold font-extrabold ring-2 ring-gold' : '',
           ].filter(Boolean).join(' '),
         },
         part,
@@ -338,7 +337,7 @@ export function AudioDramaPlayer({
     try {
       setError('');
       setPronunciationPlaying(true);
-      const playback = speakWithVoice(text, {
+      const playback = speakNaturalSpeech(text, {
         lang: 'en-US',
         rate,
         onEnd: () => {
@@ -382,7 +381,7 @@ export function AudioDramaPlayer({
     const spokenText = contextText
       ? `${word}. In this conversation: ${contextText}`
       : word;
-    handleSpeakText(spokenText, 0.78);
+    handleSpeakText(spokenText, 0.82);
   };
 
   const cacheStoryAudioAutomatically = useCallback(async (segments) => {
@@ -493,7 +492,6 @@ export function AudioDramaPlayer({
     pausedRef.current = false;
     setIsPlaying(true);
     setIsPaused(false);
-    setIsFullscreen(true);
 
     controllerRef.current = playDrama(
       lines,
@@ -965,6 +963,9 @@ export function AudioDramaPlayer({
   const offlineAudioNotice = offlineAudioSaving
     ? copy.offlineAudioSaving
     : offlineAudioStatus || (!offlineAudioError && slug ? copy.offlineAudioHint : '');
+  const chunkProgressPct = displayLines.length
+    ? Math.round(((readingChunkIndex + 1) / displayLines.length) * 100)
+    : 0;
 
   useEffect(() => {
     if (!fullScreenReaderOpen || typeof document === 'undefined') return undefined;
@@ -991,15 +992,15 @@ export function AudioDramaPlayer({
       aria-label={copy.title}
       className={
         practiceFullscreen
-          ? 'audio-drama-player speech-practice-fullscreen fixed inset-0 z-[100] overflow-y-auto overscroll-y-contain bg-paper'
+          ? 'audio-drama-player speech-practice-fullscreen fixed inset-0 z-[120] overflow-y-auto overscroll-y-contain bg-paper'
           : isFullscreen
-          ? 'audio-drama-player fixed inset-0 z-[100] overflow-y-auto overscroll-y-contain bg-paper p-4 sm:p-8'
+          ? 'audio-drama-player fixed inset-0 z-[120] overflow-y-auto overscroll-y-contain bg-paper p-4 sm:p-8'
           : 'audio-drama-player w-full'
       }
     >
-      <div className={`audio-drama-player-content ${practiceFullscreen ? 'mx-auto min-h-screen max-w-4xl space-y-4 p-0 sm:p-6' : isFullscreen ? 'mx-auto max-w-4xl space-y-4 p-4 sm:p-8' : 'space-y-3'}`}>
+      <div className={`audio-drama-player-content ${practiceFullscreen ? 'speech-practice-layout mx-auto flex min-h-[100dvh] max-w-4xl flex-col gap-2 p-0 sm:gap-4 sm:p-6' : isFullscreen ? 'mx-auto max-w-4xl space-y-4 p-4 sm:p-8' : 'space-y-3.5'}`}>
         {practiceFullscreen ? (
-          <div className="sticky z-40 flex justify-end bg-paper/95 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:px-6" style={{ top: 0 }}>
+          <div className="speech-practice-exit sticky z-40 flex justify-end bg-paper/95 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:px-6" style={{ top: 0 }}>
             <button
               type="button"
               onClick={() => {
@@ -1013,13 +1014,13 @@ export function AudioDramaPlayer({
           </div>
         ) : null}
         {!practiceFullscreen ? (
-        <div className="audio-drama-toolbar sticky top-2 z-30 grid grid-cols-2 items-center gap-2 rounded-2xl border border-gold/40 bg-paper/95 p-3 shadow-lg lg:flex lg:flex-wrap">
-          <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-auto">
+        <div className="audio-drama-toolbar duo-card grid grid-cols-2 items-center gap-2.5 rounded-2xl border-2 border-gold/40 bg-paper/95 p-3 shadow-lg sm:flex sm:flex-wrap">
+          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-auto">
             <button
               type="button"
               onClick={handlePlayPause}
               disabled={!lines.length}
-              className="primary-button min-h-11 flex-1 bg-sapphire px-3 py-2 text-xs font-extrabold text-on-sapphire sm:flex-none sm:px-4 sm:text-sm"
+              className="primary-button min-h-11 flex-1 bg-sapphire px-3.5 py-2 text-xs font-extrabold text-on-sapphire sm:flex-none sm:px-4 sm:text-sm"
             >
               {isPaused ? copy.resume : isPlaying ? copy.pause : copy.play}
             </button>
@@ -1047,7 +1048,7 @@ export function AudioDramaPlayer({
               value={Math.min(position, displayLines.length)}
               onChange={(event) => handleSeek(event.target.value)}
               aria-label={copy.seek}
-              className="order-last col-span-2 h-3 w-full cursor-pointer accent-gold lg:basis-full"
+              className="order-last col-span-2 h-2.5 w-full cursor-pointer accent-gold sm:basis-full"
             />
           ) : null}
 
@@ -1055,7 +1056,7 @@ export function AudioDramaPlayer({
             <button
               type="button"
               onClick={() => setSelectedWord(null)}
-              className="min-h-11 w-full rounded-xl border border-gold/40 bg-gold/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
+              className="min-h-11 w-full rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-bold text-ink sm:w-auto sm:text-sm"
             >
               ✕ {isBn ? 'অর্থ লুকান' : 'Hide meaning'}
             </button>
@@ -1064,7 +1065,7 @@ export function AudioDramaPlayer({
             <button
               type="button"
               onClick={stopPronunciation}
-              className="min-h-11 w-full rounded-xl border border-rose-500/40 bg-rose-500/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
+              className="min-h-11 w-full rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs font-bold text-ink sm:w-auto sm:text-sm"
             >
               ■ {copy.stopExample}
             </button>
@@ -1072,7 +1073,7 @@ export function AudioDramaPlayer({
           <button
             type="button"
             onClick={() => setChunkMode((prev) => !prev)}
-            className="min-h-11 w-full rounded-xl border border-sapphire/40 bg-sapphire/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
+            className="min-h-11 w-full rounded-xl border border-sapphire/40 bg-sapphire/10 px-3 py-2 text-xs font-bold text-ink sm:w-auto sm:text-sm"
           >
             {chunkMode
               ? (isBn ? '📄 পুরো গল্প দেখুন' : '📄 Show full story')
@@ -1093,7 +1094,7 @@ export function AudioDramaPlayer({
                 }
               }}
               aria-expanded={speechPracticeOpen}
-              className="min-h-11 w-full rounded-xl border border-gold/40 bg-gold/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
+              className="min-h-11 w-full rounded-xl border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-bold text-ink sm:w-auto sm:text-sm"
             >
               {speechPracticeOpen ? copy.closePractice : copy.practice}
             </button>
@@ -1104,17 +1105,17 @@ export function AudioDramaPlayer({
         {speechPracticeOpen ? (
           <section
             aria-label={copy.practiceTitle}
-            className={`relative isolate mx-auto w-full max-w-3xl space-y-5 overflow-hidden rounded-[1.75rem] border border-gold/35 bg-gradient-to-br from-sapphire/15 via-paper to-gold/15 p-5 shadow-xl sm:p-8${practiceFullscreen ? ' min-h-[100dvh] max-w-4xl rounded-none border-0 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:min-h-[calc(100dvh-3rem)] sm:rounded-[1.75rem]' : ''}`}
+            className={`speech-practice-panel relative isolate mx-auto flex w-full max-w-3xl flex-1 flex-col space-y-3 overflow-hidden rounded-[1.75rem] border-2 border-gold/35 bg-gradient-to-br from-sapphire/15 via-paper to-gold/15 p-3 shadow-xl sm:space-y-5 sm:p-8${practiceFullscreen ? ' max-w-4xl rounded-none border-0 pt-3 sm:rounded-[1.75rem]' : ''}`}
           >
             <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 -z-10 size-40 rounded-full bg-gold/15 blur-3xl" />
-            <div className="flex items-start gap-4">
+            <div className="speech-practice-heading flex items-start gap-3.5">
               <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl border border-gold/30 bg-gold/15 text-2xl sm:size-14 sm:text-3xl">🎙️</span>
               <div className="min-w-0 flex-1">
-                <span className="inline-flex rounded-full border border-sapphire/25 bg-sapphire/10 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-ink">
+                <span className="inline-flex rounded-full border border-sapphire/25 bg-sapphire/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.12em] text-ink">
                   {isBn ? 'শুনুন · বলুন · শিখুন' : 'Listen · Speak · Grow'}
                 </span>
-                <h2 className="mt-3 text-xl font-black leading-snug tracking-tight text-ink sm:text-2xl">{copy.practiceTitle}</h2>
-                <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink/85 sm:text-base">{copy.practiceHelp}</p>
+                <h2 className="speech-practice-title mt-2 text-lg font-black leading-snug tracking-tight text-ink sm:text-2xl">{copy.practiceTitle}</h2>
+                <p className="speech-practice-help mt-1.5 max-w-prose text-sm leading-relaxed text-ink/85 sm:text-base">{copy.practiceHelp}</p>
               </div>
             </div>
             {speechPractice.status === 'complete' ? (
@@ -1127,7 +1128,7 @@ export function AudioDramaPlayer({
                 🎉 {practiceFeedback}
               </p>
             ) : null}
-            {speechPractice.status !== 'complete' ? <div className="space-y-5">
+            {speechPractice.status !== 'complete' ? <div className="speech-practice-step space-y-3 sm:space-y-5">
               {practiceLines.slice(activePracticeLineIndex, activePracticeLineIndex + 1).map((line, visiblePracticeIndex) => {
                 const lineIndex = activePracticeLineIndex + visiblePracticeIndex;
                 const isCurrentPractice = speechPractice.lineIndex === lineIndex;
@@ -1150,18 +1151,18 @@ export function AudioDramaPlayer({
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={progress}
-                        className="h-2.5 overflow-hidden rounded-full bg-ink/15"
+                        className="duo-progress-track h-3 overflow-hidden rounded-full bg-ink/15"
                       >
-                        <div className="h-full rounded-full bg-sapphire transition-[width] duration-300" style={{ width: `${progress}%` }} />
+                        <div className="duo-progress-fill h-full rounded-full bg-sapphire transition-[width] duration-300" style={{ width: `${progress}%` }} />
                       </div>
                     </div>
                     <article
-                    className={`relative space-y-5 rounded-3xl border p-5 shadow-sm transition-colors duration-300 sm:p-7 ${
+                    className={`speech-practice-card duo-card relative space-y-3 rounded-3xl border-2 p-3 shadow-sm transition-colors duration-300 sm:space-y-5 sm:p-7 ${
                       isListening
                         ? 'border-sapphire/60 bg-sapphire/10 shadow-lg shadow-sapphire/10'
                         : hasResult
                           ? 'border-emerald-500/35 bg-emerald-500/5'
-                          : 'border-gold/20 bg-paper/75'
+                          : 'border-gold/25 bg-paper/85'
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1179,7 +1180,7 @@ export function AudioDramaPlayer({
                         <span className="text-sm font-semibold text-ink/85">{copy.attemptCount(attempts, MAX_SPEECH_PRACTICE_ATTEMPTS)}</span>
                       </div>
                     </div>
-                    <p className="max-w-[46ch] text-xl font-bold leading-[1.8] text-ink sm:text-2xl">
+                    <p className="speech-practice-sentence max-w-[46ch] text-lg font-bold leading-relaxed text-ink sm:text-2xl sm:leading-[1.85]">
                       {spokenTextParts(
                         line.text,
                         0,
@@ -1191,37 +1192,38 @@ export function AudioDramaPlayer({
                         copy.pronunciationLabel,
                       )}
                     </p>
-                    <div className="flex flex-col gap-3 sm:flex-row">
+                    <div className="flex items-center justify-center gap-2 sm:justify-start sm:gap-2.5">
                       <button
                         type="button"
                         onClick={() => {
                           if (pronunciationPlaying) stopPronunciation();
                           else handleSpeakText(line.text);
                         }}
+                        aria-label={pronunciationPlaying ? copy.stopExample : copy.listenExample}
                         aria-pressed={pronunciationPlaying}
-                        className="secondary-button min-h-12 w-full px-5 py-3 text-sm font-extrabold sm:w-auto"
+                        className="secondary-button grid size-12 min-h-12 shrink-0 place-items-center p-0 text-xl"
                       >
-                        {pronunciationPlaying ? '■' : '🔊'} {pronunciationPlaying ? copy.stopExample : copy.listenExample}
+                        <span aria-hidden="true">{pronunciationPlaying ? '■' : '🔊'}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => { void practiceLine(lineIndex); }}
+                        aria-label={
+                          isListening
+                            ? copy.stopSpeaking
+                            : isCurrentPractice && speechPractice.status === 'result'
+                              ? attemptsExhausted ? copy.attemptsLimit : copy.retrySpeaking
+                              : attemptsExhausted ? copy.attemptsLimit : copy.speakLine
+                        }
                         aria-pressed={isListening}
                         disabled={attemptsExhausted && !isListening}
-                        className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-extrabold shadow-md transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${
+                        className={`inline-flex size-12 min-h-12 shrink-0 items-center justify-center rounded-xl text-xl shadow-md transition hover:shadow-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-not-allowed disabled:opacity-60 ${
                           isListening
                             ? 'bg-red-600 text-white shadow-red-600/20'
                             : 'bg-gradient-to-r from-sapphire-deep to-sapphire text-white shadow-sapphire/20'
                         }`}
                       >
-                        <span aria-hidden="true" className="text-base">
-                          {isListening ? '■' : isCurrentPractice && speechPractice.status === 'result' ? '↻' : '🎤'}
-                        </span>
-                        {isListening
-                          ? copy.stopSpeaking
-                          : isCurrentPractice && speechPractice.status === 'result'
-                            ? attemptsExhausted ? copy.attemptsLimit : copy.retrySpeaking
-                            : attemptsExhausted ? copy.attemptsLimit : copy.speakLine}
+                        <span aria-hidden="true">{isListening ? '■' : '🎤'}</span>
                       </button>
                     </div>
                     {isListening ? (
@@ -1268,7 +1270,7 @@ export function AudioDramaPlayer({
                           <span className="font-semibold text-ink">✓ {copy.matchedWord}</span>
                           <span className="font-semibold text-ink">✕ {copy.missedWord}</span>
                         </p>
-                        <div className="flex flex-col gap-3 sm:flex-row">
+                        <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-3">
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex, true)}
@@ -1279,7 +1281,7 @@ export function AudioDramaPlayer({
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex)}
-                            className="secondary-button min-h-12 w-full px-5 py-3 text-sm font-bold sm:w-auto"
+                            className="min-h-0 rounded-lg px-2 py-1 text-xs font-semibold text-ink/70 underline-offset-4 hover:text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
                           >
                             {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
                           </button>
@@ -1291,7 +1293,7 @@ export function AudioDramaPlayer({
                         type="button"
                         onClick={() => advancePracticeLine(lineIndex)}
                         disabled={isListening}
-                        className="secondary-button min-h-12 w-full px-5 py-3 text-sm font-bold sm:w-auto"
+                        className="mx-auto block min-h-0 rounded-lg px-2 py-1 text-xs font-semibold text-ink/70 underline-offset-4 hover:text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
                       </button>
@@ -1302,7 +1304,7 @@ export function AudioDramaPlayer({
               })}
             </div> : null}
             {microphoneConsentLine !== null ? (
-              <div className="fixed inset-0 z-[120] grid place-items-center bg-black/65 p-4" role="presentation">
+              <div className="fixed inset-0 z-[130] grid place-items-center bg-black/65 p-4" role="presentation">
                 <div role="dialog" aria-modal="true" aria-labelledby="microphone-permission-title" className="w-full max-w-md space-y-4 rounded-2xl border border-gold/40 bg-paper p-5 text-ink shadow-2xl">
                   <h4 id="microphone-permission-title" className="text-lg font-extrabold">{copy.microphonePermissionTitle}</h4>
                   <p className="text-sm leading-relaxed">{copy.microphonePermissionHelp}</p>
@@ -1332,6 +1334,15 @@ export function AudioDramaPlayer({
           </div>
         ) : null}
 
+        {!practiceFullscreen && chunkMode && displayLines.length > 1 ? (
+          <div className="duo-progress-track h-2.5 w-full overflow-hidden rounded-full bg-ink/15">
+            <div
+              className="duo-progress-fill h-full rounded-full bg-gradient-to-r from-sapphire-deep via-sapphire to-gold transition-[width] duration-300"
+              style={{ width: `${chunkProgressPct}%` }}
+            />
+          </div>
+        ) : null}
+
         {!practiceFullscreen ? <div
           role="list"
           aria-label={copy.story}
@@ -1351,27 +1362,27 @@ export function AudioDramaPlayer({
                 role="listitem"
                 aria-current={isCurrentLine ? 'step' : undefined}
                 aria-label={`${line.character}: ${line.text}`}
-                className={`flex items-start gap-3 rounded-2xl border p-3.5 transition-colors duration-200 ${
+                className={`duo-dialogue-bubble flex items-start gap-3.5 rounded-2xl border-2 p-4 transition-all duration-200 sm:p-5 ${
                   isCurrentLine
-                    ? 'border-sapphire bg-sapphire/15 ring-2 ring-sapphire'
+                    ? 'border-sapphire bg-sapphire/15 ring-2 ring-sapphire shadow-md'
                     : isCompletedLine
-                      ? 'border-gold/25 bg-sapphire-deep/20'
-                      : 'border-gold/20 bg-paper/75'
+                      ? 'border-gold/30 bg-sapphire-deep/20'
+                      : 'border-gold/25 bg-paper/85 shadow-sm'
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-lg ${
+                  className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-xl shadow-sm ${
                     isCurrentLine
                       ? 'bg-sapphire text-on-sapphire'
-                      : 'bg-paper border border-gold/30'
+                      : 'bg-paper border-2 border-gold/35'
                   }`}
                 >
                   {characterIcon(line.role)}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-gold-soft">{line.character}</p>
-                  <p className="mt-1 text-base leading-relaxed">
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-gold-soft">{line.character}</p>
+                  <p className="mt-1.5 text-base font-medium leading-loose sm:text-lg">
                     {spokenTextParts(
                       line.text,
                       0,
@@ -1392,23 +1403,23 @@ export function AudioDramaPlayer({
         </div> : null}
 
         {!practiceFullscreen && chunkMode && displayLines.length > 1 ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-gold/20 bg-paper/60 px-3 py-2">
+          <div className="duo-card flex items-center justify-between gap-2 rounded-2xl border-2 border-gold/25 bg-paper/80 px-3 py-2.5">
             <button
               type="button"
               disabled={readingChunkIndex === 0 || isPlaying}
               onClick={() => setReadingChunkIndex((current) => Math.max(0, current - 1))}
-              className="min-h-10 rounded-lg border border-sapphire/25 bg-sapphire/10 px-3 py-2 text-xs font-bold text-sapphire transition hover:bg-sapphire/20 disabled:cursor-not-allowed disabled:opacity-40"
+              className="secondary-button min-h-11 rounded-xl px-3.5 py-2 text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
             >
               {copy.previousChunk}
             </button>
-            <span className="text-xs font-bold text-ink/65">
+            <span className="rounded-full bg-gold/15 px-3 py-1 text-xs font-extrabold text-gold-soft">
               {copy.chunkProgress(readingChunkIndex + 1, displayLines.length)}
             </span>
             <button
               type="button"
               disabled={readingChunkIndex >= displayLines.length - 1 || isPlaying}
               onClick={() => setReadingChunkIndex((current) => Math.min(displayLines.length - 1, current + 1))}
-              className="min-h-10 rounded-lg border border-sapphire/25 bg-sapphire/10 px-3 py-2 text-xs font-bold text-sapphire transition hover:bg-sapphire/20 disabled:cursor-not-allowed disabled:opacity-40"
+              className="primary-button min-h-11 rounded-xl bg-sapphire px-3.5 py-2 text-xs font-extrabold text-on-sapphire transition disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
             >
               {copy.nextChunk}
             </button>

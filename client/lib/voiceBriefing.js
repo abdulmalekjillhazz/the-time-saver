@@ -1,4 +1,5 @@
 import { claimAudioPlayback } from './audioPlayback.js';
+import { apiRequestAudio } from './apiClient.js';
 
 function getTimeZoneParts(date, timeZone) {
   try {
@@ -125,15 +126,12 @@ export function buildVoiceBriefing({
   return { greeting, name: displayName, period, text, lang: isBn ? 'bn' : 'en' };
 }
 
-// The title of the next unfinished routine at or after this hour, if any.
 export function getNextRoutineTitle(routines, hour) {
   const routine = nextRoutine(routines, hour);
   const title = typeof routine?.title === 'string' ? routine.title.trim() : '';
   return title || '';
 }
 
-// Spoken alarm call-out: the alarm name plus the next routine, so the user
-// hears what the alarm is for and what comes next in their schedule.
 export function buildAlarmAnnouncement({ alarmName = '', lang = 'en', nextRoutineTitle = '' } = {}) {
   const name = String(alarmName || '').trim();
   const routine = String(nextRoutineTitle || '').trim();
@@ -147,8 +145,6 @@ export function buildAlarmAnnouncement({ alarmName = '', lang = 'en', nextRoutin
   return { lang: 'en', text };
 }
 
-// Catch-up summary spoken when the app reopens after alarms rang while away
-// (closed-app push/Telegram delivered them; now the voice fills in).
 export function buildMissedAnnouncement({ names = [], lang = 'en' } = {}) {
   const list = names.map((name) => String(name || '').trim()).filter(Boolean);
   if (lang === 'bn') {
@@ -163,9 +159,6 @@ export function buildMissedAnnouncement({ names = [], lang = 'en' } = {}) {
   return { lang: 'en', text };
 }
 
-// Picks the best browser voice: a Google voice in the requested language
-// first (Chrome and Android ship Google voices, including Google বাংলা),
-// then a local voice in that language, then any voice in that language.
 export function pickSpeechVoice(voices, lang = 'en-US') {
   const list = Array.isArray(voices) ? voices : [];
   const prefix = String(lang || 'en').split('-')[0].toLowerCase();
@@ -228,6 +221,123 @@ export function speakWithVoice(text, { lang = 'en-US', rate = 0.96, onEnd, onErr
     stop,
     close: stop,
   };
+}
+
+const pronounceAudioCache = new Map();
+
+export function speakNaturalSpeech(
+  text,
+  { lang = 'en-US', rate = 0.88, speaker = 'storyteller', onEnd, onStop, onError, errorMessage } = {}
+) {
+  const normalizedLang = String(lang).toLowerCase().startsWith('bn') ? 'bn' : 'en';
+  const cacheKey = `${normalizedLang}:${speaker}:${text}`;
+  const isOnline = globalThis.navigator?.onLine !== false;
+  const hasAudioElement = typeof globalThis.Audio === 'function' && typeof globalThis.URL?.createObjectURL === 'function';
+
+  if (isOnline && hasAudioElement) {
+    const requestController = new AbortController();
+    let audio = null;
+    let objectUrl = null;
+    let stopped = false;
+    let releasePlayback = () => {};
+
+    const cleanup = () => {
+      if (audio) {
+        audio.pause();
+        audio.onended = null;
+        audio.onerror = null;
+        audio.removeAttribute?.('src');
+        audio = null;
+      }
+      if (objectUrl) {
+        globalThis.URL?.revokeObjectURL?.(objectUrl);
+        objectUrl = null;
+      }
+      releasePlayback();
+      releasePlayback = () => {};
+    };
+
+    const stop = () => {
+      if (stopped) return;
+      stopped = true;
+      requestController.abort();
+      cleanup();
+      onStop?.();
+    };
+
+    globalThis.window?.speechSynthesis?.cancel();
+    releasePlayback = claimAudioPlayback(stop);
+
+    const playBlob = async (blob) => {
+      if (stopped) return;
+      objectUrl = globalThis.URL.createObjectURL(blob);
+      audio = new globalThis.Audio(objectUrl);
+      audio.playbackRate = Math.max(0.7, Math.min(1.2, rate || 1));
+      audio.onended = () => {
+        if (stopped) return;
+        stopped = true;
+        cleanup();
+        onEnd?.();
+      };
+      audio.onerror = () => {
+        if (stopped) return;
+        cleanup();
+        try {
+          speakWithVoice(text, { lang, rate, onEnd, onStop, onError, errorMessage });
+        } catch (fallbackErr) {
+          onError?.(fallbackErr);
+        }
+      };
+      try {
+        await audio.play();
+      } catch {
+        if (stopped) return;
+        cleanup();
+        try {
+          speakWithVoice(text, { lang, rate, onEnd, onStop, onError, errorMessage });
+        } catch (fallbackErr) {
+          onError?.(fallbackErr);
+        }
+      }
+    };
+
+    if (pronounceAudioCache.has(cacheKey)) {
+      void playBlob(pronounceAudioCache.get(cacheKey));
+    } else {
+      void apiRequestAudio('/api/speech/pronounce', {
+        body: { text, lang: normalizedLang, speaker },
+        locale: normalizedLang,
+        signal: requestController.signal,
+      })
+        .then((buf) => {
+          if (stopped) return;
+          const blob = new Blob([buf], { type: 'audio/mpeg' });
+          pronounceAudioCache.set(cacheKey, blob);
+          if (pronounceAudioCache.size > 150) {
+            pronounceAudioCache.delete(pronounceAudioCache.keys().next().value);
+          }
+          void playBlob(blob);
+        })
+        .catch(() => {
+          if (stopped) return;
+          cleanup();
+          try {
+            speakWithVoice(text, { lang, rate, onEnd, onStop, onError, errorMessage });
+          } catch (fallbackErr) {
+            onError?.(fallbackErr);
+          }
+        });
+    }
+
+    return {
+      pause: () => audio?.pause(),
+      resume: () => { void audio?.play(); },
+      stop,
+      close: stop,
+    };
+  }
+
+  return speakWithVoice(text, { lang, rate, onEnd, onStop, onError, errorMessage });
 }
 
 export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, onError } = {}) {
@@ -404,4 +514,3 @@ export function buildDetailedRoutineBriefing({
   }
   return { ...base, text: parts.join(' ') };
 }
-import { apiRequestAudio } from './apiClient.js';

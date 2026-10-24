@@ -22,14 +22,20 @@ test.describe('mobile header and home page at 360px', () => {
   });
 
   test('audio drama practice is readable and accessible on a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
     await page.goto('/en/lessons/the-energy-drip-discovery');
     await page.getByRole('button', { name: '🎙 Practice pronunciation' }).click();
 
     const practice = page.getByRole('region', { name: 'Practice speaking story lines' });
+    await practice.scrollIntoViewIfNeeded();
+    await expect(practice.getByRole('heading', { name: 'Practice speaking story lines' })).toBeInViewport();
+    await expect(practice.getByText('Listen to the example, then say the sentence. You will see which words matched.')).toBeInViewport();
     await expect(practice.getByRole('progressbar', { name: 'Practice progress' })).toBeVisible();
     await expect(practice.getByText('Sentence 1', { exact: true })).toBeVisible();
     await expect(practice.getByText('0 of 3 tries')).toBeVisible();
-    await expect(practice.getByRole('button', { name: '🔊 Listen to example' })).toBeVisible();
+    const listenButton = practice.getByRole('button', { name: 'Listen to example' });
+    await expect(listenButton).toBeVisible();
+    await expect(listenButton).toHaveText('🔊');
 
     const sentence = practice.locator('article > p').first();
     const fontSize = Number.parseFloat(
@@ -37,9 +43,15 @@ test.describe('mobile header and home page at 360px', () => {
     );
     expect(fontSize).toBeGreaterThanOrEqual(20);
 
-    const readButton = practice.getByRole('button', { name: 'Read and check' });
-    const buttonBox = await readButton.boundingBox();
+    const microphoneButton = practice.getByRole('button', { name: 'Read and check' });
+    await expect(microphoneButton).toHaveText('🎤');
+    const buttonBox = await microphoneButton.boundingBox();
     expect(buttonBox.height).toBeGreaterThanOrEqual(48);
+    expect(buttonBox.width).toBeGreaterThanOrEqual(48);
+    const skipButton = practice.getByRole('button', { name: 'Skip to next sentence' });
+    await expect(skipButton).toBeInViewport();
+    expect(Number.parseFloat(await skipButton.evaluate((element) => element.ownerDocument.defaultView.getComputedStyle(element).fontSize))).toBeLessThanOrEqual(12);
+    expect((await practice.boundingBox()).height).toBeLessThanOrEqual(640);
 
     const results = await new AxeBuilder({ page }).include('section[aria-label="Practice speaking story lines"]').analyze();
     expect(results.violations).toEqual([]);

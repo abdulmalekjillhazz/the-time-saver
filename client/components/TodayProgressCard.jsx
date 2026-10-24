@@ -6,6 +6,16 @@ import { Button } from './ui/Button.jsx';
 import { toBanglaNumber } from '../lib/prayerAnchors.js';
 import { apiRequest } from '../lib/apiClient.js';
 
+const STREAK_POINTS = [
+  [18, 38],
+  [58, 18],
+  [99, 46],
+  [142, 22],
+  [184, 47],
+  [226, 16],
+  [270, 38],
+];
+
 export function TodayProgressCard({
   lang = 'bn',
   userId,
@@ -63,6 +73,7 @@ export function TodayProgressCard({
   const total = routines.length;
   const completed = routines.filter((r) => r.completionStatus === 'done').length;
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const litStreakDays = Math.min(learningStreak?.current ?? 0, STREAK_POINTS.length);
 
   const encouragement = (() => {
     if (total === 0) {
@@ -95,7 +106,7 @@ export function TodayProgressCard({
   };
 
   return (
-    <Card className="surface-card glass-panel glow-border space-y-3 border border-sapphire/30 p-4">
+    <Card className="today-progress-hero surface-card glass-panel glow-border space-y-3 border border-sapphire/30 p-4">
       {!isOnline && (
         <div
           role="status"
@@ -110,10 +121,59 @@ export function TodayProgressCard({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="streak-ledger">
+        <h2 className="text-base font-bold text-ink sm:text-lg">
+          {isBn ? 'আজকের ধারা' : 'Today’s constellation'}
+        </h2>
+        <svg
+          className="streak-constellation"
+          viewBox="0 0 288 64"
+          role="img"
+          aria-label={isBn ? 'শেখার ধারাবাহিকতার নক্ষত্রমণ্ডল' : 'Learning streak constellation'}
+        >
+          {STREAK_POINTS.slice(0, -1).map(([x1, y1], index) => {
+            const [x2, y2] = STREAK_POINTS[index + 1];
+            return (
+              <line
+                key={`link-${index}`}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                className={`constellation-link ${index < litStreakDays - 1 ? 'is-lit' : ''}`}
+              />
+            );
+          })}
+          {STREAK_POINTS.map(([cx, cy], index) => (
+            <circle
+              key={`day-${index}`}
+              cx={cx}
+              cy={cy}
+              r={index === litStreakDays - 1 && litStreakDays > 0 ? 5 : 3.5}
+              className={`constellation-node ${index < litStreakDays ? 'is-lit' : ''}`}
+              style={{ '--node-delay': `${index * 85}ms` }}
+            />
+          ))}
+        </svg>
+        <p className="streak-count" aria-live="polite">
+          <strong>{learningStreak ? (isBn ? toBanglaNumber(learningStreak.current) : learningStreak.current) : '—'}</strong>
+          <span>{isBn ? 'দিনের শেখার ধারা' : 'day learning streak'}</span>
+        </p>
+        <p className="streak-best">
+          {learningStreakError
+            ? learningStreakError
+            : learningStreak
+              ? isBn
+                ? `সর্বোচ্চ ${toBanglaNumber(learningStreak.longest)} দিন`
+                : `Best: ${learningStreak.longest} days`
+              : isBn ? 'শেখার ধারা লোড হচ্ছে…' : 'Loading learning streak…'}
+        </p>
+      </div>
+
+      <div className="streak-actions">
         <div>
-          <h2 className="text-base font-bold text-ink sm:text-lg">
-            {isBn ? 'আজকের অগ্রগতি' : 'Today’s Momentum'}
+          <h2 className="text-sm font-semibold text-ink/80">
+            {isBn ? 'আজকের অগ্রগতি' : 'Today’s momentum'}
           </h2>
           <p className="text-xs font-medium text-ink/75 sm:text-sm">
             {encouragement}
@@ -144,56 +204,37 @@ export function TodayProgressCard({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-sapphire/20 bg-paper/60 px-3 py-2 text-sm">
-        <span aria-hidden="true">{learningStreakError ? '⚠️' : '🔥'}</span>
-        <span className="font-semibold">
-          {learningStreakError || (learningStreak
-            ? isBn
-              ? `শেখার স্ট্রিক: ${toBanglaNumber(learningStreak.current)} দিন`
-              : `Learning streak: ${learningStreak.current} days`
-            : isBn ? 'শেখার স্ট্রিক লোড হচ্ছে…' : 'Loading learning streak…')}
-        </span>
-        {learningStreak ? (
-          <span className="text-xs opacity-70">
-            {learningStreak.current > 0
-              ? isBn
-                ? `সর্বোচ্চ ${toBanglaNumber(learningStreak.longest)} দিন · প্রতিদিন গল্প শেষ করুন বা কুইজ জমা দিন`
-                : `Best: ${learningStreak.longest} days · Finish a story or submit a quiz each day`
-              : isBn
-                ? 'গল্প শেষ করুন বা কুইজ জমা দিন; একদিন বাদ গেলে নতুন করে শুরু হবে'
-                : 'Finish a story or submit a quiz; missing a day restarts the streak'}
-          </span>
+      <div className="routine-constellation-summary">
+        {total > 0 ? (
+          <div className="routine-constellation" role="img" aria-label={isBn
+            ? `${toBanglaNumber(completed)} টি রুটিন সম্পন্ন, ${toBanglaNumber(total - completed)} টি বাকি`
+            : `${completed} routines complete, ${total - completed} remaining`}>
+            {routines.map((routine) => (
+              <span
+                key={routine.id}
+                className={`routine-constellation-node ${routine.completionStatus === 'done' ? 'is-lit' : ''}`}
+                aria-hidden="true"
+              />
+            ))}
+          </div>
+        ) : null}
+        <p className="routine-constellation-caption">
+          {isBn
+            ? `সম্পন্ন ${toBanglaNumber(completed)} · বাকি ${toBanglaNumber(total - completed)}`
+            : `${completed} complete · ${total - completed} remaining`}
+        </p>
+        {total > 0 ? (
+          <span
+            className="sr-only"
+            role="progressbar"
+            aria-valuenow={percentage}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={isBn ? 'আজকের রুটিন সম্পন্ন করার অগ্রগতি' : "Today's routine progress"}
+            aria-valuetext={isBn ? `${toBanglaNumber(percentage)}% সম্পন্ন` : `${percentage}% completed`}
+          />
         ) : null}
       </div>
-
-      {total > 0 && (
-        <div className="space-y-1.5 pt-1">
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-paper/60 border border-sapphire/20">
-            <div
-              className="progress-glow h-full rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${percentage}%` }}
-              role="progressbar"
-              aria-valuenow={percentage}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={isBn ? 'আজকের রুটিন সম্পন্ন করার অগ্রগতি' : "Today's routine progress"}
-              aria-valuetext={isBn ? `${toBanglaNumber(percentage)}% সম্পন্ন` : `${percentage}% completed`}
-            />
-          </div>
-          <div className="flex justify-between text-[11px] text-ink/70">
-            <span>
-              {isBn
-                ? `সম্পন্ন: ${toBanglaNumber(completed)} টি`
-                : `Completed: ${completed}`}
-            </span>
-            <span>
-              {isBn
-                ? `বাকি: ${toBanglaNumber(total - completed)} টি`
-                : `Remaining: ${total - completed}`}
-            </span>
-          </div>
-        </div>
-      )}
     </Card>
   );
 }

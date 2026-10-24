@@ -11,7 +11,7 @@ import { dbRequired } from './middleware/dbRequired.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { validate } from './middleware/validate.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
-import { authRouter } from './routes/auth.js';
+import { authRouter, csrfRouter } from './routes/auth.js';
 import { meRouter } from './routes/me.js';
 import { routinesRouter } from './routes/routines.js';
 import { completionsRouter } from './routes/completions.js';
@@ -71,7 +71,7 @@ export function createApp({ config }) {
     cors({
       origin: true,
       credentials: true,
-      allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+      allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'Authorization', 'X-Session-Token'],
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     })
   );
@@ -183,6 +183,8 @@ export function createApp({ config }) {
 
   app.use('/api', csrfProtection(config));
 
+  app.use('/api/auth/csrf', csrfRouter(config));
+
   app.post(
     '/api/word-meanings',
     validate({ body: wordMeaningBatchSchema }),
@@ -263,16 +265,17 @@ export default async function handler(req, res) {
       MONGODB_URI: (process.env.MONGODB_URI || '').trim(),
       CLIENT_ORIGIN: (process.env.CLIENT_ORIGIN || 'https://made-your-dream-bigger.vercel.app').replace(/\/+$/, ''),
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+      GOOGLE_ANDROID_CLIENT_ID: process.env.GOOGLE_ANDROID_CLIENT_ID,
       GEMINI_API_KEY: process.env.GEMINI_API_KEY,
       GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
       GROQ_API_KEY: process.env.GROQ_API_KEY,
       GROQ_MODEL: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
       ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
       ELEVENLABS_MODEL: process.env.ELEVENLABS_MODEL || 'eleven_v3',
-      ELEVENLABS_FATHER_VOICE_ID: process.env.ELEVENLABS_FATHER_VOICE_ID,
-      ELEVENLABS_MOTHER_VOICE_ID: process.env.ELEVENLABS_MOTHER_VOICE_ID,
-      ELEVENLABS_SON_VOICE_ID: process.env.ELEVENLABS_SON_VOICE_ID,
-      ELEVENLABS_STORYTELLER_VOICE_ID: process.env.ELEVENLABS_STORYTELLER_VOICE_ID,
+      ELEVENLABS_FATHER_VOICE_ID: process.env.ELEVENLABS_FATHER_VOICE_ID || 'pNInz6obpgDQGcFmaJgB',
+      ELEVENLABS_MOTHER_VOICE_ID: process.env.ELEVENLABS_MOTHER_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL',
+      ELEVENLABS_SON_VOICE_ID: process.env.ELEVENLABS_SON_VOICE_ID || 'IKne3meq5aSn9XLyUdCD',
+      ELEVENLABS_STORYTELLER_VOICE_ID: process.env.ELEVENLABS_STORYTELLER_VOICE_ID || 'JBFqnCBsd6RMkjVDRZzb',
       CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
       CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
       CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,

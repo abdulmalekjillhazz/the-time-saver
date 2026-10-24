@@ -264,6 +264,8 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
   const lesson = level.lessons.find((item) => item.id === lessonId) || level.lessons[0];
   const correct = selectedAnswer === lesson.answer;
   const isCompleted = completedLessons.includes(lesson.id);
+  const totalLessonCount = GRAMMAR_LEVELS.reduce((sum, l) => sum + l.lessons.length, 0);
+  const overallProgressPct = Math.round((completedLessons.length / totalLessonCount) * 100);
 
   useEffect(() => () => speechRef.current?.stop(), []);
 
@@ -339,22 +341,34 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
 
   return (
     <section className="grammar-lessons-section space-y-4" aria-label={isBn ? 'ইংরেজি Grammar পাঠ' : 'English grammar lessons'}>
-      <Card className="surface-card space-y-5 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/20 via-paper to-gold/10 p-5 shadow-xl sm:p-7">
-        <div className="flex items-start gap-3">
-          <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gold/15 text-3xl shadow-inner">📖</span>
-          <div>
-            <h2 className="text-xl font-black tracking-tight text-ink sm:text-2xl">
-              {isBn ? 'Building — ইংরেজি বাক্য অনুশীলন' : 'Building — English practice'}
-            </h2>
-            <p className="mt-1 text-sm leading-relaxed text-ink/75">
-              {isBn
-                ? 'সহজ নিয়ম শিখুন, ছোট অনুশীলন করুন, আর স্বাভাবিক ইংরেজি কণ্ঠে পাঠ শুনুন।'
-                : 'Learn a clear rule, try a short exercise, and listen to each lesson in a natural English voice.'}
-            </p>
+      <Card className="surface-card duo-card space-y-5 overflow-hidden rounded-3xl border-2 border-gold/30 bg-gradient-to-br from-sapphire-deep/20 via-paper to-gold/10 p-4 shadow-xl sm:p-7">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl border border-gold/35 bg-gold/15 text-3xl shadow-inner">📖</span>
+            <div>
+              <h2 className="text-xl font-black tracking-tight text-ink sm:text-2xl">
+                {isBn ? 'Building — ইংরেজি বাক্য অনুশীলন' : 'Building — English practice'}
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed text-ink/75">
+                {isBn
+                  ? 'সহজ নিয়ম শিখুন, ছোট অনুশীলন করুন, আর স্বাভাবিক ইংরেজি কণ্ঠে পাঠ শুনুন।'
+                  : 'Learn a clear rule, try a short exercise, and listen to each lesson in a natural English voice.'}
+              </p>
+            </div>
           </div>
+          <span className="shrink-0 rounded-full border border-gold/40 bg-gold/15 px-3 py-1 text-xs font-extrabold text-gold-soft">
+            {completedLessons.length}/{totalLessonCount} ★
+          </span>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-3" aria-label={isBn ? 'Grammar-এর স্তর' : 'Grammar levels'}>
+        <div className="duo-progress-track h-2.5 w-full overflow-hidden rounded-full bg-ink/15">
+          <div
+            className="duo-progress-fill h-full rounded-full bg-gradient-to-r from-sapphire-deep via-sapphire to-gold transition-[width] duration-300"
+            style={{ width: `${overallProgressPct}%` }}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2" aria-label={isBn ? 'Grammar-এর স্তর' : 'Grammar levels'}>
           {levels.map((item) => (
             <button
               key={item.id}
@@ -362,14 +376,14 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
               disabled={!item.unlocked}
               aria-pressed={levelId === item.id}
               onClick={() => chooseLevel(item.id)}
-              className={`min-h-12 rounded-xl border px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+              className={`duo-word-chip min-h-12 rounded-2xl border-2 px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-45 ${
                 levelId === item.id
-                  ? 'border-gold bg-gold/15 text-ink shadow-sm'
-                  : 'border-sapphire/20 bg-paper/65 text-ink/75 hover:border-gold/50'
+                  ? 'border-gold bg-gold/20 text-ink shadow-sm'
+                  : 'border-sapphire/25 bg-paper/75 text-ink/75 hover:border-gold/50'
               }`}
             >
-              <span className="block">{item.title[isBn ? 'bn' : 'en']}</span>
-              <span className="mt-1 block text-[10px] font-semibold opacity-65">
+              <span className="block truncate">{item.title[isBn ? 'bn' : 'en']}</span>
+              <span className="mt-0.5 block text-[10px] font-semibold opacity-70">
                 {completedCounts[item.id]}/{item.lessons.length} {isBn ? 'পাঠ শেষ' : 'lessons complete'}
               </span>
             </button>
@@ -383,10 +397,12 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
               type="button"
               aria-pressed={lesson.id === item.id}
               onClick={() => chooseLesson(item)}
-              className={`min-h-10 rounded-full border px-4 py-2 text-xs font-bold ${
+              className={`min-h-10 rounded-full border-2 px-3.5 py-1.5 text-xs font-extrabold transition ${
                 lesson.id === item.id
-                  ? 'border-sapphire bg-sapphire/15 text-ink'
-                  : 'border-sapphire/20 bg-paper/60 text-ink/75'
+                  ? 'border-sapphire bg-sapphire text-on-sapphire shadow-sm'
+                  : completedLessons.includes(item.id)
+                    ? 'border-emerald-500/45 bg-emerald-500/10 text-ink'
+                    : 'border-sapphire/20 bg-paper/65 text-ink/75 hover:border-gold/50'
               }`}
             >
               {index + 1}. {item.title[isBn ? 'bn' : 'en']}
@@ -395,33 +411,42 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
           ))}
         </div>
 
-        <article className="space-y-4 rounded-2xl border border-sapphire/20 bg-paper/70 p-4 sm:p-5">
-          <h3 className="text-lg font-extrabold text-ink">{lesson.title[isBn ? 'bn' : 'en']}</h3>
-          <p className="text-sm leading-relaxed text-ink/80">{lesson.rule[isBn ? 'bn' : 'en']}</p>
-          <p className="rounded-xl border border-gold/25 bg-gold/10 px-4 py-3 text-base font-bold text-ink" lang="en">
-            {lesson.example}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={playLesson} className="min-h-11 rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-4 py-2 text-sm font-extrabold text-white shadow-lg">
-              🔊 {isBn ? 'স্বাভাবিক কণ্ঠে শুনুন' : 'Listen naturally'}
-            </button>
-            {voiceStatus === 'Playing…' || voiceStatus === 'শুনছি…' ? (
-              <button type="button" onClick={stopLesson} className="min-h-11 rounded-xl border border-sapphire/25 bg-paper/70 px-4 py-2 text-sm font-bold text-ink">
-                {isBn ? 'থামান' : 'Stop'}
-              </button>
-            ) : null}
-            {voiceStatus ? <span role="status" className="text-xs font-semibold text-ink/70">{voiceStatus}</span> : null}
+        <article className="duo-card space-y-4 rounded-2xl border-2 border-sapphire/25 bg-paper/85 p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h3 className="text-lg font-extrabold text-ink">{lesson.title[isBn ? 'bn' : 'en']}</h3>
+            <span className="rounded-full bg-sapphire/15 px-2.5 py-0.5 text-xs font-extrabold text-sapphire">
+              {level.title[isBn ? 'bn' : 'en']}
+            </span>
           </div>
+          <p className="text-sm leading-relaxed text-ink/85">{lesson.rule[isBn ? 'bn' : 'en']}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-gold/35 bg-gold/10 px-4 py-3">
+            <p className="text-base font-extrabold text-ink" lang="en">
+              “{lesson.example}”
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={playLesson} className="primary-button min-h-10 rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-3.5 py-2 text-xs font-extrabold text-white shadow-md sm:text-sm">
+                🔊 {isBn ? 'স্বাভাবিক কণ্ঠে শুনুন' : 'Listen naturally'}
+              </button>
+              {voiceStatus === 'Playing…' || voiceStatus === 'শুনছি…' ? (
+                <button type="button" onClick={stopLesson} className="secondary-button min-h-10 rounded-xl px-3.5 py-2 text-xs font-bold text-ink sm:text-sm">
+                  {isBn ? 'থামান' : 'Stop'}
+                </button>
+              ) : null}
+            </div>
+          </div>
+          {voiceStatus ? <span role="status" className="block text-xs font-semibold text-ink/70">{voiceStatus}</span> : null}
 
-          <fieldset className="space-y-2">
+          <fieldset className="space-y-2.5">
             <legend className="text-sm font-extrabold text-ink">{lesson.prompt[isBn ? 'bn' : 'en']}</legend>
             {lesson.choices.map((choice, index) => (
-              <label key={choice} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm ${
-                selectedAnswer === index ? 'border-sapphire bg-sapphire/10' : 'border-sapphire/15 bg-paper/50'
+              <label key={choice} className={`duo-choice-tile flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border-2 px-3.5 py-2.5 text-sm font-semibold transition ${
+                selectedAnswer === index
+                  ? 'border-sapphire bg-sapphire/15 text-ink ring-2 ring-gold/60'
+                  : 'border-sapphire/20 bg-paper/70 text-ink hover:border-sapphire/50'
               }`}>
                 <input
                   type="radio"
+                  className="accent-sapphire"
                   name={`grammar-${lesson.id}`}
                   checked={selectedAnswer === index}
                   onChange={() => {
@@ -429,29 +454,33 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
                     setHasChecked(false);
                   }}
                 />
-                <span lang="en">{choice}</span>
+                <span lang="en" className="flex-1">{choice}</span>
               </label>
             ))}
           </fieldset>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
             <button
               type="button"
               onClick={checkAnswer}
               disabled={selectedAnswer === null || hasChecked || isCompleted}
-              className="min-h-11 rounded-xl border border-gold/40 bg-gold/15 px-5 py-2 text-sm font-extrabold text-ink disabled:cursor-not-allowed disabled:opacity-50"
+              className="primary-button min-h-11 rounded-xl border border-gold/40 bg-sapphire px-5 py-2.5 text-sm font-extrabold text-on-sapphire disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isBn ? 'উত্তর যাচাই' : 'Check answer'}
             </button>
             {selectedAnswer !== null && hasChecked ? (
-              <p role="status" className={`text-sm font-bold ${correct ? 'text-emerald-700' : 'text-rose-700'}`}>
+              <p role="status" className={`rounded-xl border px-3.5 py-2 text-sm font-extrabold ${
+                correct
+                  ? 'border-emerald-500/40 bg-emerald-500/15 text-ink'
+                  : 'border-rose-500/40 bg-rose-500/15 text-ink'
+              }`}>
                 {correct
-                  ? (isBn ? `ঠিক উত্তর! ${lesson.feedback.bn}` : `That's right! ${lesson.feedback.en}`)
-                  : (isBn ? 'আবার চেষ্টা করুন। নিয়মটি মনে করুন।' : 'Not quite. Think about the rule and try again.')}
+                  ? (isBn ? `✓ ঠিক উত্তর! ${lesson.feedback.bn}` : `✓ That's right! ${lesson.feedback.en}`)
+                  : (isBn ? '✗ আবার চেষ্টা করুন। নিয়মটি মনে করুন।' : '✗ Not quite. Think about the rule and try again.')}
               </p>
             ) : null}
             {isCompleted ? (
-              <button type="button" onClick={nextLesson} className="min-h-11 rounded-xl bg-sapphire px-4 py-2 text-sm font-extrabold text-white">
+              <button type="button" onClick={nextLesson} className="secondary-button min-h-11 rounded-xl px-4 py-2.5 text-sm font-extrabold text-ink">
                 {isBn ? 'পরের পাঠ →' : 'Next lesson →'}
               </button>
             ) : null}
@@ -459,9 +488,9 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
         </article>
       </Card>
 
-      <details className="group">
-        <summary className="cursor-pointer rounded-2xl border border-gold/25 bg-paper/80 px-4 py-3 font-extrabold text-ink shadow-sm">
-          {isBn
+      <details className="group" open>
+        <summary className="duo-card cursor-pointer rounded-2xl border-2 border-gold/30 bg-paper/90 px-4 py-3.5 font-extrabold text-ink shadow-sm">
+          🧩 {isBn
             ? 'গল্প থেকে বাক্য সাজানোর অনুশীলন · ১০টি বাক্যে ৩০ পয়েন্ট'
             : 'Practice building sentences from stories · earn 30 points at 10'}
         </summary>
