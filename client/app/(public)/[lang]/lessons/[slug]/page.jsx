@@ -10,10 +10,14 @@ import { PageHero } from '../../../../../components/PageHero.jsx';
 
 export const revalidate = 300;
 
-// Pre-build the published lessons when the API is reachable. Otherwise pages are built on first request.
+// Static Android export needs at least one slug when the lessons API is unavailable.
 export async function generateStaticParams() {
   const result = await getLessons();
-  if (!result.ok) return [];
+  if (!result.ok || result.lessons.length === 0) {
+    return process.env.CAPACITOR_BUNDLE === '1'
+      ? [{ lang: 'bn', slug: 'android-build-placeholder' }, { lang: 'en', slug: 'android-build-placeholder' }]
+      : [];
+  }
   return result.lessons.flatMap((l) => [{ lang: 'bn', slug: l.slug }, { lang: 'en', slug: l.slug }]);
 }
 
