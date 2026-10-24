@@ -11,12 +11,14 @@ import {
   generateAndUploadLessonAudio,
   generateAndUploadAudioDrama,
   generateElevenLabsAudio,
+  generateElevenLabsAudioWithTimestamps,
   generateNarrationAudio,
   hasCompleteNarrationVoiceConfig,
   parseNarrationSegments,
   resolveNarrationVoice,
 } from '../../src/services/elevenLabs.js';
 import { hasCompleteStoryScript } from '../../src/services/geminiLessons.js';
+import { parseStoryNarration } from '@smart-routine/shared';
 
 const config = {
   ELEVENLABS_API_KEY: 'test-elevenlabs-key',
@@ -99,6 +101,33 @@ describe('ElevenLabs provider errors', () => {
 });
 
 describe('Daily lesson narration', () => {
+  it('requests real character timings from the ElevenLabs timestamp endpoint', async () => {
+    const providerRequest = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        audio_base64: Buffer.from([1, 2, 3]).toString('base64'),
+        alignment: {
+          characters: ['H', 'i', ' ', 't', 'h', 'e', 'r', 'e', '.'],
+          character_start_times_seconds: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+          character_end_times_seconds: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+        },
+      }),
+    }));
+    vi.stubGlobal('fetch', providerRequest);
+
+    const result = await generateElevenLabsAudioWithTimestamps({
+      text: 'Hi there.',
+      speaker: 'storyteller',
+      config,
+    });
+
+    expect(providerRequest.mock.calls[0][0]).toContain('/text-to-speech/storyteller-voice/with-timestamps?output_format=mp3_44100_128');
+    expect(providerRequest.mock.calls[0][1].headers.Accept).toBe('application/json');
+    expect(JSON.parse(providerRequest.mock.calls[0][1].body)).not.toHaveProperty('output_format');
+    expect(result.audioBuffer).toEqual(Buffer.from([1, 2, 3]));
+    expect(result.alignment.characters).toHaveLength(9);
+  });
+
   it('parses family speakers into ordered narration segments', () => {
     expect(parseNarrationSegments([
       '[Rahim - Father]: First line.',
@@ -111,6 +140,23 @@ describe('Daily lesson narration', () => {
       { speaker: 'son', text: 'Third line.' },
       { speaker: 'storyteller', text: 'Closing line.' },
     ]);
+  });
+
+  it('uses the same text segments for the screen and generated audio', () => {
+    const content = [
+      '[Scene]: The door opens.',
+      '[Mina - Adult Female]: I found the key.',
+      '[Tariq - Adult Male]: It was under the book.',
+    ].join('\n');
+
+    expect(parseNarrationSegments(content).map(({ speaker, text }) => ({ speaker, text }))).toEqual(
+      parseStoryNarration(content).map(({ speaker, text }) => ({ speaker, text })),
+    );
+  });
+
+  it('does not add audio-only framing to untagged stories', () => {
+    expect(parseNarrationSegments('A plain story line.').map(({ text }) => text))
+      .toEqual(['A plain story line.']);
   });
 
   it('routes storyteller and Bengali storyteller tags to the dedicated voice', () => {
@@ -271,20 +317,42 @@ describe('Daily lesson narration', () => {
     expect(providerRequest).not.toHaveBeenCalled();
   });
 
-  it('generates, saves, and reuses one Cloudinary audio file per story', async () => {
+  it('generates timestamped sentence clips and a reusable Cloudinary manifest', async () => {
     configureCloudinary(config);
     const assets = new Map();
-    const uploadBuffer = vi.fn(async ({ buffer, publicId, folder }) => {
-      const asset = { secure_url: `https://media.example/${publicId}.mp3`, bytes: buffer.length };
+    const uploadBuffer = vi.fn(async ({ buffer, publicId, folder, resourceType, format }) => {
+      const asset = {
+        secure_url: `https://media.example/${publicId}.${format}`,
+        bytes: buffer.length,
+        buffer,
+      };
       assets.set(`${folder}/${publicId}`, asset);
       return asset;
     });
     const resourceInfo = vi.fn(async (publicId) => assets.get(publicId) || null);
     setCloudinaryClient({ resourceInfo, uploadBuffer });
-    const providerRequest = vi.fn(async () => ({
-      ok: true,
-      arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
-    }));
+    const providerRequest = vi.fn(async (url, options = {}) => {
+      if (url.startsWith('https://media.example/')) {
+        const publicId = url.split('/').at(-1).replace(/\.json$/, '');
+        return {
+          ok: true,
+          json: async () => JSON.parse(assets.get(`smart-routine/audio-dramas/${publicId}`).buffer.toString()),
+        };
+      }
+      const text = JSON.parse(options.body).text;
+      const characters = [...text];
+      return {
+        ok: true,
+        json: async () => ({
+          audio_base64: Buffer.from([1, 2, 3]).toString('base64'),
+          alignment: {
+            characters,
+            character_start_times_seconds: characters.map((_, index) => index / 10),
+            character_end_times_seconds: characters.map((_, index) => (index + 1) / 10),
+          },
+        }),
+      };
+    });
     vi.stubGlobal('fetch', providerRequest);
     const content = [
       '[Storyteller]: The story begins.',
@@ -297,29 +365,40 @@ describe('Daily lesson narration', () => {
     const first = await generateAndUploadAudioDrama({ content, config });
 
     expect(first).toMatchObject({
-      url: expect.stringMatching(/^https:\/\/media\.example\/drama-[a-f0-9]{24}\.mp3$/),
+      segments: expect.arrayContaining([
+        expect.objectContaining({
+          text: 'The story begins.',
+          url: expect.stringMatching(/sentence-1\.mp3$/),
+          words: expect.arrayContaining([expect.objectContaining({ text: 'The' })]),
+        }),
+      ]),
       cached: false,
     });
-    expect(providerRequest).toHaveBeenCalledOnce();
-    expect(uploadBuffer).toHaveBeenCalledOnce();
+    expect(first.segments).toHaveLength(5);
+    expect(providerRequest).toHaveBeenCalledTimes(5);
+    expect(uploadBuffer).toHaveBeenCalledTimes(6);
 
     const second = await generateAndUploadAudioDrama({ content, config });
 
-    expect(second).toMatchObject({ url: first.url, cached: true });
-    expect(providerRequest).toHaveBeenCalledOnce();
-    expect(uploadBuffer).toHaveBeenCalledOnce();
+    expect(second).toEqual({ segments: first.segments, cached: true });
+    expect(providerRequest).toHaveBeenCalledTimes(6);
+    expect(uploadBuffer).toHaveBeenCalledTimes(6);
   });
 
   it('reuses a previously saved story when the ElevenLabs API key is absent', async () => {
     configureCloudinary(config);
+    const manifest = {
+      version: 'sentence-alignment-v1',
+      segments: [{ text: 'The story begins.', url: 'https://media.example/sentence.mp3', words: [] }],
+    };
     const resourceInfo = vi.fn(async () => ({
-      secure_url: 'https://media.example/previously-generated.mp3',
+      secure_url: 'https://media.example/previous-manifest.json',
     }));
     setCloudinaryClient({
       resourceInfo,
       uploadBuffer: vi.fn(),
     });
-    const providerRequest = vi.fn();
+    const providerRequest = vi.fn(async () => ({ ok: true, json: async () => manifest }));
     vi.stubGlobal('fetch', providerRequest);
 
     const result = await generateAndUploadAudioDrama({
@@ -328,11 +407,11 @@ describe('Daily lesson narration', () => {
     });
 
     expect(result).toEqual({
-      url: 'https://media.example/previously-generated.mp3',
+      segments: manifest.segments,
       cached: true,
     });
     expect(resourceInfo).toHaveBeenCalledOnce();
-    expect(providerRequest).not.toHaveBeenCalled();
+    expect(providerRequest).toHaveBeenCalledOnce();
   });
 
   it('reports a clear configuration error on an uncached story when the ElevenLabs key is absent', async () => {

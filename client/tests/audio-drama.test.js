@@ -1,8 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { parseStoryNarration } from '@smart-routine/shared';
 import { AudioDramaPlayer, spokenTextParts } from '../components/AudioDramaPlayer.jsx';
-import { narrationSpeakerForRole, parseStoryScript, playDrama } from '../lib/audioDrama.js';
+import {
+  getStoryAudioProgressFromPosition,
+  getStoryLineWeights,
+  getStoryPositionFromAudioProgress,
+  narrationSpeakerForRole,
+  parseStoryScript,
+  playDrama,
+} from '../lib/audioDrama.js';
+import { speakWithVoice } from '../lib/voiceBriefing.js';
 
 const originalWindow = globalThis.window;
 const originalFetch = globalThis.fetch;
@@ -16,7 +25,10 @@ class FakeAudio {
     this.duration = 12;
     this.paused = true;
     this.volume = 1;
-    this.play = vi.fn(async () => { this.paused = false; });
+    this.play = vi.fn(async () => {
+      this.paused = false;
+      this.onplaying?.();
+    });
     this.pause = vi.fn(() => { this.paused = true; });
     this.load = vi.fn(() => this.onloadedmetadata?.());
     this.removeAttribute = vi.fn((name) => {
@@ -45,10 +57,22 @@ describe('Cloudinary audio drama', () => {
       spokenTextParts('one two তিন', 0.34, false),
     ));
 
-    expect(markup.match(/bg-gold\/40/g)).toHaveLength(2);
+    expect(markup.match(/bg-gold\/40/g)).toHaveLength(1);
     expect(markup).toContain('one');
     expect(markup).toContain('two');
     expect(markup).toContain('তিন');
+  });
+
+  it('weights progress and seeking by spoken text length instead of giving every line equal time', () => {
+    const lines = parseStoryScript(
+      '[Storyteller]: Hi.\n[Father]: This is a much longer spoken sentence with several more words.',
+    );
+    const weights = getStoryLineWeights(lines);
+    const audioPosition = getStoryPositionFromAudioProgress(0.5, weights);
+
+    expect(weights[1]).toBeGreaterThan(weights[0] * 4);
+    expect(audioPosition).toBeGreaterThan(1);
+    expect(getStoryAudioProgressFromPosition(audioPosition, weights)).toBeCloseTo(0.5, 8);
   });
 
   it('offers a dedicated pronunciation action when a word meaning is open', () => {
@@ -84,7 +108,7 @@ describe('Cloudinary audio drama', () => {
     expect(markup).not.toContain('Let us begin.');
     expect(markup).toContain('Chunk 1 / 2');
     expect(markup).toContain('Next chunk →');
-    expect(markup).toContain('aria-current="step"');
+    expect(markup).not.toContain('aria-current="step"');
     expect(markup).toContain('aria-label="Seek through the story"');
     expect(markup).toContain('Learn English by Story');
     expect(markup).toContain('Practice pronunciation');
@@ -188,6 +212,21 @@ describe('Cloudinary audio drama', () => {
     ]);
   });
 
+  it('renders exactly the narration segments sent to the audio generator', () => {
+    const content = [
+      '[Scene]: The door opens.',
+      '[Mina - Adult Female]: I found the key.',
+      '[Tariq - Adult Male]: It was under the book.',
+    ].join('\n');
+    const narrationSegments = parseStoryNarration(content);
+    const renderedLines = parseStoryScript(content);
+
+    expect(renderedLines.map(({ text }) => text)).toEqual(narrationSegments.map(({ text }) => text));
+    expect(renderedLines.map(({ role }) => narrationSpeakerForRole(role))).toEqual(
+      narrationSegments.map(({ speaker }) => narrationSpeakerForRole(speaker)),
+    );
+  });
+
   it('adds storyteller framing in Bengali for older stories that lack narrator lines', () => {
     const lines = parseStoryScript('[Father]: চলুন শুরু করি।\n[Mother]: ঠিক আছে।');
     expect(lines.map(({ role }) => role)).toEqual(['storyteller', 'male', 'storyteller', 'female', 'storyteller']);
@@ -202,14 +241,30 @@ describe('Cloudinary audio drama', () => {
     expect(narrationSpeakerForRole('storyteller')).toBe('storyteller');
   });
 
-  it('requests the saved Cloudinary asset, streams it, and supports pause and resume', async () => {
+  it('plays timestamped Cloudinary sentence clips in order and tracks aligned words', async () => {
     FakeAudio.instances = [];
     globalThis.Audio = FakeAudio;
     globalThis.fetch = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ cached: true, audioUrl: 'https://res.cloudinary.com/test/audio.mp3' }),
+        json: async () => ({
+          cached: true,
+          segments: [
+            {
+              url: 'https://res.cloudinary.com/test/sentence-1.mp3',
+              text: 'The story begins.',
+              durationSeconds: 4,
+              words: [{ text: 'The', start: 0, end: 0.5 }, { text: 'story', start: 0.5, end: 1.5 }],
+            },
+            {
+              url: 'https://res.cloudinary.com/test/sentence-2.mp3',
+              text: 'Dad lost a shoe.',
+              durationSeconds: 4,
+              words: [],
+            },
+          ],
+        }),
       });
 
     const progress = vi.fn();
@@ -219,9 +274,9 @@ describe('Cloudinary audio drama', () => {
     const player = playDrama(lines, progress, onEnd, { lang: 'bn', onNotice });
 
     player.play();
-    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
+    await vi.waitFor(() => expect(FakeAudio.instances[0]?.play).toHaveBeenCalledOnce());
     const [audio] = FakeAudio.instances;
-    expect(audio.src).toBe('https://res.cloudinary.com/test/audio.mp3');
+    expect(audio.src).toBe('https://res.cloudinary.com/test/sentence-1.mp3');
     expect(audio.preload).toBe('auto');
     expect(audio.play).toHaveBeenCalledOnce();
 
@@ -235,26 +290,131 @@ describe('Cloudinary audio drama', () => {
     });
     expect(onNotice).toHaveBeenCalledWith('গল্পের অডিও চালানো হচ্ছে…');
 
-    audio.currentTime = 3;
+    audio.currentTime = 1;
     audio.ontimeupdate();
-    expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({
-      index: 0,
-      fraction: 0.5,
-      source: 'cloudinary',
-    }));
-    player.seek(1.5);
-    expect(audio.currentTime).toBe(9);
+    expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({ source: 'cloudinary-segments' }));
+    expect(progress.mock.lastCall[0].index).toBe(0);
+    expect(progress.mock.lastCall[0].wordIndex).toBe(1);
+    audio.onended();
+    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(2));
+    const secondAudio = FakeAudio.instances[1];
+    expect(secondAudio.src).toBe('https://res.cloudinary.com/test/sentence-2.mp3');
     expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({
       index: 1,
-      fraction: 0.5,
+      wordIndex: -1,
     }));
     player.pause();
-    expect(audio.pause).toHaveBeenCalledOnce();
+    expect(secondAudio.pause).toHaveBeenCalledOnce();
     player.resume();
-    expect(audio.play).toHaveBeenCalledTimes(2);
+    expect(secondAudio.play).toHaveBeenCalledTimes(2);
 
-    audio.onended();
+    secondAudio.onended();
     expect(onEnd).toHaveBeenCalledOnce();
+    player.close();
+  });
+
+  it('does not advance sentence selection before the audio starts playing', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = class extends FakeAudio {
+      constructor() {
+        super();
+        this.play = vi.fn(() => new Promise(() => {}));
+      }
+    };
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          segments: [
+            { url: 'https://res.cloudinary.com/test/sentence-1.mp3', durationSeconds: 3, words: [] },
+            { url: 'https://res.cloudinary.com/test/sentence-2.mp3', durationSeconds: 3, words: [] },
+          ],
+        }),
+      });
+    const progress = vi.fn();
+    const player = playDrama(
+      parseStoryScript('[Narrator]: First sentence.\n[Narrator]: Second sentence.'),
+      progress,
+      vi.fn(),
+    );
+
+    player.play(1);
+    await vi.waitFor(() => expect(FakeAudio.instances[0]?.play).toHaveBeenCalledOnce());
+    expect(progress).not.toHaveBeenCalled();
+
+    const [audio] = FakeAudio.instances;
+    audio.paused = false;
+    audio.currentTime = 6;
+    audio.onplaying();
+    expect(progress).toHaveBeenCalledOnce();
+    expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({ index: 1 }));
+    player.close();
+  });
+
+  it('does not advance sentence selection when audio playback fails to start', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = class extends FakeAudio {
+      constructor() {
+        super();
+        this.play = vi.fn(async () => {
+          throw new Error('Audio playback failed.');
+        });
+      }
+    };
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          segments: [{ url: 'https://res.cloudinary.com/test/sentence.mp3', durationSeconds: 3, words: [] }],
+        }),
+      });
+    const progress = vi.fn();
+    const onError = vi.fn();
+    const player = playDrama(
+      parseStoryScript('[Narrator]: First sentence.\n[Narrator]: Second sentence.'),
+      progress,
+      vi.fn(),
+      { onError },
+    );
+
+    player.play(1);
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledOnce());
+
+    expect(progress).not.toHaveBeenCalled();
+    player.close();
+  });
+
+  it('plays the free TTS fallback when Cloudinary generation is unavailable', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = FakeAudio;
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:story-audio'),
+      revokeObjectURL: vi.fn(),
+    });
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: { message: 'not configured' } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer });
+
+    const player = playDrama(
+      parseStoryScript('[Storyteller]: The story begins.\n[Father]: Dad lost a shoe.'),
+      vi.fn(),
+      vi.fn(),
+    );
+    player.play();
+
+    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
+    expect(FakeAudio.instances[0].src).toBe('blob:story-audio');
+    expect(FakeAudio.instances[0].play).toHaveBeenCalledOnce();
+    expect(globalThis.fetch.mock.calls.map(([url]) => url)).toEqual([
+      '/api/auth/csrf',
+      '/api/speech/audio-drama',
+      '/api/auth/csrf',
+      '/api/speech/audio-drama/free',
+    ]);
     player.close();
   });
 
@@ -262,7 +422,20 @@ describe('Cloudinary audio drama', () => {
   it('plays an existing Cloudinary narration without requesting another generation', async () => {
     FakeAudio.instances = [];
     globalThis.Audio = FakeAudio;
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cached: true,
+          segments: [{
+            url: 'https://res.cloudinary.com/test/daily-lesson-sentence-1.mp3',
+            text: 'The story begins.',
+            durationSeconds: 3,
+            words: [],
+          }],
+        }),
+      });
     const onNotice = vi.fn();
     const player = playDrama(
       parseStoryScript('[Storyteller]: The story begins.'),
@@ -274,8 +447,8 @@ describe('Cloudinary audio drama', () => {
     player.play();
     await vi.waitFor(() => expect(FakeAudio.instances[0]?.play).toHaveBeenCalledOnce());
 
-    expect(FakeAudio.instances[0].src).toBe('https://res.cloudinary.com/test/daily-lesson.mp3');
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(FakeAudio.instances[0].src).toBe('https://res.cloudinary.com/test/daily-lesson-sentence-1.mp3');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     expect(onNotice).toHaveBeenCalledWith('গল্পের অডিও চালানো হচ্ছে…');
     player.close();
   });
@@ -285,7 +458,12 @@ describe('Cloudinary audio drama', () => {
     globalThis.Audio = FakeAudio;
     globalThis.fetch = vi.fn(async (url) => (url === '/api/auth/csrf'
       ? { ok: true, json: async () => ({ csrfToken: 'test-token' }) }
-      : { ok: true, json: async () => ({ audioUrl: 'https://res.cloudinary.com/test/audio.mp3' }) }));
+      : {
+        ok: true,
+        json: async () => ({
+          segments: [{ url: 'https://res.cloudinary.com/test/audio-sentence.mp3', durationSeconds: 3, words: [] }],
+        }),
+      }));
 
     const onStop = vi.fn();
     const firstPlayer = playDrama(parseStoryScript('[Narrator]: First story.'), vi.fn(), vi.fn(), { onStop });
@@ -302,6 +480,51 @@ describe('Cloudinary audio drama', () => {
     expect(FakeAudio.instances[1].play).toHaveBeenCalledOnce();
     firstPlayer.close();
     secondPlayer.close();
+  });
+
+  it('stops story narration before playing a sentence with device speech', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = FakeAudio;
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          segments: [{
+            url: 'https://res.cloudinary.com/test/story-sentence.mp3',
+            durationSeconds: 3,
+            words: [],
+          }],
+        }),
+      });
+    const speechSynthesis = {
+      getVoices: () => [{ name: 'Google US English', lang: 'en-US' }],
+      cancel: vi.fn(),
+      speak: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+    };
+    globalThis.window = { speechSynthesis };
+    globalThis.SpeechSynthesisUtterance = class {
+      constructor(text) { this.text = text; }
+    };
+
+    const story = playDrama(
+      parseStoryScript('[Narrator]: The story continues.'),
+      vi.fn(),
+      vi.fn(),
+    );
+    story.play();
+    await vi.waitFor(() => expect(FakeAudio.instances[0]?.play).toHaveBeenCalledOnce());
+
+    const sentence = speakWithVoice('Listen to this sentence.');
+
+    expect(FakeAudio.instances[0].pause).toHaveBeenCalledOnce();
+    expect(speechSynthesis.speak).toHaveBeenCalledOnce();
+    expect(speechSynthesis.speak.mock.calls[0][0].text).toBe('Listen to this sentence.');
+
+    sentence.stop();
+    story.close();
   });
 
   it('plays downloaded story audio without making a network request while offline', async () => {

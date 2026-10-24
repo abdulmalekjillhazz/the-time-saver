@@ -17,7 +17,7 @@ export function PageHero({ eyebrow, title, lead }) {
 
       {eyebrow ? (
         <p className="eyebrow relative inline-flex items-center gap-2">
-          <span className="brand-spark drop-shadow-[0_0_6px_rgba(242,193,78,0.7)]">✦</span>
+          <span className="brand-spark idle-wobble drop-shadow-[0_0_6px_rgba(242,193,78,0.7)]">✦</span>
           <span>{eyebrow}</span>
         </p>
       ) : null}

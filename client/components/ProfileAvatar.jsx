@@ -93,7 +93,7 @@ export function ProfileAvatarPicker({ value, onChange, lang = 'bn' }) {
               aria-label={AVATARS[avatarId].labels[lang] || AVATARS[avatarId].labels.en}
               aria-pressed={selected}
               onClick={() => onChange(avatarId)}
-              className={`flex min-h-16 flex-col items-center gap-1 rounded-xl border p-1.5 text-[10px] transition ${selected ? 'border-emerald-700 bg-emerald-50 ring-2 ring-emerald-600' : 'border-gray-200 hover:border-emerald-400'}`}
+              className={`glass-panel flex min-h-16 flex-col items-center gap-1 rounded-xl border p-1.5 text-[10px] text-ink transition ${selected ? 'border-gold bg-gold/10 ring-2 ring-gold shadow-[0_0_14px_rgba(242,193,78,0.35)]' : 'border-sapphire/25 hover:border-sapphire/60'}`}
             >
               <ProfileAvatar avatarId={avatarId} lang={lang} size="sm" />
               <span>{AVATARS[avatarId].labels[lang] || AVATARS[avatarId].labels.en}</span>

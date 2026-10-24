@@ -110,13 +110,20 @@ export function SyncStatus({ userId, lang = 'bn' }) {
   }
 
   if (!error && online && summary.pending === 0 && summary.failed === 0) return null;
+
+  const tone = error || summary.failed ? 'border-rose-400/40' : !online ? 'border-gold/40' : 'border-sapphire/40';
+
   return (
-    <Card className="flex flex-wrap items-center justify-between gap-3" role="status" aria-live="polite">
-      <div className="space-y-1">
-        {!online ? <p>{copy.offline}</p> : null}
-        {summary.pending ? <p>{copy.pending(summary.pending)}</p> : null}
-        {summary.failed ? <p>{copy.failed(summary.failed)}</p> : null}
-        {error ? <p>{error}</p> : null}
+    <Card
+      className={`surface-card glass-panel glow-border flex flex-wrap items-center justify-between gap-3 border p-4 ${tone}`}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="space-y-1 text-sm">
+        {!online ? <p className="font-semibold text-gold-soft">⚠️ {copy.offline}</p> : null}
+        {summary.pending ? <p className="text-sapphire">🔄 {copy.pending(summary.pending)}</p> : null}
+        {summary.failed ? <p className="font-semibold text-rose-400">⛔ {copy.failed(summary.failed)}</p> : null}
+        {error ? <p className="font-semibold text-rose-400">{error}</p> : null}
       </div>
       {online && (summary.pending > 0 || summary.failed > 0) ? (
         <Button onClick={syncNow} disabled={busy}>{copy.retry}</Button>
@@ -126,7 +133,10 @@ export function SyncStatus({ userId, lang = 'bn' }) {
           {failedOperations.map((operation) => {
             const name = operation.data?.title || operation.routineId || '';
             return (
-              <li key={operation.opId} className="flex flex-wrap items-center justify-between gap-2">
+              <li
+                key={operation.opId}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-400/30 bg-rose-400/5 p-2 text-sm text-ink"
+              >
                 <span>{copy.failedOperation(operation.type, name)}</span>
                 <span className="flex gap-2">
                   <Button variant="secondary" disabled={busy} onClick={() => retryOne(operation.opId)}>{copy.retryOne}</Button>

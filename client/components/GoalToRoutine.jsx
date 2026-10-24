@@ -97,7 +97,7 @@ export function GoalToRoutine({ lang = 'en', userId, onRoutinesAdded }) {
   }
 
   return (
-    <Card className="surface-card space-y-3">
+    <Card className="surface-card glass-panel glow-border space-y-3">
       <header className="flex items-center gap-2">
         <span aria-hidden="true">🎯</span>
         <h2 className="section-heading">{copy.title}</h2>
@@ -109,22 +109,22 @@ export function GoalToRoutine({ lang = 'en', userId, onRoutinesAdded }) {
           value={intent}
           onChange={(e) => setIntent(e.target.value)}
           placeholder={copy.placeholder}
-          className="min-w-[200px] flex-1 rounded-xl border border-sapphire/30 px-3 py-2"
+          className="min-w-[200px] flex-1 rounded-xl border border-sapphire/30 bg-paper/70 px-3 py-2 text-ink placeholder:text-ink/40 outline-none focus:border-sapphire focus:ring-2 focus:ring-sapphire/20"
         />
         <Button type="submit" disabled={busy}>{busy ? copy.generating : copy.generate}</Button>
       </form>
 
-      {error ? <p role="alert" className="text-sm text-red-600">{error}</p> : null}
-      {added ? <p role="status" className="text-sm text-green-700">{queued ? copy.queued : copy.added}</p> : null}
+      {error ? <p role="alert" className="text-sm font-semibold text-rose-400">{error}</p> : null}
+      {added ? <p role="status" className="text-sm font-semibold text-emerald-400">{queued ? copy.queued : copy.added}</p> : null}
 
       {drafts.length ? (
         <div className="space-y-2">
           <ul className="space-y-1">
             {drafts.map((d, i) => (
-              <li key={`${d.title}-${i}`} className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-semibold">{d.startTime}–{d.endTime}</span>
-                <span>{d.title}</span>
-                {d.isFrog ? <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold">🐸 {copy.frog}</span> : null}
+              <li key={`${d.title}-${i}`} style={{ '--enter-delay': `${Math.min(i, 10) * 55}ms` }} className="routine-tile glass-panel enter-up flex flex-wrap items-center gap-2 p-2.5 text-sm">
+                <span className="font-semibold text-sapphire">{d.startTime}–{d.endTime}</span>
+                <span className="text-ink">{d.title}</span>
+                {d.isFrog ? <span className="rounded-full border border-gold/40 bg-gold/15 px-2 py-0.5 text-xs font-semibold text-gold-soft">🐸 {copy.frog}</span> : null}
               </li>
             ))}
           </ul>

@@ -53,11 +53,11 @@ export function BadgesShowcase({ lang = 'bn' }) {
   if (!badges.length && !learningSummary && !learningError) return null;
 
   return (
-    <Card className="surface-card space-y-3 p-5">
+    <Card className="surface-card glass-panel glow-border space-y-3 p-5">
       <h3 className="section-heading text-base">
         {isBn ? '🏅 অর্জিত ব্যাজ ও মাইলফলক (Badges)' : '🏅 Milestone Badges & Achievements'}
       </h3>
-      {learningError ? <p role="alert" className="text-sm text-red-700">{learningError}</p> : null}
+      {learningError ? <p role="alert" className="text-sm font-semibold text-rose-400">{learningError}</p> : null}
       {learningSummary ? (
         <section className="space-y-3 rounded-xl border border-gold/30 bg-gold/5 p-3" aria-label={isBn ? 'শেখার ধারাবাহিকতা' : 'Learning streak'}>
           <p className="font-semibold">
@@ -68,12 +68,13 @@ export function BadgesShowcase({ lang = 'bn' }) {
             {isBn ? 'পয়েন্ট অর্জন করা সক্রিয় দিন' : 'Learning days with earned points'}: {learningSummary.stats.totalLearningDays}
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {learningSummary.badges.map((badge) => (
+            {learningSummary.badges.map((badge, index) => (
               <div
                 key={badge.key}
-                className={`rounded-xl border p-3 text-center transition-all ${
+                style={{ '--enter-delay': `${index * 60}ms` }}
+                className={`enter-up rounded-xl border p-3 text-center transition-all ${
                   badge.earned
-                    ? 'border-gold/50 bg-gold/10 shadow-sm'
+                    ? 'border-gold/50 bg-gold/10 shadow-sm hover:-translate-y-0.5 hover:shadow-[0_0_14px_rgba(242,193,78,0.4)]'
                     : 'border-gold/20 bg-paper/40 opacity-70 grayscale'
                 }`}
               >
@@ -94,12 +95,13 @@ export function BadgesShowcase({ lang = 'bn' }) {
       ) : null}
       {badges.length ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {badges.map((b) => (
+          {badges.map((b, index) => (
             <div
               key={b.id}
-              className={`rounded-xl border p-3 text-center transition-all ${
+              style={{ '--enter-delay': `${index * 60}ms` }}
+              className={`enter-up rounded-xl border p-3 text-center transition-all ${
                 b.unlocked
-                  ? 'border-gold/50 bg-gold/10 shadow-sm'
+                  ? 'border-gold/50 bg-gold/10 shadow-sm hover:-translate-y-0.5 hover:shadow-[0_0_14px_rgba(242,193,78,0.4)]'
                   : 'border-gold/20 bg-paper/40 opacity-70 grayscale'
               }`}
             >

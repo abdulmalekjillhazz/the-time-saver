@@ -62,7 +62,7 @@ export function RoutineDashboard({ lang = 'en', userId }) {
   const barWidth = summary ? Math.max((width - barGap * (summary.length - 1)) / summary.length, 6) : 0;
 
   return (
-    <Card className="surface-card space-y-3">
+    <Card className="surface-card glass-panel glow-border space-y-3">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="section-heading">{copy.title}</h2>
@@ -74,14 +74,14 @@ export function RoutineDashboard({ lang = 'en', userId }) {
           ) : null}
         </div>
         <div className="flex gap-2">
-          <button type="button" className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${days === 7 ? 'bg-sapphire text-on-sapphire' : 'border border-sapphire text-sapphire'}`} onClick={() => setDays(7)}>{copy.days7}</button>
-          <button type="button" className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${days === 30 ? 'bg-sapphire text-on-sapphire' : 'border border-sapphire text-sapphire'}`} onClick={() => setDays(30)}>{copy.days30}</button>
+          <button type="button" className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${days === 7 ? 'bg-sapphire text-on-sapphire shadow-[0_0_10px_rgba(96,165,250,0.5)]' : 'border border-sapphire text-sapphire hover:bg-sapphire/10'}`} onClick={() => setDays(7)}>{copy.days7}</button>
+          <button type="button" className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${days === 30 ? 'bg-sapphire text-on-sapphire shadow-[0_0_10px_rgba(96,165,250,0.5)]' : 'border border-sapphire text-sapphire hover:bg-sapphire/10'}`} onClick={() => setDays(30)}>{copy.days30}</button>
         </div>
       </header>
 
       {!summary ? <p role="status">{error || copy.loading}</p> : (
         <>
-          {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
+          {error ? <p role="alert" className="text-sm font-semibold text-rose-400">{error}</p> : null}
           {summary.every(({ total }) => !total) ? <p role="status">{copy.empty}</p> : null}
           <svg viewBox={`0 0 ${width} ${height + 20}`} className="w-full" role="img" aria-label={copy.subtitle}>
             {summary.map((day, i) => {
@@ -89,7 +89,7 @@ export function RoutineDashboard({ lang = 'en', userId }) {
               const barHeight = (pct / 100) * height;
               const x = i * (barWidth + barGap);
               const y = height - barHeight;
-              const color = pct >= 70 ? 'fill-emerald-600' : pct >= 40 ? 'fill-amber-500' : 'fill-red-600';
+              const color = pct >= 70 ? 'fill-emerald-500' : pct >= 40 ? 'fill-gold' : 'fill-rose-500';
               return (
                 <g key={day.date}>
                   <rect
@@ -97,8 +97,9 @@ export function RoutineDashboard({ lang = 'en', userId }) {
                     y={y}
                     width={barWidth}
                     height={barHeight || 1}
-                    className={day.total ? color : 'fill-gray-300'}
+                    className={`chart-bar-grow ${day.total ? color : 'fill-ink/15'}`}
                     rx="2"
+                    style={{ '--enter-delay': `${i * 40}ms` }}
                   />
                   {days <= 7 ? (
                     <text x={x + barWidth / 2} y={height + 14} fontSize="10" textAnchor="middle" fill="currentColor">

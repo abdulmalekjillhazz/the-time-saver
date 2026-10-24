@@ -1,10 +1,8 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { registerPlugin } from '@capacitor/core';
+import { isAndroidNativeApp } from './nativeAlarm.js';
 
 const NativeSpeech = registerPlugin('NativeSpeech');
-
-export function isAndroidNativeApp() {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-}
+export { isAndroidNativeApp };
 
 export async function recognizeEnglishSpeech() {
   if (!isAndroidNativeApp()) {

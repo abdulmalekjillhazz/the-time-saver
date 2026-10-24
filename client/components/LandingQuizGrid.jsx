@@ -40,7 +40,7 @@ export function LandingQuizGrid({ quizzes = [], lang = 'bn' }) {
       {quizzes.map((quiz) => {
         const result = results[quiz.slot];
         return (
-          <Card key={quiz.slot} className="surface-card space-y-4">
+          <Card key={quiz.slot} className="surface-card glass-panel glow-border space-y-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-sapphire">
                 {isBn ? `অনুশীলন কুইজ ${quiz.slot}` : `Practice quiz ${quiz.slot}`}
@@ -61,11 +61,11 @@ export function LandingQuizGrid({ quizzes = [], lang = 'bn' }) {
                       setAnswers((current) => ({ ...current, [quiz.slot]: optionIndex }));
                       setErrors((current) => ({ ...current, [quiz.slot]: '' }));
                     }}
-                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-sapphire disabled:cursor-default ${
+                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-sapphire disabled:cursor-default ${
                       correct
                         ? 'border-emerald-500 bg-emerald-500/10 text-ink'
                         : selected
-                          ? 'border-sapphire bg-sapphire text-on-sapphire'
+                          ? 'border-sapphire bg-sapphire text-on-sapphire shadow-[0_0_12px_rgba(96,165,250,0.4)]'
                           : 'border-sapphire/20 bg-paper text-ink hover:border-gold hover:bg-gold/10'
                     }`}
                   >
@@ -104,7 +104,7 @@ export function LandingQuizGrid({ quizzes = [], lang = 'bn' }) {
                   : (isBn ? 'উত্তর যাচাই করুন' : 'Check answer')}
               </Button>
             )}
-            {errors[quiz.slot] ? <p role="alert" className="text-sm text-red-700">{errors[quiz.slot]}</p> : null}
+            {errors[quiz.slot] ? <p role="alert" className="text-sm font-semibold text-rose-400">{errors[quiz.slot]}</p> : null}
           </Card>
         );
       })}

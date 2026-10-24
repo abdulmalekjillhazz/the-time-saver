@@ -31,7 +31,7 @@ describe('progressive grammar lessons', () => {
     const lessons = GRAMMAR_LEVELS.flatMap(({ lessons: levelLessons }) => levelLessons);
     const expectedAnswers = {
       'word-order': 'Mina reads a book every evening.',
-      'be-verbs': 'They are ready for class.',
+      'be-verbs': 'The students are ready for class.',
       'present-simple': 'She walks to school every day.',
       'past-simple': 'We visited our friend yesterday.',
       'present-continuous': 'The children are playing in the garden now.',
@@ -59,7 +59,10 @@ describe('progressive grammar lessons', () => {
       expect(lesson.choices).not.toContain('She walk to school every day.');
       expect(lesson.choices).not.toContain('We are visit our friend yesterday.');
     }
-    expect(lessons.find(({ id }) => id === 'be-verbs').choices[1]).toBe('They are ready for class.');
+    const beVerbLesson = lessons.find(({ id }) => id === 'be-verbs');
+    expect(beVerbLesson.choices[beVerbLesson.answer]).toBe('The students are ready for class.');
+    expect(beVerbLesson.choices).not.toContain(beVerbLesson.example);
+    expect(beVerbLesson.prompt.en).toContain('new sentence');
     expect(lessons.find(({ id }) => id === 'present-simple').choices[0]).toBe('She walks to school every day.');
   });
 

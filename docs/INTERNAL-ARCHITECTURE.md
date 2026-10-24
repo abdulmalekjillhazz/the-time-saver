@@ -33,8 +33,8 @@
 
 ## 2. Directory & Architecture Map
 - `capacitor.config.ts`:
-  - Enforces `server.url` (`https://made-your-dream-bigger.vercel.app/app`) for seamless OTA web view rendering.
-  - Declares native plugin bindings (`@capgo/capacitor-social-login`) without static `out` directory dependency.
+  - Android bundle builds load `server.url` (`https://made-your-dream-bigger.vercel.app/app`) for web updates and same-origin `/api` proxy/auth requests; `CAPACITOR_SERVER_URL` can override the origin.
+  - Keeps local web assets as the Capacitor bundle and declares native plugin bindings (`@capgo/capacitor-social-login`).
 - `client/lib/nativeGoogleAuth.js`:
   - Contains `signInWithGoogleNative(webClientId)` to bypass Chromium WebView `disallowed_useragent` blocks.
 - `client/components/PrivateApp.jsx`:

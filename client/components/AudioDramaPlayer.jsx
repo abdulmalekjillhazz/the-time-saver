@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { parseStoryScript, playDrama } from '../lib/audioDrama.js';
+import { getStoryWordWeights, parseStoryScript, playDrama } from '../lib/audioDrama.js';
 import { apiRequestAudio } from '../lib/apiClient.js';
 import {
   canAttemptSpeechPractice,
@@ -17,6 +17,12 @@ import {
   saveOfflineStoryAudio,
 } from '../lib/offlineStoryCache.js';
 import { speakWithVoice } from '../lib/voiceBriefing.js';
+
+const STORY_AUDIO_CACHE_VERSION = 'story-audio-v3-sentence-alignment';
+
+function offlineAudioContentKey(content) {
+  return `${STORY_AUDIO_CACHE_VERSION}\n${content}`;
+}
 
 function characterIcon(role) {
   if (role === 'male') return '👨';
@@ -34,20 +40,25 @@ export function spokenTextParts(
   lineIndex = 0,
   onSpeakWord,
   pronunciationLabel = 'Hear pronunciation',
+  activeWordIndex = null,
 ) {
   const parts = String(text || '').split(/(\s+)/);
-  const wordCount = parts.filter((part) => /\S/.test(part)).length;
-  const revealedWords = completed
-    ? wordCount
-    : fraction > 0
-      ? Math.min(wordCount, Math.max(1, Math.ceil(fraction * wordCount)))
-      : 0;
+  const wordWeights = getStoryWordWeights(text);
+  const totalWordWeight = wordWeights.reduce((sum, weight) => sum + weight, 0);
+  const revealedWeight = completed ? totalWordWeight : Math.max(0, fraction) * totalWordWeight;
   let wordIndex = 0;
+  let wordWeight = 0;
 
   return parts.map((part, index) => {
     if (!/\S/.test(part)) return part;
     wordIndex += 1;
-    const highlighted = wordIndex <= revealedWords;
+    const currentWordWeight = wordWeights[wordIndex - 1] || 1;
+    const highlighted = completed
+      || (activeWordIndex !== null
+        ? wordIndex <= activeWordIndex + 1
+        : (revealedWeight > 0 && wordWeight + currentWordWeight <= revealedWeight)
+          || (fraction > 0 && wordIndex === 1));
+    wordWeight += currentWordWeight;
     const clean = normalizeWord(part);
     const keyId = `${lineIndex}-${index}`;
     const selectedTerm = typeof selectedWordState === 'string'
@@ -148,6 +159,7 @@ export function AudioDramaPlayer({
 }) {
   const isBn = lang === 'bn';
   const lines = useMemo(() => parseStoryScript(content, isBn ? 'বর্ণনাকারী' : 'Narrator'), [content, isBn]);
+  const audioCacheContent = offlineAudioContentKey(content);
   const englishPracticeContent = practiceContent === undefined
     ? (lang === 'en' ? content : '')
     : practiceContent;
@@ -159,9 +171,13 @@ export function AudioDramaPlayer({
   const [isPaused, setIsPaused] = useState(false);
   const [position, setPosition] = useState(0);
   const [readingChunkIndex, setReadingChunkIndex] = useState(0);
+  const [timedSegments, setTimedSegments] = useState(null);
+  const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
+  const [activeWordIndex, setActiveWordIndex] = useState(-1);
   const [error, setError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedWord, setSelectedWord] = useState(null);
+  const [pronunciationPlaying, setPronunciationPlaying] = useState(false);
   const [chunkMode, setChunkMode] = useState(true);
   const [offlineAudio, setOfflineAudio] = useState(null);
   const [offlineAudioSaving, setOfflineAudioSaving] = useState(false);
@@ -194,6 +210,7 @@ export function AudioDramaPlayer({
   }, [vocabulary, lang]);
   const controllerRef = useRef(null);
   const lineRefs = useRef([]);
+  const playbackRequestIdRef = useRef(0);
   const isPlayingRef = useRef(false);
   const positionRef = useRef(0);
   const pausedRef = useRef(false);
@@ -203,6 +220,7 @@ export function AudioDramaPlayer({
   const activeRecognitionRef = useRef(false);
   const recognizedTextRef = useRef('');
   const pronunciationRef = useRef(null);
+  const pronunciationPlaybackIdRef = useRef(0);
 
   const copy = {
     title: isBn ? 'গল্পের মাধ্যমে ইংরেজি শিখুন' : 'Learn English by Story',
@@ -243,6 +261,7 @@ export function AudioDramaPlayer({
       : 'Microphone access failed. Check the permission and try again.',
     speakLine: isBn ? 'পড়ে যাচাই করুন' : 'Read and check',
     listenExample: isBn ? 'নমুনা উচ্চারণ শুনুন' : 'Listen to example',
+    stopExample: isBn ? 'উচ্চারণ থামান' : 'Stop example',
     stopSpeaking: isBn ? 'থামান' : 'Stop',
     retrySpeaking: isBn ? 'আবার চেষ্টা' : 'Try again',
     listening: isBn ? 'শুনছি—এখন লাইনটি পড়ুন…' : 'Listening—read the line aloud…',
@@ -301,17 +320,62 @@ export function AudioDramaPlayer({
   };
 
   const handleSpeakText = (text, rate = 0.88) => {
+    playbackRequestIdRef.current += 1;
+    const playbackId = ++pronunciationPlaybackIdRef.current;
+    controllerRef.current?.stop();
+    controllerRef.current = null;
+    isPlayingRef.current = false;
+    pausedRef.current = false;
+    positionRef.current = 0;
+    setPosition(0);
+    setReadingChunkIndex(0);
+    setIsPlaying(false);
+    setIsPaused(false);
+    setIsFullscreen(false);
+    const previousPlayback = pronunciationRef.current;
+    pronunciationRef.current = null;
+    previousPlayback?.playback?.stop?.();
     try {
-      pronunciationRef.current?.stop?.();
-      pronunciationRef.current = speakWithVoice(text, {
+      setError('');
+      setPronunciationPlaying(true);
+      const playback = speakWithVoice(text, {
         lang: 'en-US',
         rate,
-        onError: () => setError(copy.pronunciationUnavailable),
+        onEnd: () => {
+          if (pronunciationRef.current?.playbackId !== playbackId) return;
+          pronunciationRef.current = null;
+          setPronunciationPlaying(false);
+        },
+        onStop: () => {
+          if (pronunciationRef.current?.playbackId !== playbackId) return;
+          pronunciationRef.current = null;
+          setPronunciationPlaying(false);
+        },
+        onError: () => {
+          if (pronunciationRef.current?.playbackId !== playbackId) return;
+          pronunciationRef.current = null;
+          setPronunciationPlaying(false);
+          setError(copy.pronunciationUnavailable);
+        },
       });
-      setError('');
+      pronunciationRef.current = { playbackId, playback };
     } catch {
+      pronunciationRef.current = null;
+      setPronunciationPlaying(false);
       setError(copy.pronunciationUnavailable);
     }
+  };
+
+  const stopPronunciation = () => {
+    pronunciationPlaybackIdRef.current += 1;
+    const activePlayback = pronunciationRef.current;
+    pronunciationRef.current = null;
+    if (activePlayback) {
+      activePlayback.playback?.stop?.();
+    } else {
+      globalThis.window?.speechSynthesis?.cancel();
+    }
+    setPronunciationPlaying(false);
   };
 
   const handleSpeakWord = (word, contextText = '') => {
@@ -321,10 +385,13 @@ export function AudioDramaPlayer({
     handleSpeakText(spokenText, 0.78);
   };
 
-  const cacheStoryAudioAutomatically = useCallback(async () => {
+  const cacheStoryAudioAutomatically = useCallback(async (segments) => {
     if (
       !slug
       || !content
+      || !Array.isArray(segments)
+      || !segments.length
+      || Array.isArray(offlineAudioRef.current?.segments)
       || typeof globalThis.indexedDB === 'undefined'
       || offlineAudioSaveInFlightRef.current
     ) return;
@@ -338,32 +405,28 @@ export function AudioDramaPlayer({
           ? 'অডিও ডাউনলোড করতে আগে ইন্টারনেটে যুক্ত হতে হবে।'
           : 'Connect to the internet before downloading story audio.');
       }
-      const buffer = audioUrl
-        ? await fetch(audioUrl).then((response) => {
-          if (!response.ok) throw new Error('Saved story audio could not be downloaded.');
-          return response.arrayBuffer();
-        })
-        : await apiRequestAudio('/api/speech/audio-drama/offline', {
-          body: { content },
-          locale: lang,
-        });
-      const audio = new Blob([buffer], { type: 'audio/mpeg' });
-      await saveOfflineStoryAudio(slug, content, audio);
-      offlineAudioRef.current = audio;
-      setOfflineAudio(audio);
+      const cachedSegments = await Promise.all(segments.map(async (segment) => {
+        const response = await fetch(segment.url);
+        if (!response.ok) throw new Error('A story sentence could not be downloaded for offline playback.');
+        return { ...segment, url: '', audio: await response.blob() };
+      }));
+      const playlist = { segments: cachedSegments };
+      await saveOfflineStoryAudio(slug, audioCacheContent, playlist);
+      offlineAudioRef.current = playlist;
+      setOfflineAudio(playlist);
       setOfflineAudioStatus(copy.offlineAudioSaved);
-    } catch {
+    } catch (cacheError) {
       setOfflineAudioStatus('');
       setOfflineAudioError(globalThis.navigator?.onLine === false
         ? (isBn
           ? 'অডিও সংরক্ষণ করতে ইন্টারনেটে যুক্ত হন।'
           : 'Connect to the internet to save audio.')
-        : copy.offlineAudioSaveFailed);
+        : cacheError.message || copy.offlineAudioSaveFailed);
     } finally {
       setOfflineAudioSaving(false);
       offlineAudioSaveInFlightRef.current = false;
     }
-  }, [audioUrl, content, copy.offlineAudioSaveFailed, copy.offlineAudioSaved, copy.offlineAudioSaving, isBn, lang, slug]);
+  }, [audioCacheContent, content, copy.offlineAudioSaveFailed, copy.offlineAudioSaved, copy.offlineAudioSaving, isBn, slug]);
 
   useEffect(() => {
     let active = true;
@@ -376,7 +439,7 @@ export function AudioDramaPlayer({
       setOfflineAudioStatus(copy.offlineAudioUnavailable);
       return () => { active = false; };
     }
-    getOfflineStoryAudio(slug, content)
+    getOfflineStoryAudio(slug, audioCacheContent)
       .then((audio) => {
         if (!active) return;
         if (audio) {
@@ -393,6 +456,7 @@ export function AudioDramaPlayer({
     return () => { active = false; };
   }, [
     content,
+    audioCacheContent,
     copy.offlineAudioConnect,
     copy.offlineAudioHint,
     copy.offlineAudioSaveFailed,
@@ -402,29 +466,34 @@ export function AudioDramaPlayer({
   ]);
 
   const startPlayback = useCallback(async (startAt = 0) => {
+    const requestId = ++playbackRequestIdRef.current;
     controllerRef.current?.close();
-    let savedAudio = offlineAudio;
-    if (!savedAudio && slug && typeof globalThis.indexedDB !== 'undefined') {
+    controllerRef.current = null;
+    const isOffline = globalThis.navigator?.onLine === false;
+    let savedAudio = isOffline ? offlineAudio : null;
+    if (isOffline && !savedAudio && slug && typeof globalThis.indexedDB !== 'undefined') {
       try {
-        savedAudio = await getOfflineStoryAudio(slug, content);
+        savedAudio = await getOfflineStoryAudio(slug, audioCacheContent);
         if (savedAudio) {
           offlineAudioRef.current = savedAudio;
           setOfflineAudio(savedAudio);
         }
       } catch (cacheError) {
-        setOfflineAudioError(cacheError.message || copy.offlineAudioSaveFailed);
+        if (requestId === playbackRequestIdRef.current) {
+          setOfflineAudioError(cacheError.message || copy.offlineAudioSaveFailed);
+        }
       }
     }
-    if (!savedAudio && globalThis.navigator?.onLine !== false) {
-      void cacheStoryAudioAutomatically();
-    }
+    if (requestId !== playbackRequestIdRef.current) return;
     setError('');
+    setTimedSegments(null);
+    setHasStartedPlayback(false);
+    setActiveWordIndex(-1);
     isPlayingRef.current = true;
     pausedRef.current = false;
     setIsPlaying(true);
     setIsPaused(false);
     setIsFullscreen(true);
-    setReadingChunkIndex(Math.max(0, Math.min(lines.length - 1, Math.floor(startAt))));
 
     controllerRef.current = playDrama(
       lines,
@@ -432,6 +501,8 @@ export function AudioDramaPlayer({
         positionRef.current = progress.index + progress.fraction;
         setPosition(positionRef.current);
         setReadingChunkIndex(progress.index);
+        setHasStartedPlayback(true);
+        setActiveWordIndex(Number.isInteger(progress.wordIndex) ? progress.wordIndex : -1);
       },
       () => {
         isPlayingRef.current = false;
@@ -448,16 +519,29 @@ export function AudioDramaPlayer({
         volume: 0.9,
         spatial: false,
         audioUrl,
+        slug,
         storyContent: content,
+        offlineAudioKey: audioCacheContent,
         offlineAudio: savedAudio,
         onError: (message) => {
+          if (requestId !== playbackRequestIdRef.current) return;
           isPlayingRef.current = false;
           pausedRef.current = false;
           setIsPlaying(false);
           setIsPaused(false);
+          setHasStartedPlayback(false);
+          setActiveWordIndex(-1);
           setError(message || copy.friendlyError);
         },
+        onSegmentsLoaded: (segments) => {
+          setTimedSegments(segments);
+          setPosition(0);
+          positionRef.current = 0;
+          setReadingChunkIndex(0);
+          if (!isOffline) void cacheStoryAudioAutomatically(segments);
+        },
         onStop: () => {
+          if (requestId !== playbackRequestIdRef.current) return;
           isPlayingRef.current = false;
           pausedRef.current = false;
           positionRef.current = 0;
@@ -466,12 +550,15 @@ export function AudioDramaPlayer({
           setIsPlaying(false);
           setIsPaused(false);
           setIsFullscreen(false);
+          setHasStartedPlayback(false);
+          setActiveWordIndex(-1);
         },
       },
     );
     controllerRef.current.play(startAt);
   }, [
     audioUrl,
+    audioCacheContent,
     content,
     copy.friendlyError,
     copy.offlineAudioSaveFailed,
@@ -497,18 +584,24 @@ export function AudioDramaPlayer({
     playbackSettingsRef.current = { lines, lang, audioUrl };
     if (!changed) return;
     const restartAt = isPlayingRef.current ? positionRef.current : null;
+    playbackRequestIdRef.current += 1;
     controllerRef.current?.close();
     controllerRef.current = null;
+    setTimedSegments(null);
+    setHasStartedPlayback(false);
+    setActiveWordIndex(-1);
     setError('');
     if (restartAt !== null) startPlayback(Math.floor(restartAt));
   }, [lines, lang, audioUrl, startPlayback]);
 
   useEffect(() => () => {
+    playbackRequestIdRef.current += 1;
     isPlayingRef.current = false;
     controllerRef.current?.close();
     controllerRef.current = null;
-    pronunciationRef.current?.stop?.();
+    pronunciationRef.current?.playback?.stop?.();
     pronunciationRef.current = null;
+    pronunciationPlaybackIdRef.current += 1;
     activeRecognitionRef.current = false;
     recognitionRef.current?.abort();
     recognitionRef.current = null;
@@ -531,6 +624,8 @@ export function AudioDramaPlayer({
   };
 
   const handleStop = () => {
+    playbackRequestIdRef.current += 1;
+    stopPronunciation();
     controllerRef.current?.stop();
     isPlayingRef.current = false;
     pausedRef.current = false;
@@ -540,13 +635,19 @@ export function AudioDramaPlayer({
     setIsPlaying(false);
     setIsPaused(false);
     setIsFullscreen(false);
+    setTimedSegments(null);
+    setHasStartedPlayback(false);
+    setActiveWordIndex(-1);
   };
 
   const handleSeek = (value) => {
     const nextPosition = Number(value);
     positionRef.current = nextPosition;
     setPosition(nextPosition);
-    setReadingChunkIndex(Math.max(0, Math.min(lines.length - 1, Math.floor(nextPosition))));
+    setReadingChunkIndex(Math.max(
+      0,
+      Math.min((timedSegments?.length || lines.length) - 1, Math.floor(nextPosition)),
+    ));
     controllerRef.current?.seek(nextPosition);
   };
 
@@ -580,6 +681,7 @@ export function AudioDramaPlayer({
   };
 
   const practiceLine = async (lineIndex, confirmed = false) => {
+    stopPronunciation();
     if (speechPractice.status === 'listening' && speechPractice.lineIndex === lineIndex) {
       if (isAndroidNativeApp()) {
         stopEnglishSpeechRecognition().catch(() => {});
@@ -849,8 +951,14 @@ export function AudioDramaPlayer({
     }
   };
 
-  const currentLineIndex = Math.min(Math.floor(position), Math.max(lines.length - 1, 0));
-  const currentLineFraction = Math.min(1, Math.max(0, position - currentLineIndex));
+  const displayLines = timedSegments
+    ? timedSegments.map((segment) => ({
+        character: segment.character,
+        role: segment.speaker,
+        text: segment.text,
+      }))
+    : lines;
+  const currentLineIndex = Math.min(Math.floor(position), Math.max(displayLines.length - 1, 0));
   const practiceFullscreen = startInPracticeMode && speechPracticeOpen;
   const fullScreenReaderOpen = practiceFullscreen || isFullscreen;
   const activePracticeLineIndex = Math.max(0, speechPractice.lineIndex);
@@ -930,13 +1038,13 @@ export function AudioDramaPlayer({
             ) : null}
           </div>
 
-          {lines.length ? (
+          {displayLines.length ? (
             <input
               type="range"
               min="0"
-              max={lines.length}
+              max={displayLines.length}
               step="0.01"
-              value={Math.min(position, lines.length)}
+              value={Math.min(position, displayLines.length)}
               onChange={(event) => handleSeek(event.target.value)}
               aria-label={copy.seek}
               className="order-last col-span-2 h-3 w-full cursor-pointer accent-gold lg:basis-full"
@@ -950,6 +1058,15 @@ export function AudioDramaPlayer({
               className="min-h-11 w-full rounded-xl border border-gold/40 bg-gold/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
             >
               ✕ {isBn ? 'অর্থ লুকান' : 'Hide meaning'}
+            </button>
+          ) : null}
+          {pronunciationPlaying && !practiceFullscreen ? (
+            <button
+              type="button"
+              onClick={stopPronunciation}
+              className="min-h-11 w-full rounded-xl border border-rose-500/40 bg-rose-500/10 px-2.5 py-2 text-xs font-bold text-ink sm:text-sm lg:w-auto"
+            >
+              ■ {copy.stopExample}
             </button>
           ) : null}
           <button
@@ -1077,10 +1194,14 @@ export function AudioDramaPlayer({
                     <div className="flex flex-col gap-3 sm:flex-row">
                       <button
                         type="button"
-                        onClick={() => handleSpeakText(line.text)}
+                        onClick={() => {
+                          if (pronunciationPlaying) stopPronunciation();
+                          else handleSpeakText(line.text);
+                        }}
+                        aria-pressed={pronunciationPlaying}
                         className="secondary-button min-h-12 w-full px-5 py-3 text-sm font-extrabold sm:w-auto"
                       >
-                        🔊 {copy.listenExample}
+                        {pronunciationPlaying ? '■' : '🔊'} {pronunciationPlaying ? copy.stopExample : copy.listenExample}
                       </button>
                       <button
                         type="button"
@@ -1132,7 +1253,8 @@ export function AudioDramaPlayer({
                             <span
                               key={`${word}-${wordIndex}`}
                               aria-label={comparison.matchedWords[wordIndex] ? copy.matchedWord : copy.missedWord}
-                              className={`rounded-md px-2 py-1 font-semibold text-ink ${
+                              style={{ '--enter-delay': `${Math.min(wordIndex, 20) * 35}ms` }}
+                              className={`enter-up rounded-md px-2 py-1 font-semibold text-ink ${
                                 comparison.matchedWords[wordIndex]
                                   ? 'border border-emerald-500/30 bg-emerald-500/20'
                                   : 'border border-rose-500/30 bg-rose-500/20'
@@ -1217,12 +1339,11 @@ export function AudioDramaPlayer({
           className="audio-drama-story-stage w-full"
         >
           {(chunkMode
-            ? lines.slice(readingChunkIndex, readingChunkIndex + 1)
-            : lines).map((line, visibleIndex) => {
+            ? displayLines.slice(readingChunkIndex, readingChunkIndex + 1)
+            : displayLines).map((line, visibleIndex) => {
             const lineIndex = chunkMode ? readingChunkIndex : visibleIndex;
-            const isCurrentLine = lineIndex === readingChunkIndex;
-            const isCompletedLine = lineIndex < readingChunkIndex;
-            const fraction = isPlaying && isCurrentLine ? currentLineFraction : 0;
+            const isCurrentLine = hasStartedPlayback && lineIndex === readingChunkIndex;
+            const isCompletedLine = hasStartedPlayback && lineIndex < readingChunkIndex;
             return (
               <div
                 key={`${lineIndex}-${line.character}`}
@@ -1253,23 +1374,24 @@ export function AudioDramaPlayer({
                   <p className="mt-1 text-base leading-relaxed">
                     {spokenTextParts(
                       line.text,
-                      fraction,
+                      0,
                       isCompletedLine,
                       (word, keyId) => handleWordLookup(word, keyId, line.text),
                       selectedWord,
                       lineIndex,
                       handleSpeakWord,
                       copy.pronunciationLabel,
+                      isCurrentLine ? activeWordIndex : null,
                     )}
                   </p>
                 </div>
               </div>
             );
           })}
-          {!lines.length ? <p className="min-h-10 text-sm leading-relaxed opacity-80">{copy.loading}</p> : null}
+          {!displayLines.length ? <p className="min-h-10 text-sm leading-relaxed opacity-80">{copy.loading}</p> : null}
         </div> : null}
 
-        {!practiceFullscreen && chunkMode && lines.length > 1 ? (
+        {!practiceFullscreen && chunkMode && displayLines.length > 1 ? (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-gold/20 bg-paper/60 px-3 py-2">
             <button
               type="button"
@@ -1280,12 +1402,12 @@ export function AudioDramaPlayer({
               {copy.previousChunk}
             </button>
             <span className="text-xs font-bold text-ink/65">
-              {copy.chunkProgress(readingChunkIndex + 1, lines.length)}
+              {copy.chunkProgress(readingChunkIndex + 1, displayLines.length)}
             </span>
             <button
               type="button"
-              disabled={readingChunkIndex >= lines.length - 1 || isPlaying}
-              onClick={() => setReadingChunkIndex((current) => Math.min(lines.length - 1, current + 1))}
+              disabled={readingChunkIndex >= displayLines.length - 1 || isPlaying}
+              onClick={() => setReadingChunkIndex((current) => Math.min(displayLines.length - 1, current + 1))}
               className="min-h-10 rounded-lg border border-sapphire/25 bg-sapphire/10 px-3 py-2 text-xs font-bold text-sapphire transition hover:bg-sapphire/20 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {copy.nextChunk}

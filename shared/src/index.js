@@ -18,3 +18,4 @@ export * from './flags.js';
 export * from './outbox.js';
 export * from './uuid.js';
 export * from './sentenceProgress.js';
+export * from './storyNarration.js';

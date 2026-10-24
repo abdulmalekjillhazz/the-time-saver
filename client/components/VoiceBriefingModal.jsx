@@ -113,7 +113,7 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
     >
-      <Card className="surface-card max-h-[90vh] w-full max-w-lg overflow-y-auto p-5 shadow-2xl sm:p-6">
+      <Card className="surface-card modal-pop max-h-[90vh] w-full max-w-lg overflow-y-auto p-5 shadow-2xl sm:p-6">
         <div className="flex items-center justify-between border-b border-gold/25 pb-3">
           <h2 id="voice-briefing-title" className="section-heading text-lg">{copy.title}</h2>
           <button

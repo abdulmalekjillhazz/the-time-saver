@@ -13,7 +13,7 @@ let result;
 try {
   result = spawnSync(process.execPath, [nextCli, 'build'], {
     cwd: process.cwd(),
-    env: { ...process.env, CAPACITOR_BUNDLE: '1', CAPACITOR_SERVER_URL: '' },
+    env: { ...process.env, CAPACITOR_BUNDLE: '1' },
     stdio: 'inherit',
   });
 } finally {

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { parseStoryNarration, parseNarrationSpeakerName as parseSharedNarrationSpeakerName } from '@smart-routine/shared';
 import { cloudinary, uploadBufferToCloudinary } from './cloudinary.js';
 
 export const ELEVEN_LABS_BASE_URL = 'https://api.elevenlabs.io/v1';
@@ -19,17 +20,7 @@ const DEFAULT_VOICE_SETTINGS = {
   use_speaker_boost: true,
 };
 
-export const NARRATION_AUDIO_VERSION = 'multi-voice-dialogue-v1';
-
-function normalizeNarrationSpeakerName(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s*[-–—:]\s*/g, ' ')
-    .replace(/[^a-z0-9\u0980-\u09ff]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+export const NARRATION_AUDIO_VERSION = 'sentence-alignment-v1';
 
 export function getNarrationVoiceConfigVersion(config) {
   return [
@@ -57,14 +48,7 @@ export function hasCompleteNarrationVoiceConfig(config) {
 }
 
 export function parseNarrationSpeakerName(value) {
-  const normalized = normalizeNarrationSpeakerName(value);
-  if (!normalized) return 'narrator';
-
-  if (/\b(?:father|dad|papa|adult male|male|rahim|rahi|baba|babai|vaiya|man)\b/.test(normalized)) return 'father';
-  if (/\b(?:mother|mom|mama|adult female|female|asha|aasha|ma|maa|apu|woman|daughter)\b/.test(normalized)) return 'mother';
-  if (/\b(?:son|child|kid|boy|rafi|rahi|shishu|bachcha|chele|boy)\b/.test(normalized)) return 'son';
-  if (/\b(?:storyteller|story teller|narrator|narration|speaker|voice)\b/.test(normalized) || /গল্পকথক|কথক/.test(normalized)) return 'storyteller';
-  return 'narrator';
+  return parseSharedNarrationSpeakerName(value);
 }
 
 export function resolveNarrationVoice(config, speaker) {
@@ -83,39 +67,16 @@ export function resolveNarrationVoice(config, speaker) {
     narrator: config.ELEVENLABS_STORYTELLER_VOICE_ID,
   };
 
-  return voiceIdMap[resolvedSpeaker] || voiceIdMap[normalizeNarrationSpeakerName(speaker)] || null;
+  return voiceIdMap[resolvedSpeaker] || null;
 }
 
-export function parseNarrationSegments(content = '', defaultSpeaker = 'narrator') {
-  if (typeof content !== 'string' || !content.trim()) return [];
-
-  const segments = [];
-  for (const rawLine of content.split(/\r?\n/)) {
-    const trimmed = rawLine.trim();
-    if (!trimmed) continue;
-
-    const match = trimmed.match(/^\[([^\]]+)\]\s*:?(.*)$/);
-    const speakerMeta = match ? match[1].trim() : null;
-    const textValue = match ? match[2].trim() : trimmed;
-    const speakerName = speakerMeta ? parseNarrationSpeakerName(speakerMeta) : defaultSpeaker;
-    const text = textValue.trim();
-    if (!text) continue;
-
-    const speaker = speakerMeta ? speakerName : defaultSpeaker;
-    segments.push({ speaker, text, rawLine: trimmed });
-  }
-
-  if (segments.length && !segments.some(({ speaker }) => speaker === 'storyteller')) {
-    const isBengali = /[\u0980-\u09ff]/.test(content);
-    const narrator = (text) => ({ speaker: 'storyteller', text, rawLine: text });
-    const middleIndex = Math.max(1, Math.ceil(segments.length / 2));
-    segments.splice(middleIndex, 0, narrator(
-      isBengali ? 'এরপর তারা একসঙ্গে সমাধান খুঁজতে থাকে।' : 'The family talks it through together.'
-    ));
-    segments.unshift(narrator(isBengali ? 'গল্পটি শুরু হচ্ছে।' : 'The story begins.'));
-    segments.push(narrator(isBengali ? 'এই ছিল আজকের গল্প।' : 'That is the end of the story.'));
-  }
-  return segments;
+export function parseNarrationSegments(content = '', defaultSpeaker = 'Narrator') {
+  return parseStoryNarration(content, defaultSpeaker).map(({ speaker, character, text }) => ({
+    speaker,
+    character,
+    text,
+    rawLine: text,
+  }));
 }
 
 export function buildElevenLabsRequest({ text, speaker, config }) {
@@ -147,6 +108,18 @@ export function buildElevenLabsRequest({ text, speaker, config }) {
   };
 }
 
+export function buildElevenLabsTimestampRequest({ text, speaker, config }) {
+  const request = buildElevenLabsRequest({ text, speaker, config });
+  const body = JSON.parse(request.body);
+  delete body.output_format;
+  return {
+    ...request,
+    url: `${request.url}/with-timestamps?output_format=${encodeURIComponent(config.ELEVENLABS_OUTPUT_FORMAT || 'mp3_44100_128')}`,
+    body: JSON.stringify(body),
+    headers: { ...request.headers, Accept: 'application/json' },
+  };
+}
+
 export async function generateElevenLabsAudio({ text, speaker, config, signal }) {
   if (!config.ELEVENLABS_API_KEY) {
     throw new Error('ELEVENLABS_API_KEY is not configured.');
@@ -175,6 +148,79 @@ export async function generateElevenLabsAudio({ text, speaker, config, signal })
   }
 
   return response.arrayBuffer();
+}
+
+export async function generateElevenLabsAudioWithTimestamps({ text, speaker, config, signal }) {
+  if (!config.ELEVENLABS_API_KEY) {
+    throw new Error('ELEVENLABS_API_KEY is not configured.');
+  }
+
+  const request = buildElevenLabsTimestampRequest({ text, speaker, config });
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: request.body,
+    signal,
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const providerCode = body?.detail?.code || body?.detail?.status || body?.detail?.type || '';
+    const code = typeof providerCode === 'string'
+      ? providerCode.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 64)
+      : '';
+    throw new ElevenLabsApiError(response.status, code);
+  }
+
+  const result = await response.json();
+  const audioBuffer = Buffer.from(result?.audio_base64 || '', 'base64');
+  const alignment = result?.alignment || result?.normalized_alignment;
+  if (
+    !audioBuffer.length
+    || !Array.isArray(alignment?.characters)
+    || !Array.isArray(alignment?.character_start_times_seconds)
+    || !Array.isArray(alignment?.character_end_times_seconds)
+    || alignment.characters.length !== alignment.character_start_times_seconds.length
+    || alignment.characters.length !== alignment.character_end_times_seconds.length
+  ) {
+    throw new Error('ElevenLabs returned audio without usable character timestamps.');
+  }
+
+  return { audioBuffer, alignment };
+}
+
+function splitNarrationSentences(text) {
+  return String(text || '').match(/[^.!?।]+(?:[.!?।]+|$)/gu)?.map((sentence) => sentence.trim()).filter(Boolean) || [];
+}
+
+function wordTimingsFromAlignment(text, alignment) {
+  const characters = [...text];
+  if (characters.length !== alignment.characters.length) return [];
+
+  const timings = [];
+  let word = '';
+  let start = null;
+  let end = null;
+  const finishWord = () => {
+    if (word && start !== null && end !== null) timings.push({ text: word, start, end });
+    word = '';
+    start = null;
+    end = null;
+  };
+
+  characters.forEach((character, index) => {
+    if (/\s/u.test(character)) {
+      finishWord();
+      return;
+    }
+    word += character;
+    const charStart = alignment.character_start_times_seconds[index];
+    const charEnd = alignment.character_end_times_seconds[index];
+    if (Number.isFinite(charStart)) start = start === null ? charStart : Math.min(start, charStart);
+    if (Number.isFinite(charEnd)) end = end === null ? charEnd : Math.max(end, charEnd);
+  });
+  finishWord();
+  return timings;
 }
 
 export function buildElevenLabsDialogueRequest({ segments, config }) {
@@ -324,38 +370,68 @@ async function createAudioDramaAsset({ content, config, signal }) {
   const contentHash = crypto.createHash('sha256').update(`${voiceConfigVersion}\n${content}`).digest('hex').slice(0, 24);
   const folder = 'smart-routine/audio-dramas';
   const publicId = `drama-${contentHash}`;
-  const fullPublicId = `${folder}/${publicId}`;
-  const segments = parseNarrationSegments(content);
-  if (!segments.length) throw new Error('The audio drama does not contain any narration segments.');
-
-  const existingFull = await cloudinary().client.resourceInfo(fullPublicId, 'video');
-  if (existingFull?.secure_url) {
-    return {
-      url: existingFull.secure_url,
-      cached: true,
-    };
+  const existingManifest = await cloudinary().client.resourceInfo(`${folder}/${publicId}`, 'raw');
+  if (existingManifest?.secure_url) {
+    const response = await fetch(existingManifest.secure_url, { signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new Error('The saved story audio manifest could not be loaded from Cloudinary.');
+    const manifest = await response.json();
+    if (manifest?.version === NARRATION_AUDIO_VERSION && Array.isArray(manifest.segments) && manifest.segments.length) {
+      return { segments: manifest.segments, cached: true };
+    }
   }
 
   if (!config.ELEVENLABS_API_KEY) {
     throw new ElevenLabsApiError(503, 'api_key_not_configured');
   }
 
-  const generated = await generateNarrationAudio({ lesson: { content }, config, signal });
-  if (!generated.audioBuffer.length || generated.count !== segments.length) {
-    throw new Error('ElevenLabs returned an incomplete story narration.');
+  const sentences = parseNarrationSegments(content).flatMap((segment) =>
+    splitNarrationSentences(segment.text).map((text) => ({ ...segment, text })),
+  );
+  if (!sentences.length) throw new Error('The audio drama does not contain any narration segments.');
+
+  const timedSegments = [];
+  for (const [index, segment] of sentences.entries()) {
+    const generated = await generateElevenLabsAudioWithTimestamps({
+      text: segment.text,
+      speaker: segment.speaker,
+      config,
+      signal,
+    });
+    const words = wordTimingsFromAlignment(segment.text, generated.alignment);
+    if (!words.length) throw new Error(`ElevenLabs returned no word timings for story sentence ${index + 1}.`);
+    const segmentPublicId = `${publicId}-sentence-${index + 1}`;
+    const uploaded = await uploadBufferToCloudinary({
+      config,
+      buffer: generated.audioBuffer,
+      publicId: segmentPublicId,
+      folder,
+      resourceType: 'video',
+      format: 'mp3',
+    });
+    if (!uploaded?.secure_url) {
+      throw new Error(`Cloudinary did not return a secure URL for story sentence ${index + 1}.`);
+    }
+    timedSegments.push({
+      speaker: segment.speaker,
+      character: segment.character,
+      text: segment.text,
+      url: uploaded.secure_url,
+      durationSeconds: Math.max(0, ...generated.alignment.character_end_times_seconds.filter(Number.isFinite)),
+      words,
+    });
   }
 
-  const uploadedFull = await uploadBufferToCloudinary({
+  const uploadedManifest = await uploadBufferToCloudinary({
     config,
-    buffer: generated.audioBuffer,
+    buffer: Buffer.from(JSON.stringify({ version: NARRATION_AUDIO_VERSION, segments: timedSegments })),
     publicId,
     folder,
-    resourceType: 'video',
-    format: 'mp3',
+    resourceType: 'raw',
+    format: 'json',
   });
-  if (!uploadedFull?.secure_url) throw new Error('Cloudinary did not return a secure full audio drama URL.');
+  if (!uploadedManifest?.secure_url) throw new Error('Cloudinary did not return a secure story audio manifest URL.');
 
-  return { url: uploadedFull.secure_url, cached: false };
+  return { segments: timedSegments, cached: false };
 }
 
 export async function generateAndUploadAudioDrama({ content, config, signal }) {

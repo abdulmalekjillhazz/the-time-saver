@@ -121,7 +121,7 @@ const COPY = {
     snoozeAlarm: 'Snooze 5 min',
     stopwatch: 'Stopwatch', startTimer: 'Start', pauseTimer: 'Pause', resetTimer: 'Reset',
     expandStopwatch: 'Open full screen', collapseStopwatch: 'Exit full screen',
-    voiceAlarmNote: 'When an alarm rings, your Google voice speaks the alarm name and your next routine, and a notification is sent with the same message. Alarms ring while this app is open.', nativeAlarmNote: 'Android uses your selected alarm sound and keeps alarms ringing when Smart Routine is closed. Allow the Android alarm permissions below.', alarmVoiceUnavailable: 'The voice alarm could not play in this browser. The notification was still sent.',
+    voiceAlarmNote: 'When an alarm rings, your Google voice speaks the alarm name and your next routine, and a notification is sent with the same message. Alarms ring while this app is open.', nativeAlarmNote: 'Android uses your selected alarm sound and keeps alarms ringing when Smart Routine is closed. Allow the Android alarm permissions below.',     alarmVoiceUnavailable: 'The voice announcement could not play. The alarm sound may still be active.',
     alarmPushOn: 'Closed-app alerts are on for this device — alarms ring even with the app closed.', alarmPushOff: 'Turn on closed-app alerts so alarms ring even with the app closed.',
     enableClosedAppAlerts: '🔔 Enable closed-app alerts', pushUnavailable: 'Closed-app alerts are unavailable in this browser.',
     pushServiceUnavailable: 'This browser profile cannot receive closed-app alerts. Try a regular browser profile or the Android app; browser alarms only ring while this page is open.',
@@ -191,7 +191,7 @@ const COPY = {
     snoozeAlarm: '৫ মিনিট স্নুজ',
     stopwatch: 'স্টপওয়াচ', startTimer: 'শুরু', pauseTimer: 'থামান', resetTimer: 'রিসেট',
     expandStopwatch: 'পুরো পর্দায় খুলুন', collapseStopwatch: 'পুরো পর্দা বন্ধ করুন',
-    voiceAlarmNote: 'অ্যালার্ম বাজলে Google ভয়েসে অ্যালার্মের নাম ও পরের রুটিন শোনা যাবে, আর একই বার্তায় নোটিফিকেশন আসবে। অ্যাপ খোলা থাকলে অ্যালার্ম বাজবে।', nativeAlarmNote: 'Android-এ আপনার বেছে নেওয়া অ্যালার্মের শব্দ বাজবে এবং Smart Routine বন্ধ থাকলেও অ্যালার্ম চলবে। নিচের Android alarm অনুমতিগুলো দিন।', alarmVoiceUnavailable: 'এই browser-এ ভয়েস অ্যালার্ম চালানো যায়নি। নোটিফিকেশন পাঠানো হয়েছে।',
+    voiceAlarmNote: 'অ্যালার্ম বাজলে Google ভয়েসে অ্যালার্মের নাম ও পরের রুটিন শোনা যাবে, আর একই বার্তায় নোটিফিকেশন আসবে। অ্যাপ খোলা থাকলে অ্যালার্ম বাজবে।', nativeAlarmNote: 'Android-এ আপনার বেছে নেওয়া অ্যালার্মের শব্দ বাজবে এবং Smart Routine বন্ধ থাকলেও অ্যালার্ম চলবে। নিচের Android alarm অনুমতিগুলো দিন।',     alarmVoiceUnavailable: 'ভয়েস বার্তাটি চালানো যায়নি। অ্যালার্মের শব্দ আলাদাভাবে বাজতে পারে।',
     alarmPushOn: 'এই ডিভাইসে বন্ধ-অ্যাপ অ্যালার্ট চালু আছে — অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।', alarmPushOff: 'বন্ধ-অ্যাপ অ্যালার্ট চালু করুন, তাহলে অ্যাপ বন্ধ থাকলেও অ্যালার্ম বাজবে।',
     enableClosedAppAlerts: '🔔 বন্ধ-অ্যাপ অ্যালার্ট চালু করুন', pushUnavailable: 'এই browser-এ বন্ধ-অ্যাপ অ্যালার্ট সমর্থিত নয়।',
     pushServiceUnavailable: 'এই browser profile বন্ধ-অ্যাপ alert নিতে পারছে না। সাধারণ browser profile বা Android app ব্যবহার করুন; browser alarm শুধু পেজ খোলা থাকলে বাজে।',
@@ -222,7 +222,7 @@ function PasswordField({ label, copy, hint, ...inputProps }) {
         <input
           {...inputProps}
           type={visible ? 'text' : 'password'}
-          className="block w-full rounded border bg-paper p-3 pr-12 text-ink"
+          className="block w-full rounded-xl border border-gold/25 bg-paper/70 p-3 pr-12 text-ink outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/30"
         />
         <button
           type="button"
@@ -1931,7 +1931,7 @@ export function PrivateApp() {
 
   if (!user) {
     return (
-      <main className="app-shell mx-auto my-6 max-w-md space-y-5 rounded-[2rem] p-4 sm:my-10 sm:p-7">
+      <main className="app-shell enter-up mx-auto my-6 max-w-md space-y-5 rounded-[2rem] p-4 sm:my-10 sm:p-7">
         <header className="app-hero relative space-y-4 overflow-hidden rounded-3xl p-6 sm:p-7">
           <div className="relative z-10 space-y-1.5">
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{copy.title}</h1>
@@ -1970,24 +1970,24 @@ export function PrivateApp() {
               title={theme === 'dark' ? copy.themeLight : copy.themeDark}
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
             >
-              {theme === 'dark' ? '☀️' : '🌙'}
+              <span key={theme} className="coin-flip" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
             </Button>
           </div>
         </header>
 
-        <Card as="form" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" className="surface-card space-y-5 rounded-3xl p-6 sm:p-7" onSubmit={authenticate}>
+        <Card as="form" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" className="surface-card glass-panel glow-border enter-up space-y-5 rounded-3xl p-6 sm:p-7" onSubmit={authenticate}>
           <div className="grid grid-cols-2 gap-2 rounded-2xl border border-gold/25 bg-paper/60 p-1.5">
             <button
               type="button"
               onClick={() => { setRegistering(false); setError(''); }}
-              className={`min-h-[42px] rounded-xl text-sm font-bold transition ${!registering ? 'bg-sapphire text-on-sapphire shadow-md' : 'text-ink/75 hover:text-ink'}`}
+              className={`min-h-[42px] rounded-xl text-sm font-bold transition ${!registering ? 'bg-sapphire text-on-sapphire tab-bounce shadow-[0_0_12px_rgba(96,165,250,0.5)]' : 'text-ink/75 hover:text-ink'}`}
             >
               {copy.login}
             </button>
             <button
               type="button"
               onClick={() => { setRegistering(true); setError(''); }}
-              className={`min-h-[42px] rounded-xl text-sm font-bold transition ${registering ? 'bg-sapphire text-on-sapphire shadow-md' : 'text-ink/75 hover:text-ink'}`}
+              className={`min-h-[42px] rounded-xl text-sm font-bold transition ${registering ? 'bg-sapphire text-on-sapphire tab-bounce shadow-[0_0_12px_rgba(96,165,250,0.5)]' : 'text-ink/75 hover:text-ink'}`}
             >
               {copy.register}
             </button>
@@ -1998,11 +1998,11 @@ export function PrivateApp() {
               <>
                 <label className="block text-sm font-semibold">
                   {copy.name}
-                  <input name="displayName" required maxLength="60" placeholder={lang === 'bn' ? 'আপনার নাম' : 'Your name'} className="mt-1.5 block w-full rounded-xl border bg-paper p-3 text-ink" />
+                  <input name="displayName" required maxLength="60" placeholder={lang === 'bn' ? 'আপনার নাম' : 'Your name'} className="mt-1.5 block w-full rounded-xl border border-gold/25 bg-paper/70 p-3 text-ink outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/30" />
                 </label>
                 <label className="block text-sm font-semibold">
                   {copy.locale}
-                  <select name="locale" value={lang} onChange={(event) => setStoredLanguage(event.target.value)} className="mt-1.5 block w-full rounded-xl border bg-paper p-3 text-ink">
+                  <select name="locale" value={lang} onChange={(event) => setStoredLanguage(event.target.value)} className="mt-1.5 block w-full rounded-xl border border-gold/25 bg-paper/70 p-3 text-ink outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/30">
                     <option value="bn">বাংলা (Bangla)</option>
                     <option value="en">English</option>
                   </select>
@@ -2012,7 +2012,7 @@ export function PrivateApp() {
 
             <label className="block text-sm font-semibold">
               {copy.email}
-              <input name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="mt-1.5 block w-full rounded-xl border bg-paper p-3 text-ink" />
+              <input name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="mt-1.5 block w-full rounded-xl border border-gold/25 bg-paper/70 p-3 text-ink outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/30" />
             </label>
 
             <PasswordField
@@ -2027,7 +2027,7 @@ export function PrivateApp() {
           </div>
 
           {error ? (
-            <p role="alert" className="rounded-xl border border-red-500/40 bg-red-500/10 px-3.5 py-2.5 text-xs font-semibold text-red-300">
+            <p role="alert" className="rounded-xl border border-rose-400/40 bg-rose-400/10 px-3.5 py-2.5 text-xs font-semibold text-rose-300">
               ⚠️ {error}
             </p>
           ) : null}
@@ -2059,7 +2059,7 @@ export function PrivateApp() {
           ) : null}
         </Card>
         {offlineSavedLessons.length ? (
-          <Card className="surface-card space-y-4 rounded-3xl p-5">
+          <Card className="surface-card glass-panel glow-border space-y-4 rounded-3xl p-5">
             <div>
               <h2 className="text-lg font-extrabold text-ink">অফলাইনে সংরক্ষিত গল্প</h2>
               <p className="mt-1 text-sm text-ink/75">অ্যাকাউন্টে সাইন ইন না করেও এই ডিভাইসে রাখা গল্প পড়তে পারবেন।</p>
@@ -2195,7 +2195,7 @@ export function PrivateApp() {
         aria-pressed={theme === 'dark'}
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
       >
-        <span className="tab-icon" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+        <span key={theme} className="tab-icon coin-flip" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
       </Button>
     </div>
   );
@@ -2217,7 +2217,7 @@ export function PrivateApp() {
         </Button>
       ) : null}
       {!immersiveTab ? (
-      <header className="app-hero flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl px-5 py-6 sm:px-8 sm:py-8">
+      <header className="app-hero enter-up flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl px-5 py-6 sm:px-8 sm:py-8">
         <div className="relative z-10 w-full">
           <div className="app-hero-heading-row">
             <div className="app-tabs app-header-controls-mobile">{renderAppHeaderControls()}</div>
@@ -2271,8 +2271,8 @@ export function PrivateApp() {
           ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
           ['speaking', '🎙️', lang === 'bn' ? 'কথা বলা শিখুন' : 'Learn to speak', lang === 'bn' ? 'কথা' : 'Speak'],
           ['grammar', '🧩', lang === 'bn' ? 'Building · ইংরেজি বাক্য অনুশীলন' : 'Building · English practice', 'Building'],
-        ].map(([key, icon, label, shortLabel]) => (
-          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} className={`tab-button ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
+        ].map(([key, icon, label, shortLabel], index) => (
+          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} style={{ '--enter-delay': `${index * 60}ms` }} className={`tab-button enter-up ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
             <span className={`tab-icon tab-icon-${key}`} aria-hidden="true">
               {icon}
             </span>
@@ -2285,18 +2285,20 @@ export function PrivateApp() {
         </div>
       </nav>
 
-      {tab === 'leaderboard' ? <LeaderboardPanel lang={lang} /> : null}
+      {tab === 'leaderboard' ? <div className="tab-enter"><LeaderboardPanel lang={lang} /></div> : null}
 
       {tab === 'speaking' ? (
-        <SpeakingSituations
-          lang={lang}
-          dailyLesson={dailyLesson}
-          onStoryComplete={markSpeakingStoryComplete}
-        />
+        <div className="tab-enter">
+          <SpeakingSituations
+            lang={lang}
+            dailyLesson={dailyLesson}
+            onStoryComplete={markSpeakingStoryComplete}
+          />
+        </div>
       ) : null}
 
       {tab === 'settings' ? (
-        <section className="space-y-4">
+        <section className="tab-enter space-y-4">
           <h2 className="section-heading">{lang === 'bn' ? 'পরিসংখ্যান ও অগ্রগতি' : 'Statistics and progress'}</h2>
           <GamificationBar lang={lang} userId={user.id} />
           <RoutineDashboard lang={lang} userId={user.id} />
@@ -2306,10 +2308,10 @@ export function PrivateApp() {
         </section>
       ) : null}
 
-      {tab === 'grammar' ? <GrammarLessons lang={lang} stories={grammarStorySources} /> : null}
+      {tab === 'grammar' ? <div className="tab-enter"><GrammarLessons lang={lang} stories={grammarStorySources} /></div> : null}
 
       {tab === 'today' ? (
-        <section className="space-y-4">
+        <section className="tab-enter space-y-4">
           <TodayProgressCard
             lang={lang}
             userId={user.id}
@@ -2319,14 +2321,14 @@ export function PrivateApp() {
           />
 
           {reminders.length ? (
-            <Card className="border-gold bg-gold-soft" role="status">
+            <Card className="border-gold bg-gold-soft glass-panel" role="status">
               <h2 className="font-bold">{copy.reminder}</h2>
               <ul>{reminders.map((routine) => <li key={routine.id}>{routine.title} · {routine.startTime}</li>)}</ul>
             </Card>
           ) : null}
 
           {focusRoutines.length ? (
-            <Card className="surface-card space-y-2">
+            <Card className="surface-card glass-panel glow-border space-y-2">
               <h2 className="section-heading">{copy.focus20}</h2>
               <p className="text-sm opacity-75">{copy.focus20Help}</p>
               <ul className="grid gap-2 sm:grid-cols-2">
@@ -2343,7 +2345,7 @@ export function PrivateApp() {
             </Card>
           ) : null}
 
-          <Card className="surface-card space-y-4">
+          <Card className="surface-card glass-panel glow-border space-y-4">
             <h2 className="section-heading"><span aria-hidden="true">🌤️</span> {copy.today}</h2>
             {routines.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gold/30 bg-gold/5 p-8 text-center sm:p-10">
@@ -2393,7 +2395,7 @@ export function PrivateApp() {
                         type="button"
                         onClick={() => setReplanRoutine(routine)}
                         title={lang === 'bn' ? 'সময় কম? ৫ মিনিটের সংক্ষেপ বিকল্প' : 'Short on time? 5-min version'}
-                        className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-amber-400 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500/20"
+                        className="inline-flex min-h-[44px] items-center gap-1 rounded-lg border border-gold bg-gold/10 px-3 py-1.5 text-xs font-bold text-gold-soft hover:bg-gold/20"
                       >
                         <span aria-hidden="true">⚡</span>
                         <span>{lang === 'bn' ? '৫ মিনিট' : '5 min'}</span>
@@ -2426,7 +2428,7 @@ export function PrivateApp() {
                       ))}
                       <Button
                         variant="secondary"
-                        className="icon-button inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-ink/60 hover:text-red-400"
+                        className="icon-button inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-ink/60 hover:text-rose-400"
                         aria-label={copy.delete}
                         title={copy.delete}
                         disabled={busy}
@@ -2445,7 +2447,7 @@ export function PrivateApp() {
       ) : null}
 
       {tab === 'plan' ? (
-        <section className="space-y-4">
+        <section className="tab-enter space-y-4">
           <div className="space-y-2">
             <p className="eyebrow">{lang === 'bn' ? 'ধাপ ১ · রুটিন তৈরি' : 'STEP 1 · CREATE A ROUTINE'}</p>
             <AddRoutineBuilderCard
@@ -2463,7 +2465,7 @@ export function PrivateApp() {
               <GoalToRoutine lang={lang} userId={user.id} onRoutinesAdded={() => loadRoutines(user).catch(reportError)} />
             </div>
           </details>
-          <Card className="surface-card p-4">
+          <Card className="surface-card glass-panel glow-border p-4">
             <h2 className="section-heading"><span aria-hidden="true">📅</span> {lang === 'bn' ? 'ধাপ ২ · মাসিক ক্যালেন্ডার' : 'STEP 2 · MONTHLY CALENDAR'}</h2>
             <div className="mt-4 space-y-4 border-t border-sapphire/15 pt-3">
               <header className="flex flex-wrap items-center justify-between gap-3">
@@ -2531,7 +2533,7 @@ export function PrivateApp() {
             </div>
             </div>
           </Card>
-          <Card className="surface-card p-4">
+          <Card className="surface-card glass-panel glow-border p-4">
             <h2 className="section-heading"><span aria-hidden="true">💡</span> {lang === 'bn' ? 'ধাপ ৩ · ধারণা ও টেমপ্লেট' : 'STEP 3 · IDEAS & TEMPLATES'}</h2>
             <div className="mt-4 space-y-4 pt-3 border-t border-sapphire/15">
               <Button
@@ -2550,8 +2552,8 @@ export function PrivateApp() {
       ) : null}
 
       {tab === 'focus' ? (
-        <section className="space-y-4">
-            <Card className="surface-card space-y-4">
+        <section className="tab-enter space-y-4">
+            <Card className="surface-card glass-panel glow-border space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="section-heading"><span aria-hidden="true">⏱️</span> {copy.stopwatch}</h2>
                 <StopwatchReadout className="stopwatch-display" />
@@ -2568,7 +2570,7 @@ export function PrivateApp() {
               </div>
             </Card>
           <section className="space-y-4">
-            <Card className="surface-card space-y-4">
+            <Card className="surface-card glass-panel glow-border space-y-4">
               <h2 className="section-heading"><span aria-hidden="true">🔔</span> {copy.alarmTitle}</h2>
               <form className="grid gap-3 sm:grid-cols-2" onSubmit={scheduleAlarm}>
                 <label className="block">{copy.alarmTime}<input type="datetime-local" value={alarmTime} min={localDateTimeValue(new Date(Date.now() + 60_000))} onChange={(event) => setAlarmTime(event.target.value)} required className="polished-input mt-1 block w-full p-3" /></label>
@@ -2635,7 +2637,7 @@ export function PrivateApp() {
               ) : null}
               <ul className="space-y-2">
                 {alarms.length ? alarms.map((alarm) => (
-                  <li key={alarm.id} className="alarm-row flex items-center justify-between gap-3 rounded-xl px-3 py-2">
+                  <li key={alarm.id} className="alarm-row alarm-ring flex items-center justify-between gap-3 rounded-xl px-3 py-2">
                     <span><strong>{alarm.label || copy.alarmTitle}</strong><span className="ml-2 text-sm opacity-70">{copy.setFor} {new Date(alarm.at).toLocaleString(lang === 'bn' ? 'bn-BD' : 'en')}</span>{alarm.firedAt ? <span className="ml-2 text-xs text-gold">{copy.alarmDone}</span> : null}</span>
                     <span className="flex shrink-0 gap-2">
                       <Button variant="secondary" className="min-h-[44px] px-3" aria-label={`${copy.snoozeAlarm}: ${alarm.label || copy.alarmTime}`} title={copy.snoozeAlarm} onClick={() => snoozeOneAlarm(alarm.id)}>⏰</Button>
@@ -2650,7 +2652,7 @@ export function PrivateApp() {
       ) : null}
 
       {tab === 'lessons' ? (
-        <section className="space-y-4">
+        <section className="tab-enter space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {offlineCacheStatus ? <p role="status" className="text-sm text-ink/80">{offlineCacheStatus}</p> : <span />}
             <Button
@@ -2664,7 +2666,7 @@ export function PrivateApp() {
           {dailyLesson ? <DailyLessonCard dailyLesson={dailyLesson} quiz={dailyQuiz} lang={lang} collapsible trackLearning /> : null}
           {lessons.length ? (
             <div className="space-y-4">
-              <Card className={`surface-card ${lesson || lessonLoadingSlug ? 'lesson-catalog-reading' : ''} space-y-3 p-4 sm:p-6`}>
+              <Card className={`surface-card glass-panel glow-border ${lesson || lessonLoadingSlug ? 'lesson-catalog-reading' : ''} space-y-3 p-4 sm:p-6`}>
                 <h2 className="text-xl font-extrabold text-gold-soft">{copy.lessons}</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {lessons.map((item) => (
@@ -2697,7 +2699,7 @@ export function PrivateApp() {
                   ))}
                 </div>
               </Card>
-              <Card id="published-lesson-story" className={`surface-card scroll-mt-6 space-y-5 rounded-2xl border border-gold/30 p-4 shadow-md sm:p-6 ${lesson || lessonLoadingSlug ? 'lesson-reader-overlay-open' : ''}`}>
+              <Card id="published-lesson-story" className={`surface-card story-reading-card glass-panel glow-border scroll-mt-6 space-y-5 rounded-2xl border border-gold/30 p-4 shadow-md sm:p-6 ${lesson || lessonLoadingSlug ? 'lesson-reader-overlay-open' : ''}`}>
                 {lesson || lessonLoadingSlug ? (
                   <header className="lesson-reader-header">
                     <Button type="button" variant="secondary" className="reader-back-button" disabled={Boolean(lessonLoadingSlug)} onClick={() => setLesson(null)} aria-label={copy.closeLesson} title={copy.closeLesson}>
@@ -2708,7 +2710,7 @@ export function PrivateApp() {
                     <p className="min-w-0 truncate font-bold text-ink">
                       {lesson ? localized(lesson.title, 'en') : localized(lessons.find((item) => item.slug === lessonLoadingSlug)?.title || '', 'en')}
                       {lesson && storyAward?.lessonId === lesson.id && storyAward.earnedPoints > 0 ? (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-sapphire/10 px-2 py-1 text-xs font-extrabold text-sapphire">
+                        <span className="points-pop ml-2 inline-flex items-center rounded-full bg-sapphire/10 px-2 py-1 text-xs font-extrabold text-sapphire">
                           +{storyAward.earnedPoints} ⭐ {copy.storyPoints}
                         </span>
                       ) : null}
@@ -2799,7 +2801,7 @@ export function PrivateApp() {
       ) : null}
 
       {tab === 'settings' ? (
-        <Card className="surface-card space-y-4">
+        <Card className="surface-card glass-panel glow-border tab-enter space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gold/20 pb-3">
             <div>
               <h2 className="section-heading"><span aria-hidden="true">🎯</span> {copy.insights}</h2>
@@ -2844,7 +2846,7 @@ export function PrivateApp() {
       ) : null}
 
       <section className={tab === 'settings' ? 'space-y-4' : 'hidden'} aria-label={copy.settings}>
-          <Card className="surface-card space-y-3 p-5">
+          <Card className="surface-card glass-panel glow-border space-y-3 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                   <h3 className="font-bold text-ink flex items-center gap-2">
@@ -2859,13 +2861,13 @@ export function PrivateApp() {
                 aria-label={lang === 'bn' ? 'নামাজের সময় ও আজান চালু বা বন্ধ করুন' : 'Toggle prayer times and Azan'}
                 aria-pressed={showPrayerTimes}
                 onClick={() => setShowPrayerTimes(!showPrayerTimes)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${showPrayerTimes ? 'bg-sapphire-deep' : 'bg-gray-300'}`}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${showPrayerTimes ? 'bg-sapphire-deep' : 'bg-ink/20'}`}
               >
                 <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${showPrayerTimes ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
           </Card>
-          <Card className="surface-card space-y-3 p-5">
+          <Card className="surface-card glass-panel glow-border space-y-3 p-5">
             <h2 className="text-lg font-semibold">{lang === 'bn' ? 'দ্রুত সেটিংস' : 'Quick settings'}</h2>
             <div className="grid grid-cols-2 gap-2">
               {pwaInstallPrompt ? (
@@ -2896,7 +2898,7 @@ export function PrivateApp() {
                 aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               >
-                <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+                <span key={theme} className="coin-flip" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
                 <span>{theme === 'dark' ? copy.themeLight : copy.themeDark}</span>
               </Button>
               <Button
@@ -2915,7 +2917,7 @@ export function PrivateApp() {
             </div>
           </Card>
           <PrayerTimesCard lang={lang} />
-          <Card className="space-y-3">
+          <Card className="surface-card glass-panel glow-border space-y-3 p-5">
             <h2 className="text-2xl font-semibold">{copy.settings}</h2>
             <form className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end" onSubmit={saveProfile}>
               <div>
@@ -2934,7 +2936,7 @@ export function PrivateApp() {
                     maxLength={60}
                     minLength={1}
                     required
-                    className="mt-1 block w-full"
+                    className="mt-1 block w-full rounded-xl border border-gold/25 bg-paper/70 p-3 text-ink outline-none transition-colors focus:border-gold focus:ring-2 focus:ring-gold/30"
                     autoComplete="name"
                   />
                 </label>
@@ -2983,12 +2985,12 @@ export function PrivateApp() {
         />
       )}
       {offlineConsentOpen ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="offline-story-cache-title"
-            className="surface-card w-full max-w-lg space-y-4 rounded-3xl border border-sapphire/40 p-5 shadow-2xl sm:p-7"
+            className="surface-card glass-panel glow-border modal-pop w-full max-w-lg space-y-4 rounded-3xl border border-sapphire/40 p-5 shadow-2xl sm:p-7"
           >
             <div aria-hidden="true" className="text-3xl">📥</div>
             <h2 id="offline-story-cache-title" className="text-xl font-extrabold text-ink sm:text-2xl">
@@ -3054,7 +3056,7 @@ export function PrivateApp() {
                   ? 'এই কাজটি শেষ হলে সম্পন্ন নির্বাচন করুন। বাদ দিতে চাইলে এড়িয়ে যান—কাজের সময় নেভিগেশন লুকানো থাকবে।'
                   : 'Focus on this task. Mark it complete when you finish, or skip it; navigation stays hidden while you work.'}
               </p>
-              {error ? <p role="alert" className="mx-auto max-w-xl rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-800">{error}</p> : null}
+              {error ? <p role="alert" className="mx-auto max-w-xl rounded-xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300">{error}</p> : null}
               {notice ? <p role="status" className="mx-auto max-w-xl rounded-xl border border-sapphire/30 bg-sapphire/10 px-4 py-3 text-sm font-semibold text-sapphire">{notice}</p> : null}
               <div className="mx-auto flex w-full max-w-md flex-col gap-3 sm:flex-row">
                 <Button
@@ -3092,7 +3094,7 @@ export function PrivateApp() {
             paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
           }}
         >
-          <h2 className="text-lg font-bold uppercase tracking-[0.24em] text-amber-300">{copy.stopwatch}</h2>
+          <h2 className="text-lg font-bold uppercase tracking-[0.24em] text-gold-soft">{copy.stopwatch}</h2>
           <StopwatchReadout as="output" className="whitespace-nowrap font-mono text-[clamp(3rem,18vw,10rem)] font-extrabold tabular-nums leading-none tracking-tight" />
           <div className="flex flex-wrap items-center justify-center gap-3">
             {stopwatchStartedAt === null

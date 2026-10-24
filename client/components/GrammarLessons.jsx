@@ -37,11 +37,21 @@ export const GRAMMAR_LEVELS = [
           en: 'Use am with I, is with he, she, it, or one person or thing, and are with you, we, they, or more than one person or thing.',
           bn: 'I-এর সঙ্গে am, he/she/it বা একজন/একটি জিনিসের সঙ্গে is, আর you/we/they বা একাধিক ব্যক্তির/জিনিসের সঙ্গে are বসে।',
         },
-        example: 'They are ready for class.',
-        prompt: { en: 'Which sentence uses the correct be verb with they?', bn: 'They-এর সঙ্গে be verb সঠিকভাবে কোন বাক্যে বসেছে?' },
-        choices: ['I am ready for class.', 'They are ready for class.', 'He is ready for class.'],
+        example: 'I am ready for class.',
+        prompt: {
+          en: 'Which new sentence uses are with a plural subject?',
+          bn: 'নতুন কোন বাক্যে plural subject-এর সঙ্গে are ব্যবহার করা হয়েছে?',
+        },
+        choices: [
+          'She is ready for class.',
+          'The students are ready for class.',
+          'He is ready for class.',
+        ],
         answer: 1,
-        feedback: { en: 'Use are with they.', bn: 'They-এর সঙ্গে are বসে।' },
+        feedback: {
+          en: "The subject 'students' is plural, so use are.",
+          bn: "'Students' subject plural, তাই এর সঙ্গে are বসে।",
+        },
       },
       {
         id: 'do-questions',

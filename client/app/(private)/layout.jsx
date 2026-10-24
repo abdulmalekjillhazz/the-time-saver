@@ -20,7 +20,7 @@ export const viewport = {
 
 export default function PrivateLayout({ children }) {
   return (
-    <html lang="bn">
+    <html lang="bn" suppressHydrationWarning>
       <body className="private-app-body">{children}</body>
     </html>
   );

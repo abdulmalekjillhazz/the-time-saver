@@ -12,6 +12,7 @@ import {
 import { CloudinaryApiError, isCloudinaryConfigured } from '../services/cloudinary.js';
 import { generateGoogleTtsAudio, GoogleTtsApiError } from '../services/googleTts.js';
 import { logger } from '../lib/logger.js';
+import { parseStoryNarration } from '@smart-routine/shared';
 
 const MINUTE = 60 * 1000;
 const audioDramaRequest = z.object({
@@ -125,7 +126,7 @@ export function speechRouter({ config = {} } = {}) {
     async (req, res, next) => {
       try {
         const audio = await generateGoogleTtsAudio({
-          text: req.body.content,
+          text: parseStoryNarration(req.body.content).map(({ text }) => text).join('\n'),
           lang: req.body.lang,
         });
         logger.info({ audioSource: 'google-tts', storyAudio: true }, 'story audio generated');
@@ -165,12 +166,10 @@ export function speechRouter({ config = {} } = {}) {
         logger.info({
           audioSource: 'cloudinary',
           cached: Boolean(result.cached),
+          sentenceCount: result.segments.length,
           storyAudio: true,
         }, 'story audio ready');
-        return res.json({
-          cached: Boolean(result.cached),
-          audioUrl: result.url,
-        });
+        return res.json(result);
       } catch (err) {
         if (!(err instanceof AppError)) {
           logger.warn({ errName: err.name }, 'Story audio generation or Cloudinary save failed');

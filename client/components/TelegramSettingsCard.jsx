@@ -16,12 +16,12 @@ export function TelegramSettingsCard({ user, lang = 'bn', onSaved }) {
     title: isBn ? '🤖 টেলিগ্রাম হ্যাবিট বট নোটিফিকেশন' : '🤖 Telegram Habit Bot Notifications',
     desc: isBn ? 'টেলিগ্রামে প্রতিদিনের রুটিন পান এবং এক ক্লিকেই সম্পূর্ণ করুন (১০০% ফ্রি)।' : 'Receive daily routines on Telegram and complete them in 1-click (100% Free).',
     step1: isBn ? '১. প্রথমে টেলিগ্রামে আপনার বটের চ্যাটে /start লিখুন।' : '1. Open Telegram bot and send /start.',
-    step2: isBn ? '২. বটের দেওয়া চ্যাট আইডি নিচে পেস্ট করে সেভ করুন:' : '2. Paste your Chat ID provided by the bot below:',
+    step2: isBn ? '২. বটের দেওয়া চ্যাট আইডি নিচে পেস্ট করে সেভ করুন:' : '2. Paste your Chat ID provided by the bot below:',
     placeholder: isBn ? 'আপনার Telegram Chat ID' : 'Your Telegram Chat ID',
     toggle: isBn ? 'টেলিগ্রাম নোটিফিকেশন চালু রাখুন' : 'Enable Telegram Daily Alerts',
     save: isBn ? 'সেভ করুন' : 'Save Connection',
     saved: isBn ? 'সফলভাবে সংরক্ষিত!' : 'Saved successfully!',
-    failed: isBn ? 'সংরক্ষণ ব্যর্থ হয়েছে' : 'Failed to save',
+    failed: isBn ? 'সংরক্ষণ ব্যর্থ হয়েছে' : 'Failed to save',
   };
 
   const handleSave = async (e) => {
@@ -44,7 +44,7 @@ export function TelegramSettingsCard({ user, lang = 'bn', onSaved }) {
   };
 
   return (
-    <Card className="surface-card space-y-4 p-5">
+    <Card className="surface-card glass-panel glow-border space-y-4 p-5">
       <div className="border-b border-gold/20 pb-3">
         <h3 className="section-heading text-base flex items-center gap-2">
           <span>🤖</span> {copy.title}
@@ -52,7 +52,7 @@ export function TelegramSettingsCard({ user, lang = 'bn', onSaved }) {
         <p className="mt-1 text-sm text-ink/85">{copy.desc}</p>
       </div>
 
-      <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs text-sky-950 space-y-1">
+      <div className="rounded-xl border border-sapphire/30 bg-sapphire/10 p-3 text-xs text-ink space-y-1">
         <p><strong>{copy.step1}</strong></p>
         <p>{copy.step2}</p>
       </div>
@@ -64,7 +64,7 @@ export function TelegramSettingsCard({ user, lang = 'bn', onSaved }) {
             value={chatId}
             onChange={(e) => setChatId(e.target.value)}
             placeholder={copy.placeholder}
-            className="w-full rounded-xl border border-gold/25 p-2.5 text-sm font-mono"
+            className="w-full rounded-xl border border-gold/25 bg-paper/70 p-2.5 text-sm font-mono text-ink placeholder:text-ink/40 outline-none focus:border-gold/70 focus:ring-2 focus:ring-gold/30"
           />
         </div>
 

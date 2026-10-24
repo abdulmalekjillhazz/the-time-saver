@@ -1,6 +1,7 @@
 import { apiRequest, apiRequestAudio } from './apiClient.js';
 import { claimAudioPlayback } from './audioPlayback.js';
 import { saveOfflineStoryAudio } from './offlineStoryCache.js';
+import { parseStoryNarration } from '@smart-routine/shared';
 
 const CHARACTERS = {
   narrator: { character: 'Narrator', pan: 0, pitch: 1, rate: 1 },
@@ -9,15 +10,6 @@ const CHARACTERS = {
   female: { character: 'Female', pan: 0.45, pitch: 1.15, rate: 1 },
   child: { character: 'Child', pan: 0.2, pitch: 1.35, rate: 1.05 },
 };
-const MAX_SPEECH_CHARS = 150;
-
-function looksLikeSpeakerName(name = '') {
-  const normalized = String(name || '').trim();
-  if (!normalized) return false;
-  const compact = normalized.toLowerCase().replace(/[^a-z0-9\u0980-\u09ff]+/g, ' ');
-  return /(?:father|dad|papa|adult male|male|mother|mom|adult female|female|asha|rahim|rahi|story ?teller|narrator|child|son|daughter|rafi|রহিম|আশা|রাফি|মা|শিশু|বাচ্চা|গল্পকথক|বর্ণনাকারী)/.test(compact);
-}
-
 function characterSettings(name = '') {
   const normalized = String(name || '').toLowerCase();
   if (/storyteller|story teller|narrator|বর্ণনাকারী|গল্পকথক|কথক/.test(normalized)) return CHARACTERS.storyteller;
@@ -27,94 +19,58 @@ function characterSettings(name = '') {
   return CHARACTERS.narrator;
 }
 
-function splitText(text) {
-  const chunks = [];
-  let current = '';
-  for (const word of text.split(/\s+/)) {
-    if (!word) continue;
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length <= MAX_SPEECH_CHARS) {
-      current = candidate;
-      continue;
-    }
-    if (current) chunks.push(current);
-    current = word;
-    while (current.length > MAX_SPEECH_CHARS) {
-      chunks.push(current.slice(0, MAX_SPEECH_CHARS));
-      current = current.slice(MAX_SPEECH_CHARS);
-    }
-  }
-  if (current) chunks.push(current);
-  return chunks;
+export function parseStoryScript(content = '', defaultSpeaker = 'Narrator') {
+  return parseStoryNarration(content, defaultSpeaker).map(({ character, text }) => {
+    const settings = characterSettings(character);
+    return {
+      character,
+      role: settings.character.toLowerCase(),
+      text,
+      pan: settings.pan,
+      pitch: settings.pitch,
+      rate: settings.rate,
+    };
+  });
 }
 
-export function parseStoryScript(content = '', defaultSpeaker = 'Narrator') {
-  const lines = [];
-  if (typeof content !== 'string' || !content.trim()) return lines;
+export function getStoryWordWeights(text) {
+  const words = String(text || '').match(/\S+/gu) || [];
+  return words.map((word) => {
+    const characters = [...word].filter((character) => /[\p{L}\p{N}]/u.test(character)).length;
+    const pause = /[.!?।]$/.test(word) ? 2 : /[,;:]$/.test(word) ? 1 : 0;
+    return Math.max(1, characters) + pause;
+  });
+}
 
-  for (const rawLine of content.split(/\r?\n/)) {
-    const trimmed = rawLine.trim();
-    if (!trimmed) continue;
+export function getStoryLineWeights(lines) {
+  return lines.map(({ text }) => Math.max(1, getStoryWordWeights(text).reduce((sum, weight) => sum + weight, 0)));
+}
 
-    let speaker = defaultSpeaker;
-    let text = trimmed;
-
-    const bracketMatch = trimmed.match(/^\[([^\]]+)\]\s*:?\s*(.*)$/);
-    if (bracketMatch) {
-      const candidate = bracketMatch[1].trim();
-      const candidateText = bracketMatch[2].trim();
-      if (candidate && looksLikeSpeakerName(candidate)) {
-        speaker = candidate;
-        text = candidateText;
-      } else {
-        speaker = defaultSpeaker;
-        text = trimmed;
-      }
-    } else {
-      const plainMatch = trimmed.match(/^([A-Za-zÀ-ÖØ-öø-ÿ\u0980-\u09FF][\w\s'’.-]*?)\s*:\s*(.+)$/);
-      if (plainMatch) {
-        const candidate = plainMatch[1].trim();
-        if (looksLikeSpeakerName(candidate)) {
-          speaker = candidate;
-          text = plainMatch[2].trim();
-        } else {
-          speaker = defaultSpeaker;
-          text = trimmed;
-        }
-      }
+export function getStoryPositionFromAudioProgress(progress, weights) {
+  if (!weights.length) return 0;
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  let remaining = Math.max(0, Math.min(1, progress)) * totalWeight;
+  for (let index = 0; index < weights.length; index += 1) {
+    const weight = weights[index];
+    if (remaining <= weight || index === weights.length - 1) {
+      return index + Math.max(0, Math.min(1, remaining / weight));
     }
-
-    if (!text || !text.trim()) continue;
-
-    const settings = characterSettings(speaker || defaultSpeaker);
-    for (const chunk of splitText(text)) {
-      lines.push({
-        character: speaker || defaultSpeaker,
-        role: settings.character.toLowerCase(),
-        text: chunk,
-        pan: settings.pan,
-        pitch: settings.pitch,
-        rate: settings.rate,
-      });
-    }
+    remaining -= weight;
   }
-  if (lines.length && !lines.some(({ role }) => role === 'storyteller')) {
-    const isBengali = /[\u0980-\u09ff]/.test(content);
-    const storyteller = isBengali ? 'গল্পকথক' : 'Storyteller';
-    const wrapLine = (text) => ({
-      character: storyteller,
-      role: 'storyteller',
-      text,
-      pan: CHARACTERS.storyteller.pan,
-      pitch: CHARACTERS.storyteller.pitch,
-      rate: CHARACTERS.storyteller.rate,
-    });
-    const middleIndex = Math.max(1, Math.ceil(lines.length / 2));
-    lines.splice(middleIndex, 0, wrapLine(isBengali ? 'এরপর তারা একসঙ্গে সমাধান খুঁজতে থাকে।' : 'The family talks it through together.'));
-    lines.unshift(wrapLine(isBengali ? 'গল্পটি শুরু হচ্ছে।' : 'The story begins.'));
-    lines.push(wrapLine(isBengali ? 'এই ছিল আজকের গল্প।' : 'That is the end of the story.'));
-  }
-  return lines;
+  return weights.length;
+}
+
+export function getStoryAudioProgressFromPosition(position, weights) {
+  if (!weights.length) return 0;
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  const boundedPosition = Math.max(0, Math.min(weights.length, Number(position) || 0));
+  const lineIndex = Math.min(Math.floor(boundedPosition), weights.length - 1);
+  const lineFraction = boundedPosition === weights.length ? 1 : boundedPosition - lineIndex;
+  const completedWeight = weights
+    .slice(0, lineIndex)
+    .reduce((sum, weight) => sum + weight, 0)
+    + weights[lineIndex] * lineFraction;
+  return completedWeight / totalWeight;
 }
 
 export function narrationSpeakerForRole(role) {
@@ -134,37 +90,51 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   lang = 'bn',
   volume = 1,
   audioUrl = '',
+  slug = '',
   storyContent = '',
+  offlineAudioKey = '',
   offlineAudio = null,
   onError = () => {},
   onNotice = () => {},
   onStop = () => {},
+  onSegmentsLoaded = () => {},
 } = {}) {
   let index = 0;
   let isPlaying = false;
   let isPaused = false;
   let audio = null;
+  let preloadedAudio = null;
+  let preloadedSegmentIndex = -1;
   let audioObjectUrl = null;
   let audioSource = null;
+  let timedSegments = null;
+  let audioProgressSynchronized = true;
   let requestAbortController = null;
   let runId = 0;
   let currentVolume = Math.max(0, Math.min(1, volume));
   let desiredStartIndex = 0;
+  const lineWeights = getStoryLineWeights(lines);
   let releasePlayback = () => {};
   const content = storyContent || lines.map(({ character, text }) => `[${character}]: ${text}`).join('\n');
 
   const emitProgress = (position) => {
     if (!lines.length) return;
-    const boundedPosition = Math.max(0, Math.min(lines.length, position));
-    index = Math.min(Math.floor(boundedPosition), lines.length - 1);
-    const fraction = index === lines.length - 1 && boundedPosition === lines.length
+    const progressDetails = typeof position === 'object' ? position : null;
+    const totalLines = timedSegments?.length || lines.length;
+    const boundedPosition = Math.max(0, Math.min(totalLines, progressDetails
+      ? progressDetails.index + progressDetails.fraction
+      : position));
+    const progressIndex = Math.min(Math.floor(boundedPosition), totalLines - 1);
+    index = Math.min(progressIndex, lines.length - 1);
+    const fraction = progressIndex === totalLines - 1 && boundedPosition === totalLines
       ? 1
-      : boundedPosition - index;
+      : boundedPosition - progressIndex;
     onProgress({
-      index,
+      index: progressDetails?.index ?? progressIndex,
       fraction,
-      percent: ((index + fraction) / lines.length) * 100,
-      line: lines[index],
+      percent: ((progressIndex + fraction) / totalLines) * 100,
+      line: timedSegments?.[progressIndex] || lines[index],
+      wordIndex: progressDetails?.wordIndex,
       source: audioSource,
       spatialAvailable: false,
     });
@@ -176,12 +146,20 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     if (audio) {
       audio.pause();
       audio.onloadedmetadata = null;
+      audio.onplaying = null;
       audio.ontimeupdate = null;
       audio.onended = null;
       audio.onerror = null;
       audio.removeAttribute?.('src');
       audio.load?.();
       audio = null;
+    }
+    if (preloadedAudio) {
+      preloadedAudio.pause();
+      preloadedAudio.removeAttribute?.('src');
+      preloadedAudio.load?.();
+      preloadedAudio = null;
+      preloadedSegmentIndex = -1;
     }
     audioSource = null;
     if (audioObjectUrl) {
@@ -199,22 +177,32 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     onError(message || (lang === 'bn' ? 'অডিও চালানো যায়নি।' : 'Could not play the story audio.'));
   };
 
-  const configureAudio = (id, src, source) => {
+  const configureAudio = (id, src, source, syncProgress = true) => {
     audioSource = source;
+    audioProgressSynchronized = syncProgress;
     audio = new globalThis.Audio();
     audio.preload = 'auto';
     audio.volume = currentVolume;
     audio.onloadedmetadata = () => {
       if (id !== runId || !audio) return;
       if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        audio.currentTime = (audio.duration * Math.min(desiredStartIndex, lines.length - 1)) / lines.length;
-        emitProgress(desiredStartIndex);
+        audio.currentTime = audio.duration * getStoryAudioProgressFromPosition(
+          Math.min(desiredStartIndex, lines.length - 1),
+          lineWeights,
+        );
       }
       if (!isPaused) void startAudio(id);
     };
+    audio.onplaying = () => {
+      if (!syncProgress || id !== runId || !audio || audio.paused) return;
+      const progress = Number.isFinite(audio.duration) && audio.duration > 0
+        ? getStoryPositionFromAudioProgress(audio.currentTime / audio.duration, lineWeights)
+        : desiredStartIndex;
+      emitProgress(progress);
+    };
     audio.ontimeupdate = () => {
-      if (id !== runId || !audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
-      emitProgress((audio.currentTime / audio.duration) * lines.length);
+      if (!syncProgress || id !== runId || !audio || audio.paused || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+      emitProgress(getStoryPositionFromAudioProgress(audio.currentTime / audio.duration, lineWeights));
     };
     audio.onended = () => finishPlayback(id);
     audio.onerror = () => {
@@ -232,14 +220,96 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     audio.load();
   };
 
+  const configureTimedSegment = (id, segmentIndex, startAtSeconds = 0, audioOverride = null) => {
+    const segment = timedSegments?.[segmentIndex];
+    if (id !== runId || !segment) return;
+    if (audioOverride) {
+      preloadedAudio = null;
+      preloadedSegmentIndex = -1;
+    }
+    cleanupAudio();
+    audioSource = 'cloudinary-segments';
+    audioProgressSynchronized = true;
+    audio = audioOverride || new globalThis.Audio();
+    audio.preload = 'auto';
+    audio.volume = currentVolume;
+    audio.onloadedmetadata = () => {
+      if (id !== runId || !audio) return;
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = Math.min(Math.max(0, startAtSeconds), audio.duration);
+      }
+      if (!isPaused) void startAudio(id);
+    };
+    audio.onplaying = () => {
+      if (id !== runId || !audio || audio.paused) return;
+      const wordIndex = Array.isArray(segment.words)
+        ? segment.words.reduce((current, word, wordPosition) => (
+          audio.currentTime >= word.start ? wordPosition : current
+        ), -1)
+        : -1;
+      emitProgress({
+        index: segmentIndex,
+        fraction: audio.duration > 0 ? audio.currentTime / audio.duration : 0,
+        wordIndex,
+      });
+    };
+    audio.ontimeupdate = () => {
+      if (id !== runId || !audio || audio.paused) return;
+      const wordIndex = Array.isArray(segment.words)
+        ? segment.words.reduce((current, word, wordPosition) => (
+          audio.currentTime >= word.start ? wordPosition : current
+        ), -1)
+        : -1;
+      emitProgress({
+        index: segmentIndex,
+        fraction: audio.duration > 0 ? audio.currentTime / audio.duration : 0,
+        wordIndex,
+      });
+    };
+    audio.onended = () => {
+      if (id !== runId) return;
+      if (segmentIndex + 1 < timedSegments.length) {
+        const nextIndex = segmentIndex + 1;
+        const nextAudio = preloadedSegmentIndex === nextIndex ? preloadedAudio : null;
+        configureTimedSegment(id, nextIndex, 0, nextAudio);
+      }
+      else finishPlayback(id);
+    };
+    audio.onerror = () => {
+      if (id !== runId) return;
+      fail(lang === 'bn'
+        ? `গল্পের ${segmentIndex + 1} নম্বর বাক্যের অডিও চালানো যায়নি। আবার চেষ্টা করুন।`
+        : `Story sentence ${segmentIndex + 1} could not be played. Please try again.`);
+    };
+    audio.src = segment.url || globalThis.URL.createObjectURL(segment.audio);
+    if (!segment.url) audioObjectUrl = audio.src;
+    audio.load();
+    const nextSegmentIndex = segmentIndex + 1;
+    const nextSegment = timedSegments[nextSegmentIndex];
+    if (nextSegment?.url) {
+      preloadedAudio = new globalThis.Audio();
+      preloadedAudio.preload = 'auto';
+      preloadedAudio.src = nextSegment.url;
+      preloadedSegmentIndex = nextSegmentIndex;
+      preloadedAudio.load();
+    }
+  };
+
   const playOfflineAudio = (id) => {
     if (id !== runId || !isPlaying || !offlineAudio || typeof globalThis.URL?.createObjectURL !== 'function') {
       return false;
     }
+    if (Array.isArray(offlineAudio.segments) && offlineAudio.segments.length) {
+      timedSegments = offlineAudio.segments;
+      onSegmentsLoaded(timedSegments);
+      onNotice(lang === 'bn' ? 'এই ডিভাইসে রাখা বাক্যভিত্তিক অডিও চালানো হচ্ছে।' : 'Playing sentence audio saved on this device.');
+      configureTimedSegment(id, 0);
+      return true;
+    }
     cleanupAudio();
     audioObjectUrl = globalThis.URL.createObjectURL(offlineAudio);
     onNotice(lang === 'bn' ? 'এই ডিভাইসে রাখা অডিও চালানো হচ্ছে।' : 'Playing audio saved on this device.');
-    configureAudio(id, audioObjectUrl, 'offline');
+    configureAudio(id, audioObjectUrl, 'offline', false);
     return true;
   };
 
@@ -247,7 +317,16 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     if (id !== runId) return;
     isPlaying = false;
     isPaused = false;
-    emitProgress(lines.length);
+    if (timedSegments?.length) {
+      const lastIndex = timedSegments.length - 1;
+      emitProgress({
+        index: lastIndex,
+        fraction: 1,
+        wordIndex: (timedSegments[lastIndex].words?.length || 1) - 1,
+      });
+    } else if (audioProgressSynchronized) {
+      emitProgress(lines.length);
+    }
     releasePlayback();
     releasePlayback = () => {};
     onEnd();
@@ -266,11 +345,6 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
 
   const loadAndPlayStory = async (id) => {
     if (id !== runId || !isPlaying || !lines.length) return;
-    if (audioUrl) {
-      onNotice(lang === 'bn' ? 'গল্পের অডিও চালানো হচ্ছে…' : 'Playing story audio…');
-      configureAudio(id, audioUrl, 'cloudinary');
-      return;
-    }
     if (playOfflineAudio(id)) return;
     if (globalThis.navigator?.onLine === false) {
       fail(lang === 'bn'
@@ -288,6 +362,20 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
         signal: abortController.signal,
       });
       if (id !== runId || !isPlaying) return;
+      if (Array.isArray(result.segments) && result.segments.length > 0) {
+        if (result.segments.some((segment) => typeof segment.url !== 'string' || !segment.url)) {
+          throw new Error('Story sentence audio is incomplete.');
+        }
+        timedSegments = result.segments;
+        onSegmentsLoaded(timedSegments);
+        const initialPosition = Math.max(0, Math.min(timedSegments.length - 0.001, desiredStartIndex));
+        const initialIndex = Math.floor(initialPosition);
+        const initialTime = (Number(timedSegments[initialIndex].durationSeconds) || 0)
+          * (initialPosition - initialIndex);
+        onNotice(lang === 'bn' ? 'গল্পের অডিও চালানো হচ্ছে…' : 'Playing story audio…');
+        configureTimedSegment(id, initialIndex, initialTime);
+        return;
+      }
       if (typeof result.audioUrl !== 'string' || !result.audioUrl) {
         throw new Error(lang === 'bn'
           ? 'গল্পের অডিও পাওয়া যায়নি। আবার চেষ্টা করুন।'
@@ -295,7 +383,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       }
 
       onNotice(lang === 'bn' ? 'গল্পের অডিও চালানো হচ্ছে…' : 'Playing story audio…');
-      configureAudio(id, result.audioUrl, 'cloudinary');
+      configureAudio(id, result.audioUrl, 'cloudinary', false);
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
       if (playOfflineAudio(id)) return;
@@ -308,15 +396,15 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
         if (id !== runId || !isPlaying) return;
         const fallbackAudio = new Blob([audioData], { type: 'audio/mpeg' });
         if (slug && typeof globalThis.indexedDB !== 'undefined') {
-          void saveOfflineStoryAudio(slug, content, fallbackAudio).catch(() => {});
+          void saveOfflineStoryAudio(slug, offlineAudioKey || content, fallbackAudio).catch(() => {});
         }
         if (typeof globalThis.URL?.createObjectURL !== 'function') {
-          throw new Error('Audio playback is unavailable on this device.');
+          throw new Error('Audio playback is unavailable on this device.', { cause: error });
         }
         cleanupAudio();
         audioObjectUrl = globalThis.URL.createObjectURL(fallbackAudio);
         onNotice(lang === 'bn' ? 'Google-এর স্বাভাবিক কণ্ঠে গল্প শোনা হচ্ছে।' : 'Playing the story with Google voice.');
-        configureAudio(id, audioObjectUrl, 'offline');
+        configureAudio(id, audioObjectUrl, 'offline', false);
       } catch {
         fail(lang === 'bn'
           ? 'গল্পের অডিও চালানো যাচ্ছে না। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
@@ -341,7 +429,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       index = Math.floor(desiredStartIndex);
       isPlaying = true;
       isPaused = false;
-      emitProgress(desiredStartIndex);
+      timedSegments = null;
       onNotice(lang === 'bn' ? 'গল্পের অডিও প্রস্তুত হচ্ছে…' : 'Preparing story audio…');
       releasePlayback();
       releasePlayback = () => {};
@@ -375,8 +463,16 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
         : 0;
       index = Math.min(Math.floor(target), lines.length - 1);
       desiredStartIndex = target;
+      if (timedSegments?.length) {
+        const segmentIndex = Math.floor(target);
+        const segment = timedSegments[segmentIndex];
+        const startAtSeconds = (Number(segment.durationSeconds) || 0) * (target - segmentIndex);
+        configureTimedSegment(runId, segmentIndex, startAtSeconds);
+        emitProgress({ index: segmentIndex, fraction: target - segmentIndex, wordIndex: -1 });
+        return;
+      }
       if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
-        audio.currentTime = audio.duration * target / lines.length;
+        audio.currentTime = audio.duration * getStoryAudioProgressFromPosition(target, lineWeights);
       }
       emitProgress(target);
     },

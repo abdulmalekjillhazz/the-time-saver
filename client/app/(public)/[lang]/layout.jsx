@@ -55,7 +55,7 @@ export default async function PublicLayout(props) {
   };
 
   return (
-    <html lang={lang}>
+    <html lang={lang} suppressHydrationWarning>
       <body>
         <JsonLd data={siteSchema} />
         <a href="#main" className="sr-only focus:not-sr-only focus:p-2">

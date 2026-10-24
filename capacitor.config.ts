@@ -1,7 +1,9 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const capacitorServerUrl = (process.env.CAPACITOR_SERVER_URL || 'https://made-your-dream-bigger.vercel.app')
-  .replace(/\/+$/, '');
+const capacitorServerUrl = (
+  process.env.CAPACITOR_SERVER_URL ||
+  (process.env.CAPACITOR_BUNDLE === '1' ? 'https://made-your-dream-bigger.vercel.app' : '')
+).replace(/\/+$/, '');
 
 const config: CapacitorConfig = {
   appId: 'com.madeyourdreambigger.smartroutine',
@@ -19,14 +21,14 @@ const config: CapacitorConfig = {
     },
   },
   webDir: 'client/out',
-  ...(process.env.CAPACITOR_BUNDLE === '1'
-    ? {}
-    : {
+  ...(capacitorServerUrl
+    ? {
         server: {
           url: `${capacitorServerUrl}/app`,
           cleartext: false,
         },
-      }),
+      }
+    : {}),
 };
 
 export default config;

@@ -14,14 +14,14 @@ export function Header({ lang, dict }) {
   return (
     <header className="public-site-header">
       <nav aria-label={dict.nav.label} className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 px-4 py-3">
-        <Link href={`/${lang}`} aria-label={dict.brand} className="inline-flex min-h-[44px] items-center gap-3 py-1 text-xl font-extrabold tracking-tight text-gold">
+        <Link href={`/${lang}`} aria-label={dict.brand} className="inline-flex min-h-[44px] items-center gap-3 py-1 text-xl font-extrabold tracking-tight text-gold transition-opacity hover:opacity-90">
           <Image
             src={BRAND_LOGO_URL}
             alt={logoAlt}
             width={48}
             height={48}
             priority
-            className="h-12 w-12 rounded-full border-2 border-gold/80 object-cover shadow-md"
+            className="idle-wobble h-12 w-12 rounded-full border-2 border-gold/80 object-cover shadow-[0_0_14px_rgba(242,193,78,0.35)] transition-shadow hover:shadow-[0_0_20px_rgba(242,193,78,0.55)]"
           />
           <span>{dict.brand}</span>
         </Link>
@@ -38,14 +38,14 @@ export function Header({ lang, dict }) {
 
           <Link
             href="/app"
-            className="hidden min-h-[40px] items-center rounded-xl bg-gold px-4 py-2 text-sm font-bold text-on-gold shadow-sm hover:opacity-95 sm:inline-flex"
+            className="hidden min-h-[40px] items-center rounded-xl bg-gold px-4 py-2 text-sm font-bold text-on-gold shadow-[0_0_14px_rgba(242,193,78,0.35)] transition-shadow hover:opacity-95 hover:shadow-[0_0_20px_rgba(242,193,78,0.5)] sm:inline-flex"
           >
             {dict.nav.app}
           </Link>
           <a
             href={ANDROID_APK_DOWNLOAD_URL}
             download
-            className="hidden min-h-[40px] items-center rounded-xl border border-gold/50 px-4 py-2 text-sm font-bold text-gold hover:bg-gold/10 lg:inline-flex"
+            className="hidden min-h-[40px] items-center rounded-xl border border-gold/50 px-4 py-2 text-sm font-bold text-gold transition-colors hover:bg-gold/10 lg:inline-flex"
           >
             {dict.nav.downloadAndroid}
           </a>

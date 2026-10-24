@@ -195,7 +195,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
 
   if (collapsible && !expanded) {
     return (
-      <Card id="daily-lesson-full-content" className="surface-card overflow-hidden border border-gold/30 p-0">
+      <Card id="daily-lesson-full-content" className="surface-card story-reading-card overflow-hidden border border-gold/30 p-0">
         <div className="flex flex-col gap-4 bg-gradient-to-r from-sapphire/10 via-paper to-gold/10 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="min-w-0">
             <p className="text-xs font-extrabold uppercase tracking-wider text-sapphire">
@@ -225,7 +225,7 @@ export function DailyLessonCard({ dailyLesson, quiz, lang = 'bn', collapsible = 
   return (
     <Card
       id={collapsible ? 'daily-lesson-full-content' : undefined}
-      className={`surface-card space-y-6 p-4 sm:p-6 ${collapsible ? 'daily-lesson-reader-screen' : ''}`}
+      className={`surface-card story-reading-card space-y-6 p-4 sm:p-6 ${collapsible ? 'daily-lesson-reader-screen' : ''}`}
     >
       {collapsible ? (
         <header className="daily-lesson-reader-header">

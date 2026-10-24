@@ -60,7 +60,7 @@ export function EveningReflectionModal({ lang = 'bn', onClose, onSaved }) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
     >
-      <Card className="surface-card w-full max-w-md p-5 sm:p-6 shadow-2xl">
+      <Card className="surface-card glass-panel glow-border modal-pop w-full max-w-md p-5 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
         <div className="flex items-center justify-between border-b border-gold/20 pb-3">
           <h2 id="evening-reflection-title" className="section-heading text-lg">{copy.title}</h2>
           <button
@@ -85,14 +85,15 @@ export function EveningReflectionModal({ lang = 'bn', onClose, onSaved }) {
             { id: 'happy', emoji: '😊', label: copy.happy },
             { id: 'neutral', emoji: '😐', label: copy.neutral },
             { id: 'tired', emoji: '😔', label: copy.tired },
-          ].map((m) => (
+          ].map((m, index) => (
             <button
               key={m.id}
               type="button"
               onClick={() => setSelectedMood(m.id)}
-              className={`flex min-h-[44px] flex-col items-center justify-center rounded-xl border p-3 text-center transition-all ${
+              style={{ '--enter-delay': `${120 + index * 70}ms` }}
+              className={`enter-up flex min-h-[44px] flex-col items-center justify-center rounded-xl border p-3 text-center transition-all ${
                 selectedMood === m.id
-                  ? 'border-gold bg-gold/15 font-bold text-gold-soft shadow-sm'
+                  ? 'border-gold bg-gold/15 font-bold text-gold-soft shadow-[0_0_14px_rgba(242,193,78,0.4)]'
                   : 'border-gold/25 bg-paper/60 text-ink/80 hover:bg-gold/10'
               }`}
             >

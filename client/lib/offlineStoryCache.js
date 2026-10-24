@@ -114,7 +114,13 @@ export async function saveOfflineStoryAudio(slug, content, audio) {
   if (typeof slug !== 'string' || !slug.trim() || typeof content !== 'string' || !content.trim()) {
     throw new Error('গল্পের পরিচিতি পাওয়া যায়নি, তাই অডিও অফলাইনে রাখা যাচ্ছে না।');
   }
-  if (typeof globalThis.Blob !== 'function' || !(audio instanceof globalThis.Blob) || audio.size === 0) {
+  const isAudioBlob = (value) => typeof globalThis.Blob === 'function'
+    && value instanceof globalThis.Blob
+    && value.size > 0;
+  const isAudioPlaylist = Array.isArray(audio?.segments)
+    && audio.segments.length > 0
+    && audio.segments.every((segment) => isAudioBlob(segment?.audio));
+  if (!isAudioBlob(audio) && !isAudioPlaylist) {
     throw new Error('অডিও ফাইলটি খালি বা ব্যবহারযোগ্য নয়।');
   }
   await transact([AUDIO_STORE], 'readwrite', (transaction) => {

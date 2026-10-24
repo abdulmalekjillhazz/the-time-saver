@@ -62,7 +62,7 @@ export function LeaderboardPanel({ lang = 'bn' }) {
 
   return (
     <section className="space-y-4" aria-labelledby="learning-leaderboard-title">
-      <Card className="surface-card space-y-2 p-4 sm:p-6">
+      <Card className="surface-card glass-panel glow-border space-y-2 p-4 sm:p-6">
         <h1 id="learning-leaderboard-title" className="section-heading">
           <span aria-hidden="true">🏆</span> {copy.title}
         </h1>
@@ -70,14 +70,17 @@ export function LeaderboardPanel({ lang = 'bn' }) {
         <p className="text-sm font-semibold text-sapphire">{copy.levels}</p>
       </Card>
 
-      {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm font-semibold text-rose-400">{error}</p> : null}
       {members === null && !error ? <p role="status">{copy.loading}</p> : null}
-      {members?.length === 0 ? <Card className="surface-card p-5"><p>{copy.empty}</p></Card> : null}
+      {members?.length === 0 ? <Card className="surface-card glass-panel p-5"><p>{copy.empty}</p></Card> : null}
       {members?.length ? (
         <ol className="space-y-3">
-          {members.map((member) => (
+          {members.map((member, index) => (
             <li key={member.userId}>
-              <Card className={`surface-card flex items-center gap-3 p-3 sm:gap-4 sm:p-4 ${member.isKing ? 'border-2 border-gold/70 shadow-md' : ''}`}>
+              <Card
+                style={{ '--enter-delay': `${Math.min(index, 10) * 70}ms` }}
+                className={`surface-card glass-panel enter-up flex items-center gap-3 p-3 transition-transform sm:gap-4 sm:p-4 ${member.isKing ? 'border-2 border-gold/70 shadow-[0_0_20px_rgba(242,193,78,0.35)] hover:-translate-y-0.5' : 'hover:-translate-y-0.5'}`}
+              >
                 <span className="w-8 shrink-0 text-center text-xl font-extrabold text-sapphire" aria-label={`Rank ${member.rank}`}>
                   {rankIcon(member.rank, member.isKing)}
                 </span>

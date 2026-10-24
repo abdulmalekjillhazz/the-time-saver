@@ -2380,11 +2380,15 @@ select:disabled {
   }
 
   .surface-card:hover {
-    transform: translateY(-2px);
+    transform: perspective(1000px) translateY(-6px) rotateX(1.4deg) rotateY(-1deg) scale(1.008);
     box-shadow:
       0 16px 34px rgb(0 0 0 / 0.34),
       0 3px 10px rgb(var(--c-sapphire-deep) / 0.22),
       inset 0 1px rgb(255 255 255 / 0.12);
+  }
+
+  .surface-card.story-reading-card:hover {
+    transform: none;
   }
 
   .surface-card.mobile-speaking-practice-open:hover {
@@ -2399,6 +2403,197 @@ select:disabled {
   }
 }
 
+@keyframes enter-rise-3d {
+  from {
+    opacity: 0;
+    transform: perspective(900px) translateY(18px) rotateX(-6deg) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: perspective(900px) translateY(0) rotateX(0deg) scale(1);
+  }
+}
+
+.enter-up {
+  animation: enter-rise-3d 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+@keyframes idle-wobble-3d {
+  0%, 100% {
+    transform: perspective(600px) rotateY(0deg) rotateZ(0deg);
+  }
+
+  50% {
+    transform: perspective(600px) rotateY(6deg) rotateZ(-2deg);
+  }
+}
+
+.idle-wobble {
+  display: inline-block;
+  animation: idle-wobble-3d 4s ease-in-out infinite;
+}
+
+@keyframes bar-grow-3d {
+  from {
+    opacity: 0;
+    transform: perspective(500px) scaleY(0) rotateX(-20deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: perspective(500px) scaleY(1) rotateX(0deg);
+  }
+}
+
+.chart-bar-grow {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: bar-grow-3d 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+@keyframes modal-pop-3d {
+  from {
+    opacity: 0;
+    transform: perspective(800px) translateY(14px) rotateX(-8deg) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: perspective(800px) translateY(0) rotateX(0deg) scale(1);
+  }
+}
+
+.modal-pop {
+  animation: modal-pop-3d 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes status-pop-3d {
+  0% {
+    opacity: 0;
+    transform: perspective(400px) scale(0.5) rotateZ(-8deg);
+  }
+
+  55% {
+    opacity: 1;
+    transform: perspective(400px) scale(1.12) rotateZ(3deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(400px) scale(1) rotateZ(0deg);
+  }
+}
+
+.status-pop {
+  animation: status-pop-3d 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes tab-enter-3d {
+  from {
+    opacity: 0;
+    transform: perspective(900px) translateX(10px) rotateY(3deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: perspective(900px) translateX(0) rotateY(0deg);
+  }
+}
+
+.tab-enter {
+  animation: tab-enter-3d 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes coin-flip-3d {
+  0% {
+    transform: perspective(300px) rotateY(0deg) scale(1);
+  }
+
+  50% {
+    transform: perspective(300px) rotateY(180deg) scale(1.2);
+  }
+
+  100% {
+    transform: perspective(300px) rotateY(360deg) scale(1);
+  }
+}
+
+.coin-flip {
+  display: inline-block;
+  animation: coin-flip-3d 480ms ease-in-out both;
+}
+
+@keyframes tab-bounce-3d {
+  0% {
+    transform: perspective(300px) scale(0.9) translateY(2px);
+  }
+
+  60% {
+    transform: perspective(300px) scale(1.04) translateY(-1px);
+  }
+
+  100% {
+    transform: perspective(300px) scale(1) translateY(0);
+  }
+}
+
+.tab-bounce {
+  animation: tab-bounce-3d 260ms ease-out both;
+}
+
+@keyframes alarm-ring-3d {
+  0% {
+    opacity: 0;
+    transform: perspective(400px) rotateZ(0deg) scale(0.9);
+  }
+
+  25% {
+    transform: perspective(400px) rotateZ(-4deg) scale(1.02);
+  }
+
+  50% {
+    transform: perspective(400px) rotateZ(4deg) scale(1.02);
+  }
+
+  75% {
+    transform: perspective(400px) rotateZ(-2deg) scale(1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(400px) rotateZ(0deg) scale(1);
+  }
+}
+
+.alarm-ring {
+  animation: alarm-ring-3d 500ms ease-out both;
+}
+
+@keyframes points-pop-3d {
+  0% {
+    opacity: 0;
+    transform: perspective(300px) translateY(6px) scale(0.6);
+  }
+
+  60% {
+    opacity: 1;
+    transform: perspective(300px) translateY(-3px) scale(1.15);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(300px) translateY(0) scale(1);
+  }
+}
+
+.points-pop {
+  display: inline-block;
+  animation: points-pop-3d 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-tabs .tab-button,
   .surface-card {
@@ -2407,6 +2602,24 @@ select:disabled {
 
   .app-tabs .tab-button:active,
   .app-tabs .tab-button-active {
+    transform: none !important;
+  }
+
+  .enter-up,
+  .idle-wobble,
+  .chart-bar-grow,
+  .modal-pop,
+  .status-pop,
+  .tab-enter,
+  .coin-flip,
+  .tab-bounce,
+  .alarm-ring,
+  .points-pop {
+    animation: none !important;
+  }
+
+  .enter-up {
+    opacity: 1 !important;
     transform: none !important;
   }
 }

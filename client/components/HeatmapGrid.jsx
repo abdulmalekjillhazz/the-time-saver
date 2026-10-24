@@ -33,11 +33,11 @@ export function HeatmapGrid({ lang = 'bn' }) {
     return () => { active = false; };
   }, []);
 
-  const levelColors = ['bg-ink/10', 'bg-emerald-200', 'bg-emerald-400', 'bg-emerald-600', 'bg-emerald-800'];
+  const levelColors = ['bg-ink/10', 'bg-sapphire/30', 'bg-sapphire/55', 'bg-sapphire/80', 'bg-gold'];
   const activeCount = data.filter((d) => d.count > 0).length;
 
   return (
-    <Card className="surface-card space-y-3 p-5">
+    <Card className="surface-card glass-panel glow-border space-y-3 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="section-heading text-base">{copy.title}</h3>
         <span className="text-xs font-semibold text-gold-soft">
@@ -46,17 +46,17 @@ export function HeatmapGrid({ lang = 'bn' }) {
       </div>
 
       {loading ? (
-        <div className="h-16 animate-pulse rounded bg-ink/10" />
+        <div className="h-16 animate-pulse rounded-xl bg-ink/10" />
       ) : error ? (
-        <p role="alert" className="text-sm text-red-700">{copy.error}</p>
+        <p role="alert" className="text-sm font-semibold text-rose-400">{copy.error}</p>
       ) : (
-        <div className="overflow-x-auto pb-2">
+        <div className="enter-up overflow-x-auto pb-2">
           <div className="grid grid-flow-col grid-rows-7 gap-1">
             {data.map((day) => (
               <div
                 key={day.date}
                 title={`${day.date}: ${day.count} routines`}
-                className={`h-3 w-3 rounded-sm ${levelColors[day.level] || 'bg-ink/10'} transition-transform hover:scale-125`}
+                className={`h-3 w-3 rounded-sm ${levelColors[day.level] || 'bg-ink/10'} transition-transform hover:scale-125 hover:shadow-[0_0_6px_rgba(242,193,78,0.6)]`}
               />
             ))}
           </div>

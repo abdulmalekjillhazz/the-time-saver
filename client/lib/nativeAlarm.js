@@ -3,7 +3,8 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 const NativeAlarm = registerPlugin('NativeAlarm');
 
 export function isAndroidNativeApp() {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+  return (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android')
+    || Capacitor.isPluginAvailable('NativeAlarm');
 }
 
 export async function requestNativeAlarmPermissions() {

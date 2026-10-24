@@ -157,8 +157,8 @@ export function HabitCirclesCard({ lang = 'bn' }) {
         <p className="py-2 text-sm italic text-ink/75">{copy.noCircles}</p>
       ) : (
         <div className="space-y-4">
-          {circles.map((c) => (
-            <div key={c.id} className="routine-tile glass-panel p-4">
+          {circles.map((c, index) => (
+            <div key={c.id} style={{ '--enter-delay': `${Math.min(index, 10) * 65}ms` }} className="routine-tile glass-panel enter-up p-4">
               <div className="flex items-center justify-between border-b border-gold/20 pb-2">
                 <div>
                   <h4 className="font-bold text-ink text-sm">{c.name}</h4>

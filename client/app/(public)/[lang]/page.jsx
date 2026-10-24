@@ -229,7 +229,7 @@ export default async function HomePage(props) {
           </div>
         </section>
 
-        <section id="daily-story" className="surface-card scroll-mt-8 overflow-hidden p-5 sm:p-8">
+        <section id="daily-story" className="surface-card story-reading-card scroll-mt-8 overflow-hidden p-5 sm:p-8">
           <div className="rounded-2xl border-2 border-gold/45 bg-paper p-4 sm:p-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-gold/30 bg-gold/10 p-3.5">
@@ -374,11 +374,11 @@ export default async function HomePage(props) {
           </section>
         ) : null}
 
-        <section className="surface-card grid grid-cols-2 gap-4 p-6 text-center sm:grid-cols-4">
-          <div><p className="text-2xl font-black text-gold sm:text-3xl">🌙</p><p className="mt-1 text-xs font-medium opacity-90">{isBn ? 'প্রতিদিন নতুন গল্প' : 'A fresh daily story'}</p></div>
-          <div><p className="text-2xl font-black text-sapphire sm:text-3xl">🧩</p><p className="mt-1 text-xs font-medium opacity-90">{isBn ? 'গল্পভিত্তিক কুইজ' : 'Story-based quizzes'}</p></div>
-          <div><p className="text-2xl font-black text-gold sm:text-3xl">🎧</p><p className="mt-1 text-xs font-medium opacity-90">{isBn ? 'শুনে শেখার সুবিধা' : 'Listen as you learn'}</p></div>
-          <div><p className="text-2xl font-black text-sapphire sm:text-3xl">🇧🇩</p><p className="mt-1 text-xs font-medium opacity-90">{isBn ? 'বাংলা ও ইংরেজি' : 'Bangla and English'}</p></div>
+        <section className="surface-card glass-panel glow-border grid grid-cols-2 gap-4 p-6 text-center sm:grid-cols-4">
+          <div className="enter-up" style={{ '--enter-delay': '0ms' }}><p className="text-2xl font-black text-gold sm:text-3xl">🌙</p><p className="mt-1 text-xs font-medium opacity-90">{isBn ? 'প্রতিদিন নতুন গল্প' : 'A fresh daily story'}</p></div>
+          <div className="enter-up" style={{ '--enter-delay': '80ms' }}><p className="text-2xl font-black text-sapphire sm:text-3xl">🧩</p><p className="mt-1 text-xs font-medium opacity-90">{isBn ? 'গল্পভিত্তিক কুইজ' : 'Story-based quizzes'}</p></div>
+          <div className="enter-up" style={{ '--enter-delay': '160ms' }}><p className="text-2xl font-black text-gold sm:text-3xl">🎧</p><p className="mt-1 text-xs font-medium opacity-90">{isBn ? 'শুনে শেখার সুবিধা' : 'Listen as you learn'}</p></div>
+          <div className="enter-up" style={{ '--enter-delay': '240ms' }}><p className="text-2xl font-black text-sapphire sm:text-3xl">🇧🇩</p><p className="mt-1 text-xs font-medium opacity-90">{isBn ? 'বাংলা ও ইংরেজি' : 'Bangla and English'}</p></div>
         </section>
 
         {recentLessons.length ? (
@@ -414,7 +414,7 @@ export default async function HomePage(props) {
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
             {features.map((f, i) => (
-              <article key={i} className="routine-tile p-6">
+              <article key={i} style={{ '--enter-delay': `${i * 70}ms` }} className="routine-tile enter-up p-6">
                 <div className="flex items-center justify-between">
                   <span className="brand-orb text-2xl">{f.icon}</span>
                   <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-0.5 text-xs font-bold text-gold-soft">{f.tag}</span>

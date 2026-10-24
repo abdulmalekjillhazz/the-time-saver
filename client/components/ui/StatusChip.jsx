@@ -16,7 +16,7 @@ export function StatusChip({ lang, status }) {
   const label = labels[status] ?? status;
   const style = STYLES[status] ?? STYLES.skipped;
   return (
-    <span className={`inline-flex min-h-[28px] items-center rounded-md px-3 text-sm font-semibold ${style}`}>
+    <span key={status} className={`status-pop inline-flex min-h-[28px] items-center rounded-md px-3 text-sm font-semibold ${style}`}>
       {label}
     </span>
   );

@@ -90,18 +90,19 @@ export function TemplatePicker({ lang = 'en', userId, onRoutineAdded }) {
   }
 
   return (
-    <Card className="surface-card space-y-3">
+    <Card className="surface-card glass-panel glow-border space-y-3">
       <h2 className="section-heading">{copy.title}</h2>
       {error ? <p role="alert" className="text-sm font-semibold text-rose-400">{error}</p> : null}
       {queuedIds.size ? <p role="status" className="text-sm opacity-80">{copy.queued}</p> : null}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {ROUTINE_TEMPLATES.map((template) => (
+        {ROUTINE_TEMPLATES.map((template, index) => (
           <button
             key={template.id}
             type="button"
             onClick={() => addTemplate(template)}
             disabled={!userId || busyId === template.id || addedIds.has(template.id)}
-            className="flex min-h-[44px] items-center justify-between gap-2 rounded-xl border border-sapphire/20 px-3.5 py-2.5 text-left text-sm transition hover:border-gold/50 disabled:opacity-50"
+            style={{ '--enter-delay': `${Math.min(index, 10) * 45}ms` }}
+            className="enter-up flex min-h-[44px] items-center justify-between gap-2 rounded-xl border border-sapphire/20 bg-paper/40 px-3.5 py-2.5 text-left text-sm transition-all hover:-translate-y-0.5 hover:border-gold/50 hover:shadow-[0_0_12px_rgba(242,193,78,0.3)] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none"
           >
             <span>
               <span className="block font-semibold">{templateTitle(template, lang)}</span>
