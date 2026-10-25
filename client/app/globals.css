@@ -3574,7 +3574,7 @@ select:disabled {
 
 .speech-practice-progress-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
   color: rgb(var(--c-ink) / 0.68);

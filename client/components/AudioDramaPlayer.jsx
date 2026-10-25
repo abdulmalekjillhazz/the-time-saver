@@ -17,7 +17,7 @@ import {
   saveOfflineMeanings,
   saveOfflineStoryAudio,
 } from '../lib/offlineStoryCache.js';
-import { getMicrosoftEnglishVoices, speakNaturalSpeech } from '../lib/voiceBriefing.js';
+import { getMicrosoftEnglishVoices, speakNaturalSpeech, speakWithGoogleTts } from '../lib/voiceBriefing.js';
 
 const STORY_AUDIO_CACHE_VERSION = 'story-audio-v3-sentence-alignment';
 
@@ -323,6 +323,7 @@ export function AudioDramaPlayer({
       ? 'মাইক্রোফোন ব্যবহার করা যায়নি। অনুমতি পরীক্ষা করে আবার চেষ্টা করুন।'
       : 'Microphone access failed. Check the permission and try again.',
     speakLine: isBn ? 'পড়ে যাচাই করুন' : 'Read and check',
+    progressPercent: (percent) => `${percent}% ${isBn ? 'সম্পন্ন' : 'done'}`,
     listenExample: isBn ? 'নমুনা উচ্চারণ শুনুন' : 'Listen to example',
     stopExample: isBn ? 'উচ্চারণ থামান' : 'Stop example',
     stopSpeaking: isBn ? 'থামান' : 'Stop',
@@ -409,6 +410,32 @@ export function AudioDramaPlayer({
     const previousPlayback = pronunciationRef.current;
     pronunciationRef.current = null;
     previousPlayback?.playback?.stop?.();
+    const finishPronunciation = () => {
+      if (pronunciationRef.current?.playbackId !== playbackId) return;
+      pronunciationRef.current = null;
+      setPronunciationPlaying(false);
+    };
+    const startGoogleTtsFallback = () => {
+      if (pronunciationRef.current?.playbackId !== playbackId) return;
+      try {
+        const playback = speakWithGoogleTts(text, {
+          lang: 'en',
+          locale: lang,
+          onEnd: finishPronunciation,
+          onError: () => {
+            if (pronunciationRef.current?.playbackId !== playbackId) return;
+            pronunciationRef.current = null;
+            setPronunciationPlaying(false);
+            setError(copy.pronunciationUnavailable);
+          },
+        });
+        pronunciationRef.current = { playbackId, playback };
+      } catch {
+        pronunciationRef.current = null;
+        setPronunciationPlaying(false);
+        setError(copy.pronunciationUnavailable);
+      }
+    };
     try {
       setError('');
       setPronunciationPlaying(true);
@@ -416,28 +443,14 @@ export function AudioDramaPlayer({
         lang: 'en-US',
         rate,
         voice: microsoftVoices.find((voice) => speechVoiceKey(voice) === selectedVoiceURI),
-        onEnd: () => {
-          if (pronunciationRef.current?.playbackId !== playbackId) return;
-          pronunciationRef.current = null;
-          setPronunciationPlaying(false);
-        },
-        onStop: () => {
-          if (pronunciationRef.current?.playbackId !== playbackId) return;
-          pronunciationRef.current = null;
-          setPronunciationPlaying(false);
-        },
-        onError: () => {
-          if (pronunciationRef.current?.playbackId !== playbackId) return;
-          pronunciationRef.current = null;
-          setPronunciationPlaying(false);
-          setError(copy.pronunciationUnavailable);
-        },
+        onEnd: finishPronunciation,
+        onStop: finishPronunciation,
+        onError: startGoogleTtsFallback,
       });
       pronunciationRef.current = { playbackId, playback };
     } catch {
-      pronunciationRef.current = null;
-      setPronunciationPlaying(false);
-      setError(copy.pronunciationUnavailable);
+      pronunciationRef.current = { playbackId, playback: null };
+      startGoogleTtsFallback();
     }
   };
 
@@ -647,9 +660,18 @@ export function AudioDramaPlayer({
   useEffect(() => {
     if (autoPlaySignal > 0 && autoPlaySignal !== lastAutoPlayRef.current && lines.length > 0) {
       lastAutoPlayRef.current = autoPlaySignal;
-      startPlayback(0);
+      if (!speechPracticeOpen) startPlayback(0);
     }
-  }, [autoPlaySignal, lines, startPlayback]);
+  }, [autoPlaySignal, lines, speechPracticeOpen, startPlayback]);
+
+  useEffect(() => {
+    if (!speechPracticeOpen || !isPlayingRef.current) return;
+    controllerRef.current?.pause();
+    isPlayingRef.current = false;
+    pausedRef.current = true;
+    setIsPlaying(false);
+    setIsPaused(true);
+  }, [speechPracticeOpen]);
 
   useEffect(() => {
     const changed = playbackSettingsRef.current.lines !== lines
@@ -1223,7 +1245,7 @@ export function AudioDramaPlayer({
                 const attemptsExhausted = !canAttemptSpeechPractice(attempts);
                 const hasResult = isCurrentPractice && speechPractice.status === 'result';
                 const currentStep = completedPracticeLineIndexes.length + 1;
-                const progress = Math.round((currentStep / practiceLines.length) * 100);
+                const progress = Math.round((completedPracticeLineIndexes.length / practiceLines.length) * 100);
                 return (
                   <div key={`practice-step-${lineIndex}-${line.character}`} className="speech-practice-step">
                     <div className="speech-practice-progress-row" aria-label={copy.practiceProgressLabel}>
@@ -1238,6 +1260,7 @@ export function AudioDramaPlayer({
                       >
                         <span aria-hidden="true" style={{ width: `${progress}%` }} />
                       </div>
+                      <span>{copy.progressPercent(progress)}</span>
                     </div>
                     <article
                     className={`speech-practice-card duo-card space-y-3 rounded-2xl border p-4 transition-colors duration-300 sm:p-6 ${

@@ -145,7 +145,8 @@ describe('Cloudinary audio drama', () => {
     expect(markup).not.toContain('Listen · Speak · Grow');
     expect(markup).not.toContain('Sentence difficulty adapts to your progress');
     expect(markup).not.toContain('Sentence 1');
-    expect(markup).toContain('aria-valuenow="100"');
+    expect(markup).toContain('aria-valuenow="0"');
+    expect(markup).toContain('>0% done</span>');
     expect(markup).not.toContain('0 of 3 tries');
     expect(markup).toContain('aria-label="Listen to example"');
     expect(markup).toContain('aria-label="Read and check"');
@@ -182,7 +183,8 @@ describe('Cloudinary audio drama', () => {
 
     expect(markup).toContain('অনুশীলনের অগ্রগতি');
     expect(markup).toContain('>1 / 2</span>');
-    expect(markup).toContain('aria-valuenow="50"');
+    expect(markup).toContain('aria-valuenow="0"');
+    expect(markup).toContain('>0% সম্পন্ন</span>');
     expect(markup).not.toContain('0 / 3 বার চেষ্টা');
   });
 
