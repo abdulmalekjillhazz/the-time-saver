@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import mongoose from 'mongoose';
 import { lessonAttemptSchema, dailyQuizAttemptSchema, dailyLessonReadSchema } from '@smart-routine/shared';
-import { requireAuth } from '../middleware/requireAuth.js';
+import { requireAuth, extractSessionToken } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { AppError, MSG } from '../lib/AppError.js';
@@ -38,7 +38,8 @@ function parseLandingQuizSlot(value) {
 
 async function tryAttachUser(req) {
   try {
-    const session = await loadSession(req.cookies?.[SESSION_COOKIE]);
+    const token = extractSessionToken(req);
+    const session = await loadSession(token);
     if (session) {
       const user = await loadUserForSession(session);
       req.session = session;

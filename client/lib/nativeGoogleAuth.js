@@ -26,11 +26,11 @@ export async function signInWithGoogleNative(webClientId) {
     });
 
     // নেটিভ গুগল প্লে সার্ভিসেস ডায়ালগ চালু করা
+    // Note: Do NOT pass custom scopes here because capacitor-social-login rejects with
+    // "You CANNOT use scopes without modifying the main activity" unless using default scopes.
     const response = await SocialLogin.login({
       provider: 'google',
-      options: {
-        scopes: ['openid', 'email', 'profile'],
-      },
+      options: {},
     });
 
     // রেসপন্স যাচাইকরণ (সব সম্ভাব্য শেপ সাপোর্ট করে)

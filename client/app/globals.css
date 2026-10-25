@@ -307,6 +307,25 @@
   --c-on-gold: 255 255 255;
 }
 
+:root[data-theme="light"] body,
+:root[data-theme="light"] p,
+:root[data-theme="light"] h1,
+:root[data-theme="light"] h2,
+:root[data-theme="light"] h3,
+:root[data-theme="light"] h4,
+:root[data-theme="light"] h5,
+:root[data-theme="light"] h6,
+:root[data-theme="light"] label,
+:root[data-theme="light"] legend,
+:root[data-theme="light"] .text-ink {
+  color: rgb(0 0 0) !important;
+}
+
+:root[data-theme="light"] [class*="text-ink/"] {
+  color: rgb(0 0 0) !important;
+  opacity: 1 !important;
+}
+
 body {
   min-height: 100vh;
   background-color: #030817;
@@ -3574,18 +3593,64 @@ body,
   }
 }
 
-:root[data-theme="light"] .app-shell-main :is(.primary-button, .secondary-button, .tab-button) {
-  border-color: rgb(15 23 42 / 0.14) !important;
-  background: #fff !important;
-  color: #0f172a !important;
-  box-shadow: 0 2px 4px rgb(15 23 42 / 0.08), 0 5px 12px rgb(15 23 42 / 0.08) !important;
+/* Cloud-floating elevation in light mode - buttons float on sky clouds */
+:root[data-theme="light"] .app-shell-main .primary-button {
+  background: linear-gradient(135deg, #1d4ed8, #1e3a8a) !important;
+  color: #ffffff !important;
+  border: 1px solid rgb(147 197 253 / 0.4) !important;
+  box-shadow:
+    0 8px 20px -3px rgb(37 99 235 / 0.35),
+    0 16px 36px -6px rgb(15 23 42 / 0.18),
+    0 4px 10px rgb(147 197 253 / 0.45),
+    inset 0 1px 2px rgb(255 255 255 / 0.35) !important;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease, filter 220ms ease !important;
 }
 
-:root[data-theme="light"] .app-shell-main :is(.primary-button, .secondary-button, .tab-button):hover:not(:disabled) {
-  border-color: rgb(15 23 42 / 0.22) !important;
-  background: #fff !important;
+:root[data-theme="light"] .app-shell-main .primary-button:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.02) !important;
+  box-shadow:
+    0 14px 28px -3px rgb(37 99 235 / 0.45),
+    0 24px 48px -6px rgb(15 23 42 / 0.22),
+    0 8px 18px rgb(147 197 253 / 0.6),
+    inset 0 1px 2px rgb(255 255 255 / 0.45) !important;
+  filter: brightness(1.06) !important;
+}
+
+:root[data-theme="light"] .app-shell-main :is(.secondary-button, .tab-button, .duo-choice-tile, .duo-word-chip) {
+  border-color: rgb(147 197 253 / 0.35) !important;
+  background: linear-gradient(180deg, #ffffff, #f0f7ff) !important;
   color: #0f172a !important;
-  box-shadow: 0 4px 8px rgb(15 23 42 / 0.1), 0 8px 16px rgb(15 23 42 / 0.1) !important;
+  box-shadow:
+    0 8px 24px -4px rgb(59 130 246 / 0.18),
+    0 16px 36px -6px rgb(15 23 42 / 0.12),
+    0 3px 8px -2px rgb(147 197 253 / 0.4),
+    inset 0 2px 2px rgb(255 255 255 / 0.95) !important;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease, border-color 220ms ease !important;
+}
+
+:root[data-theme="light"] .app-shell-main :is(.secondary-button, .tab-button, .duo-choice-tile, .duo-word-chip):hover:not(:disabled) {
+  border-color: rgb(59 130 246 / 0.45) !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  transform: translateY(-2.5px) scale(1.015) !important;
+  box-shadow:
+    0 14px 32px -4px rgb(59 130 246 / 0.26),
+    0 24px 48px -6px rgb(15 23 42 / 0.16),
+    0 6px 14px -2px rgb(147 197 253 / 0.5),
+    inset 0 2px 3px rgb(255 255 255 / 1) !important;
+}
+
+/* Floating cloud highlighted shadows for icons in light mode */
+:root[data-theme="light"] :is([aria-hidden="true"], [role="img"], .icon-container, .duo-card span[class*="text-3xl"], .duo-card span[class*="text-4xl"], .duo-card span[class*="text-5xl"]) {
+  filter: drop-shadow(0 4px 10px rgb(37 99 235 / 0.22)) drop-shadow(0 8px 22px rgb(15 23 42 / 0.12));
+}
+
+:root[data-theme="light"] .grid[class*="rounded-2xl"],
+:root[data-theme="light"] .grid[class*="rounded-full"] {
+  box-shadow:
+    0 10px 26px -3px rgb(37 99 235 / 0.22),
+    0 18px 36px -5px rgb(15 23 42 / 0.12),
+    inset 0 2px 4px rgb(255 255 255 / 0.95) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3597,11 +3662,11 @@ body,
 
 .speech-practice-layout {
   width: 100%;
-  height: 100dvh;
   min-height: 100dvh;
   gap: 0;
-  overflow: hidden;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: max(2rem, env(safe-area-inset-bottom, 24px));
 }
 
 .speech-practice-exit {
@@ -3629,15 +3694,16 @@ body,
 }
 
 .speech-practice-layout > .speech-practice-panel {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: 1rem;
+  padding: 1rem 1rem max(3.5rem, env(safe-area-inset-bottom, 36px));
   box-shadow: none;
 }
 

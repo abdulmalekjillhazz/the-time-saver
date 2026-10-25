@@ -35,9 +35,7 @@ describe('native Android Google sign-in', () => {
     });
     expect(SocialLogin.login).toHaveBeenCalledWith({
       provider: 'google',
-      options: {
-        scopes: ['openid', 'email', 'profile'],
-      },
+      options: {},
     });
   });
 

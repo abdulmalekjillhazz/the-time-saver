@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SPEAKING_SITUATIONS } from '../lib/speakingSituations.js';
 import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
+import { ContextSpeakingPractice } from './ContextSpeakingPractice.jsx';
 import { Card } from './ui/Card.jsx';
 
 export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryComplete }) {
@@ -41,6 +42,7 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
       ? situations[situations.length - 1].id
       : SPEAKING_SITUATIONS[0].id
   ));
+  const [speakingMode, setSpeakingMode] = useState('dialogue');
   const [autoPlaySignal, setAutoPlaySignal] = useState(0);
   const [isMobileView, setIsMobileView] = useState(false);
   const [mobilePlayerVisible, setMobilePlayerVisible] = useState(false);
@@ -86,9 +88,42 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
           </div>
           <p className="max-w-3xl text-sm leading-relaxed text-ink/75 sm:text-base">
             {isBn
-              ? 'দৈনন্দিন জীবনের একটি পরিস্থিতি বেছে নিন। কথোপকথন শুনুন, শব্দে ট্যাপ করে ধীরে উচ্চারণ শিখুন, তারপর নিজে বলে অনুশীলন করুন।'
-              : 'Choose an everyday situation. Listen to the conversation, tap any word to hear a slow pronunciation in context, then practise saying each line.'}
+              ? 'দৈনন্দিন জীবনের একটি পরিস্থিতি বেছে নিন। কথোপকথন শুনুন, শব্দে ট্যাপ করে ধীরে উচ্চারণ শিখুন, অথবা ৫ মিনিট মুক্ত কথন দিয়ে ১০০ নম্বরে নিজের কথা যাচাই করুন।'
+              : 'Choose an everyday situation. Listen to the conversation, tap any word to hear a slow pronunciation in context, or practise 5-minute free speech evaluated out of 100.'}
           </p>
+        </div>
+
+        {/* Practice Mode Tabs */}
+        <div className="flex rounded-2xl border-2 border-sapphire/25 bg-paper/70 p-1 gap-1" role="tablist" aria-label={isBn ? 'কথন অনুশীলন মোড' : 'Speaking mode'}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={speakingMode === 'dialogue'}
+            onClick={() => setSpeakingMode('dialogue')}
+            className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-black transition ${
+              speakingMode === 'dialogue'
+                ? 'border-2 border-sapphire/40 bg-sapphire text-on-sapphire shadow-sm'
+                : 'text-ink/75 hover:bg-gold/15'
+            }`}
+          >
+            🗣️ {isBn ? 'সংলাপ ও উচ্চারণ পাঠ' : 'Dialogue & Lines'}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={speakingMode === 'free-speech'}
+            onClick={() => {
+              setSpeakingMode('free-speech');
+              if (isMobileView) setMobilePlayerVisible(true);
+            }}
+            className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-black transition ${
+              speakingMode === 'free-speech'
+                ? 'border-2 border-sapphire/40 bg-sapphire text-on-sapphire shadow-sm'
+                : 'text-ink/75 hover:bg-gold/15'
+            }`}
+          >
+            ⏱️ {isBn ? '৫ মিনিট মুক্ত কথন (স্কোর / ১০০)' : '5-Min Free Speech (/100)'}
+          </button>
         </div>
 
         <div className="space-y-3">
@@ -153,21 +188,29 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
                   ) : null}
                   {selected && isMobileView && mobilePlayerVisible ? (
                     <div className="px-3 pb-3">
-                      <AudioDramaPlayer
-                        key={`speaking-situation-${selectedSituation.id}`}
-                        title={selectedSituation.title.en}
-                        slug={selectedSituation.slug || ''}
-                        content={selectedSituation.dialogue}
-                        practiceContent={selectedSituation.dialogue}
-                        audioUrl={selectedSituation.audioUrl || ''}
-                        lang={lang}
-                        autoPlaySignal={autoPlaySignal}
-                        startInPracticeMode
-                        initialChunkMode={false}
-                        onComplete={selectedSituation.completionId && onStoryComplete
-                          ? () => onStoryComplete(selectedSituation.completionId)
-                          : undefined}
-                      />
+                      {speakingMode === 'free-speech' ? (
+                        <ContextSpeakingPractice
+                          key={`context-speaking-${selectedSituation.id}`}
+                          situation={selectedSituation}
+                          lang={lang}
+                        />
+                      ) : (
+                        <AudioDramaPlayer
+                          key={`speaking-situation-${selectedSituation.id}`}
+                          title={selectedSituation.title.en}
+                          slug={selectedSituation.slug || ''}
+                          content={selectedSituation.dialogue}
+                          practiceContent={selectedSituation.dialogue}
+                          audioUrl={selectedSituation.audioUrl || ''}
+                          lang={lang}
+                          autoPlaySignal={autoPlaySignal}
+                          startInPracticeMode
+                          initialChunkMode={false}
+                          onComplete={selectedSituation.completionId && onStoryComplete
+                            ? () => onStoryComplete(selectedSituation.completionId)
+                            : undefined}
+                        />
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -193,20 +236,28 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
               </p>
             </div>
           </div>
-          <AudioDramaPlayer
-            key={`speaking-situation-${selectedSituation.id}`}
-            title={selectedSituation.title.en}
-            slug={selectedSituation.slug || ''}
-            content={selectedSituation.dialogue}
-            practiceContent={selectedSituation.dialogue}
-            audioUrl={selectedSituation.audioUrl || ''}
-            lang={lang}
-            autoPlaySignal={autoPlaySignal}
-            initialChunkMode={false}
-            onComplete={selectedSituation.completionId && onStoryComplete
-              ? () => onStoryComplete(selectedSituation.completionId)
-              : undefined}
-          />
+          {speakingMode === 'free-speech' ? (
+            <ContextSpeakingPractice
+              key={`context-speaking-${selectedSituation.id}`}
+              situation={selectedSituation}
+              lang={lang}
+            />
+          ) : (
+            <AudioDramaPlayer
+              key={`speaking-situation-${selectedSituation.id}`}
+              title={selectedSituation.title.en}
+              slug={selectedSituation.slug || ''}
+              content={selectedSituation.dialogue}
+              practiceContent={selectedSituation.dialogue}
+              audioUrl={selectedSituation.audioUrl || ''}
+              lang={lang}
+              autoPlaySignal={autoPlaySignal}
+              initialChunkMode={false}
+              onComplete={selectedSituation.completionId && onStoryComplete
+                ? () => onStoryComplete(selectedSituation.completionId)
+                : undefined}
+            />
+          )}
         </div>
       </Card>
     </section>

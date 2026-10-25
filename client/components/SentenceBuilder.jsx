@@ -8,34 +8,10 @@ import { playCongratulationsSound } from '../lib/notificationSound.js';
 import { speakNaturalSpeech } from '../lib/voiceBriefing.js';
 import { lookupStoryWordMeaning, normalizeWord } from './StoryReader.jsx';
 import { Card } from './ui/Card.jsx';
+import { CORE_SENTENCES } from '../data/sentences/index.js';
 
+export { CORE_SENTENCES };
 const LEVELS = ['basic', 'intermediate', 'advanced'];
-const CORE_SENTENCES = [
-  { level: 'basic', sentence: 'My cat hates mornings.', translation: 'আমার বিড়াল সকালবেলা একদম পছন্দ করে না।' },
-  { level: 'basic', sentence: 'Where is my phone?', translation: 'আমার ফোনটা কোথায় গেল?' },
-  { level: 'basic', sentence: 'I need more coffee.', translation: 'আমার আরেকটু কফি দরকার।' },
-  { level: 'basic', sentence: 'Why are you laughing?', translation: 'তুমি হাসছ কেন?' },
-  { level: 'basic', sentence: 'He fell asleep fast.', translation: 'সে দ্রুত ঘুমিয়ে পড়ল।' },
-  { level: 'basic', sentence: 'The dog stole bread.', translation: 'কুকুরটি পাউরুটি চুরি করে নিয়ে গেল।' },
-  { level: 'basic', sentence: 'Just five more minutes!', translation: 'আর মাত্র পাঁচটা মিনিট!' },
-  { level: 'basic', sentence: 'We forgot the keys.', translation: 'আমরা চাবিটা ভুলে ফেলে এসেছি।' },
-  { level: 'intermediate', sentence: 'I was searching for glasses on my head.', translation: 'আমি মাথায় চশমা রেখে সারা বাড়ি খুঁজছিলাম।' },
-  { level: 'intermediate', sentence: 'He set five alarms and still woke late.', translation: 'সে পাঁচটা অ্যালার্ম দিয়েও দেরিতে ঘুম থেকে উঠল।' },
-  { level: 'intermediate', sentence: 'I walked in and forgot why I came.', translation: 'আমি ঘরে ঢুকে ভুলেই গেলাম কেন এসেছিলাম।' },
-  { level: 'intermediate', sentence: 'The waiter said enjoy, and I said you.', translation: 'ওয়েটার বলল খাবার উপভোগ করুন, আমি বললাম আপনিও!' },
-  { level: 'intermediate', sentence: 'My tea got cold while waiting for it.', translation: 'চা ঠান্ডা হওয়ার অপেক্ষায় থাকতে থাকতে একেবারে বরফ হয়ে গেল।' },
-  { level: 'intermediate', sentence: 'She smiled and nodded without understanding a word.', translation: 'একটা কথাও না বুঝে সে শুধু মাথা নেড়ে হাসল।' },
-  { level: 'intermediate', sentence: 'I went for bananas and bought chocolate cake.', translation: 'কলা কিনতে গিয়ে চকোলেট কেক কিনে বাড়ি ফিরলাম।' },
-  { level: 'intermediate', sentence: 'The cat walked straight across my warm keyboard.', translation: 'বিড়ালটি সোজা এসে আমার গরম কিবোর্ডের ওপর হেঁটে গেল।' },
-  { level: 'advanced', sentence: 'I thought today was Friday until my friend laughed and said it was Tuesday.', translation: 'বন্ধু হেসে মনে করিয়ে দেওয়ার আগ পর্যন্ত আমি ভাবছিলাম আজ শুক্রবার, অথচ আজ কেবল মঙ্গলবার!' },
-  { level: 'advanced', sentence: 'He searched for his mobile in panic while talking to his mother on that same phone.', translation: 'মায়ের সাথে ফোনে কথা বলতে বলতেই সে ভয়ে পাগলের মতো নিজের ফোন খুঁজছিল!' },
-  { level: 'advanced', sentence: 'I tried to steal a midnight snack quietly, but the loud metal spoon crashed onto the floor.', translation: 'মধ্যরাতে চুপিচুপি খাবার নিতে গিয়ে দেখি ধাতব চামচটা সশব্দে মেঝেতে আছড়ে পড়ল!' },
-  { level: 'advanced', sentence: 'The internet stopped working right at the most exciting minute of my favorite cricket match.', translation: 'প্রিয় ক্রিকেট ম্যাচের সবথেকে উত্তেজনাপূর্ণ মুহূর্তে ঠিক তখনই ইন্টারনেট সংযোগ চলে গেল!' },
-  { level: 'advanced', sentence: 'She promised to study for ten minutes, but spent two hours watching funny cat videos instead.', translation: 'সে দশ মিনিট পড়ার কথা বলে দুই ঘণ্টা কাটিয়ে দিল মজার সব বিড়ালের ভিডিও দেখে।' },
-  { level: 'advanced', sentence: 'He pretended to answer an urgent phone call just to avoid an awkward conversation in the lift.', translation: 'লিফটের মধ্যে অস্বস্তিকর কথাবার্তা এড়াতে সে জরুরি ফোনে কথা বলার ভান করল।' },
-  { level: 'advanced', sentence: 'I carefully ironed my shirt in the morning, only to spill hot breakfast tea down the front.', translation: 'সকালে যত্ন করে শার্ট ইস্ত্রি করলাম, আর খাবার টেবিলে বসতেই গরম চা শার্টের ওপর চলকে পড়ল!' },
-  { level: 'advanced', sentence: 'After opening the refrigerator five times in one hour, he realized no magical food was appearing.', translation: 'এক ঘণ্টায় পাঁচবার ফ্রিজ খোলার পর সে বুঝতে পারল জাদুকরী কোনো খাবার নিজে থেকে তৈরি হচ্ছে না।' },
-];
 
 export function shuffleItems(items, random = Math.random) {
   const shuffled = items.map((value, index) => ({ value, index }));
@@ -208,16 +184,23 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
 
   const availableStories = useMemo(() => {
     const uniqueStories = new Map();
-    for (const exercise of practiceExercises) {
+    uniqueStories.set('core', isBn ? '✨ বাস্তব জীবনের ছোট বাক্য (Sentence Bank)' : '✨ Everyday Sentence Bank');
+    for (const exercise of exercises) {
       if (exercise.storyBacked) uniqueStories.set(exercise.slug, exercise.sourceTitle);
     }
     return [...uniqueStories].map(([slug, title]) => ({ slug, title }));
-  }, [practiceExercises]);
+  }, [exercises, isBn]);
 
   const filteredExercises = useMemo(
-    () => practiceExercises.filter((exercise) => exercise.level === level
-      && (storySlug === 'all' || exercise.slug === storySlug)),
-    [practiceExercises, level, storySlug],
+    () => {
+      let pool = practiceExercises;
+      if (storySlug === 'core') {
+        pool = exercises.filter(({ storyBacked }) => !storyBacked);
+      }
+      return pool.filter((exercise) => exercise.level === level
+        && (storySlug === 'all' || (storySlug === 'core' ? !exercise.storyBacked : exercise.slug === storySlug)));
+    },
+    [practiceExercises, exercises, level, storySlug],
   );
   const shuffledExercises = useMemo(
     () => shuffleItems(filteredExercises),
@@ -283,6 +266,12 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const removeWordAtPosition = (position) => {
     if (result === 'correct') return;
     setSelected((current) => current.filter((_, idx) => idx !== position));
+    setResult('');
+  };
+
+  const clearSelection = () => {
+    if (result === 'correct') return;
+    setSelected([]);
     setResult('');
   };
 
@@ -544,7 +533,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                         className="rounded-lg border border-sapphire/35 bg-sapphire/10 px-2.5 py-1 text-xs font-bold text-ink hover:bg-sapphire/20"
                         title={isBn ? 'শেষ শব্দটি মুছুন' : 'Undo last word'}
                       >
-                        ↩ {isBn ? 'আনডু' : 'Undo'}
+                        ↩️ {isBn ? 'আনডু' : 'Undo'}
                       </button>
                       <button
                         type="button"
@@ -552,7 +541,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                         className="rounded-lg border border-rose-400/35 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-500 hover:bg-rose-500/20"
                         title={isBn ? 'সব মুছুন' : 'Clear all'}
                       >
-                        ✕ {isBn ? 'রিসেট' : 'Reset'}
+                        🗑️ {isBn ? 'রিসেট' : 'Reset'}
                       </button>
                     </div>
                   ) : null}
@@ -630,29 +619,45 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     type="button"
                     onClick={checkSentence}
                     disabled={!selected.length || result === 'correct' || completionBusy}
-                    className="primary-button inline-flex min-h-[46px] items-center justify-center rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-5 py-2.5 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="primary-button inline-flex min-h-[46px] items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-5 py-2.5 text-sm font-extrabold text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {completionBusy
-                      ? (isBn ? 'সংরক্ষণ হচ্ছে…' : 'Saving…')
-                      : (isBn ? 'বাক্য যাচাই' : 'Check sentence')}
+                    <span>✅</span>
+                    <span>
+                      {completionBusy
+                        ? (isBn ? 'সংরক্ষণ হচ্ছে…' : 'Saving…')
+                        : (isBn ? 'বাক্য যাচাই' : 'Check sentence')}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={resetSentence}
                     disabled={!selected.length}
-                    className="secondary-button inline-flex min-h-[46px] items-center justify-center rounded-xl border border-sapphire/25 bg-paper/70 px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-sapphire/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="secondary-button inline-flex min-h-[46px] items-center justify-center gap-1.5 rounded-xl border border-sapphire/25 bg-paper/70 px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-sapphire/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isBn ? 'সব মুছুন' : 'Reset all'}
+                    <span>🧹</span>
+                    <span>{isBn ? 'সব মুছুন' : 'Reset all'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={nextExercise}
+                    className="secondary-button inline-flex min-h-[46px] items-center justify-center gap-1.5 rounded-xl border border-gold/35 bg-gold/10 px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-gold/20"
+                    title={isBn ? 'অন্য একটি বাক্য আনুন' : 'Load another sentence'}
+                  >
+                    <span>🎲</span>
+                    <span>{isBn ? 'অন্য বাক্য' : 'Next'}</span>
                   </button>
                   {result === 'correct' ? (
                     <button
                       type="button"
                       onClick={nextExercise}
-                      className="secondary-button inline-flex min-h-[46px] items-center justify-center rounded-xl border-2 border-gold/45 bg-gold/15 px-4 py-2.5 text-sm font-extrabold text-gold-soft transition hover:bg-gold/25"
+                      className="secondary-button inline-flex min-h-[46px] items-center justify-center gap-1.5 rounded-xl border-2 border-gold/45 bg-gold/15 px-4 py-2.5 text-sm font-extrabold text-gold-soft transition hover:bg-gold/25"
                     >
-                      {exerciseIndex === shuffledExercises.length - 1
-                        ? (isBn ? 'অনুশীলন শেষ করুন' : 'Finish practice')
-                        : (isBn ? 'পরের বাক্য →' : 'Next sentence →')}
+                      <span>✨</span>
+                      <span>
+                        {exerciseIndex === shuffledExercises.length - 1
+                          ? (isBn ? 'অনুশীলন শেষ করুন' : 'Finish practice')
+                          : (isBn ? 'পরের বাক্য →' : 'Next sentence →')}
+                      </span>
                     </button>
                   ) : null}
                 </div>

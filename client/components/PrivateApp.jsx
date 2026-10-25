@@ -48,6 +48,7 @@ import {
   stopNativeAlarm,
 } from '../lib/nativeAlarm.js';
 import { getFocusRoutines } from '../lib/routineFocus.js';
+import { DEFAULT_PUBLISHED_LESSONS } from '../data/defaultLessons.js';
 import { AiBadge } from './ui/AiBadge.jsx';
 import { Button } from './ui/Button.jsx';
 import { Card } from './ui/Card.jsx';
@@ -749,57 +750,57 @@ export function PrivateApp() {
   }, [user, lang]);
 
   const loadLessons = useCallback(async () => {
-    const [publishedResult, dailyResult] = await Promise.allSettled([
-      request('/api/lessons'),
-      request('/api/lessons/today?locale=en'),
-    ]);
-    if (publishedResult.status === 'fulfilled') {
-      setLessons(publishedResult.value.lessons);
+    let remoteLessons = [];
+    let remoteDaily = null;
+    let remoteDailyQuiz = null;
+
+    try {
+      const [publishedResult, dailyResult] = await Promise.allSettled([
+        request('/api/lessons'),
+        request('/api/lessons/today?locale=en'),
+      ]);
+      if (publishedResult.status === 'fulfilled' && Array.isArray(publishedResult.value?.lessons) && publishedResult.value.lessons.length > 0) {
+        remoteLessons = publishedResult.value.lessons;
+      }
+      if (dailyResult.status === 'fulfilled' && dailyResult.value?.dailyLesson) {
+        remoteDaily = dailyResult.value.dailyLesson;
+        remoteDailyQuiz = dailyResult.value.quiz || null;
+      }
+    } catch {
+      // Ignore network errors on Android
+    }
+
+    if (remoteDaily) {
+      setDailyLesson(remoteDaily);
+      setDailyQuiz(remoteDailyQuiz);
+    }
+
+    if (remoteLessons.length > 0) {
+      setLessons(remoteLessons);
     } else {
       try {
-        const cachedLessons = getOfflineCacheConsent() === true
-          ? await listOfflineLessons()
-          : [];
-        if (cachedLessons.length) {
-          setLessons(cachedLessons);
-          setOfflineSavedLessons(cachedLessons);
-          setNotice('ইন্টারনেট সংযোগ নেই। এই ডিভাইসে আগে সংরক্ষিত পাঠগুলো দেখানো হচ্ছে।');
-        } else {
-          reportError(publishedResult.reason);
+        const cachedLessons = await listOfflineLessons().catch(() => []);
+        const pool = [...DEFAULT_PUBLISHED_LESSONS, ...cachedLessons.filter((c) => !DEFAULT_PUBLISHED_LESSONS.some((d) => d.slug === c.slug))];
+        setLessons(pool);
+        if (!remoteDaily && pool[0]) {
+          setDailyLesson(pool[0]);
+          setDailyQuiz(pool[0].quiz || null);
         }
-      } catch (cacheError) {
-        reportError(cacheError);
+      } catch {
+        setLessons(DEFAULT_PUBLISHED_LESSONS);
+        if (!remoteDaily && DEFAULT_PUBLISHED_LESSONS[0]) {
+          setDailyLesson(DEFAULT_PUBLISHED_LESSONS[0]);
+          setDailyQuiz(DEFAULT_PUBLISHED_LESSONS[0].quiz || null);
+        }
       }
     }
-    if (dailyResult.status === 'fulfilled') {
-      setDailyLesson(dailyResult.value.dailyLesson || null);
-      setDailyQuiz(dailyResult.value.quiz || null);
-    } else {
-      try {
-        const cachedLessons = getOfflineCacheConsent() === true
-          ? await listOfflineLessons()
-          : [];
-        const cachedDailyLesson = cachedLessons.find((savedLesson) => savedLesson.isDailyStory);
-        if (cachedDailyLesson) {
-          setDailyLesson({ ...cachedDailyLesson, isOffline: true });
-          setDailyQuiz(cachedDailyLesson.quiz || null);
-          setNotice('ইন্টারনেট সংযোগ নেই। এই ডিভাইসে আগে সংরক্ষিত আজকের গল্প দেখানো হচ্ছে।');
-        } else {
-          setDailyLesson(null);
-          setDailyQuiz(null);
-          reportError(dailyResult.reason);
-        }
-      } catch (cacheError) {
-        setDailyLesson(null);
-        setDailyQuiz(null);
-        reportError(cacheError);
-      }
-    }
-  }, [reportError]);
+  }, []);
 
   const getLessonDetails = useCallback((slug) => {
     const cached = lessonDetailsRef.current.get(slug);
     if (cached) return Promise.resolve(cached);
+
+    const defaultMatch = DEFAULT_PUBLISHED_LESSONS.find((l) => l.slug === slug);
 
     const pending = lessonRequestsRef.current.get(slug);
     if (pending) return pending;
@@ -810,8 +811,17 @@ export function PrivateApp() {
         lessonRequestsRef.current.delete(slug);
         return result.lesson;
       })
-      .catch((requestError) => {
+      .catch(async (requestError) => {
         lessonRequestsRef.current.delete(slug);
+        if (defaultMatch) {
+          lessonDetailsRef.current.set(slug, defaultMatch);
+          return defaultMatch;
+        }
+        const offlineMatch = await getOfflineLesson(slug).catch(() => null);
+        if (offlineMatch) {
+          lessonDetailsRef.current.set(slug, offlineMatch);
+          return offlineMatch;
+        }
         throw requestError;
       });
     lessonRequestsRef.current.set(slug, requestPromise);
@@ -830,10 +840,6 @@ export function PrivateApp() {
         try {
           await getLessonDetails(item.slug);
         } catch {
-          if (active && !prefetchFailed) {
-            prefetchFailed = true;
-            setNotice(copy.lessonPrefetchWarning);
-          }
           active = false;
         }
       }
@@ -971,6 +977,16 @@ export function PrivateApp() {
     if (typeof window === 'undefined') return;
     setBrowserNotificationPermission('Notification' in window ? Notification.permission : 'unsupported');
   }, []);
+
+  useEffect(() => {
+    void loadLessons();
+  }, [loadLessons]);
+
+  useEffect(() => {
+    if (tab === 'lessons' && (!lessons.length || !dailyLesson)) {
+      void loadLessons();
+    }
+  }, [tab, lessons.length, dailyLesson, loadLessons]);
 
   useEffect(() => {
     if (!user) return;

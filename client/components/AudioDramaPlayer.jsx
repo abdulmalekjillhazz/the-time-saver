@@ -34,10 +34,35 @@ function speechVoiceKey(voice) {
   return voice.voiceURI || `${voice.name}:${voice.lang}`;
 }
 
-function characterIcon(role) {
-  if (role === 'male') return '👨';
-  if (role === 'female') return '👩';
-  if (role === 'child') return '🧒';
+function characterIcon(role, text = '') {
+  if (!text) {
+    if (role === 'male') return '👨';
+    if (role === 'female') return '👩';
+    if (role === 'child') return '🧒';
+    return '🎙️';
+  }
+  const expression = getPracticeExpression(text);
+  if (role === 'female') {
+    if (expression === '😄') return '😊';
+    if (expression === '😢') return '🙍‍♀️';
+    if (expression === '😮') return '😲';
+    if (expression === '😟') return '🤦‍♀️';
+    if (expression === '😠') return '😡';
+    return '👩';
+  }
+  if (role === 'child') {
+    if (expression === '😄') return '😃';
+    if (expression === '😢') return '😢';
+    return '🧒';
+  }
+  if (role === 'male') {
+    if (expression === '😄') return '😊';
+    if (expression === '😢') return '🙍‍♂️';
+    if (expression === '😮') return '😲';
+    if (expression === '😟') return '🤦‍♂️';
+    if (expression === '😠') return '😡';
+    return '👨';
+  }
   return '🎙️';
 }
 
@@ -589,6 +614,7 @@ export function AudioDramaPlayer({
   ]);
 
   const startPlayback = useCallback(async (startAt = 0) => {
+    if (speechPracticeOpen) return;
     const requestId = ++playbackRequestIdRef.current;
     controllerRef.current?.close();
     controllerRef.current = null;
@@ -700,12 +726,22 @@ export function AudioDramaPlayer({
   }, [autoPlaySignal, lines, speechPracticeOpen, startPlayback]);
 
   useEffect(() => {
-    if (!speechPracticeOpen || !isPlayingRef.current) return;
-    controllerRef.current?.pause();
+    if (!speechPracticeOpen) return;
+    controllerRef.current?.stop?.();
+    controllerRef.current?.close?.();
+    controllerRef.current?.pause?.();
+    controllerRef.current = null;
     isPlayingRef.current = false;
-    pausedRef.current = true;
+    pausedRef.current = false;
     setIsPlaying(false);
-    setIsPaused(true);
+    setIsPaused(false);
+    if (typeof globalThis.window !== 'undefined' && globalThis.window?.speechSynthesis) {
+      try {
+        globalThis.window.speechSynthesis.cancel();
+      } catch {
+        // Ignore
+      }
+    }
   }, [speechPracticeOpen]);
 
   useEffect(() => {
@@ -1325,6 +1361,14 @@ export function AudioDramaPlayer({
                   if (!await cancelSpeechPractice()) return;
                   setSpeechPracticeOpen(false);
                 } else {
+                  controllerRef.current?.stop?.();
+                  controllerRef.current?.close?.();
+                  controllerRef.current = null;
+                  isPlayingRef.current = false;
+                  setIsPlaying(false);
+                  if (typeof globalThis.window !== 'undefined' && globalThis.window?.speechSynthesis) {
+                    try { globalThis.window.speechSynthesis.cancel(); } catch {}
+                  }
                   setCompletedPracticeLineIndexes([]);
                   setAttemptsByLine({});
                   practiceComparisonsRef.current = {};
@@ -1444,15 +1488,12 @@ export function AudioDramaPlayer({
                     }`}
                   >
                     <div className="mb-2 flex items-center gap-3">
-                      <span className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-gold/40 bg-gold/10 text-3xl" aria-hidden="true">
-                        {characterIcon(line.role)}
-                      </span>
                       <span
-                        className="grid size-12 shrink-0 place-items-center rounded-full bg-paper text-4xl shadow-inner"
+                        className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-gold/40 bg-gold/10 text-3xl shadow-inner"
                         role="img"
                         aria-label={isBn ? 'চরিত্রের অভিব্যক্তি' : 'Character expression'}
                       >
-                        {getPracticeExpression(line.text)}
+                        {characterIcon(line.role, line.text)}
                       </span>
                       <span className="min-w-0 truncate text-sm font-extrabold text-gold-soft">{line.character}</span>
                     </div>
@@ -1580,33 +1621,36 @@ export function AudioDramaPlayer({
                             </span>
                           ))}
                         </p>
-                        <div className="flex flex-col items-center gap-2">
+                        <div className="flex flex-col items-center gap-2.5 pt-2">
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex, true)}
-                            className="primary-button min-h-11 w-full px-4 py-2 text-sm font-bold"
+                            className="primary-button min-h-12 w-full rounded-xl px-4 py-2.5 text-sm font-black shadow-md"
                           >
-                            {copy.completeLine}
+                            ✅ {copy.completeLine}
                           </button>
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex)}
-                            className="min-h-10 rounded-lg px-2 py-1 text-xs font-semibold text-ink/70 underline-offset-4 hover:text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+                            className="secondary-button min-h-10 w-full rounded-xl border border-gold/40 px-3 py-2 text-xs font-bold text-ink shadow-sm hover:bg-gold/15"
                           >
-                            {currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}
+                            ⏭️ {currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}
                           </button>
                         </div>
                       </div>
                     ) : null}
                     {speechPractice.status !== 'result' ? (
-                      <button
-                        type="button"
-                        onClick={() => advancePracticeLine(lineIndex)}
-                        disabled={isListening}
-                        className="mx-auto block min-h-0 rounded-lg px-2 py-1 text-xs font-semibold text-ink/70 underline-offset-4 hover:text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}
-                      </button>
+                      <div className="pt-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => advancePracticeLine(lineIndex)}
+                          disabled={isListening}
+                          className="secondary-button mx-auto inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-sapphire/25 px-4 py-2 text-xs font-bold text-ink shadow-sm hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span>⏭️</span>
+                          <span>{currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}</span>
+                        </button>
+                      </div>
                     ) : null}
                     </article>
                   </div>
