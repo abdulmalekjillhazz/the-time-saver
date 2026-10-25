@@ -96,7 +96,9 @@ describe('English sentence builder', () => {
     expect(markup).toContain('A Morning Walk');
     expect(markup).toContain('value="all"');
     expect(markup).toContain('Why Breaks Help the Brain');
-    expect(markup).toContain('শব্দের উচ্চারণ শুনুন');
+    expect(markup).toContain('শব্দ বেছে নিন ও উচ্চারণ শুনুন');
+    expect(markup).not.toContain('🔊');
+    expect(markup).toContain('স্তর ও গল্প বেছে নিন');
     expect(markup).toContain('বাক্য যাচাই');
     expect(markup).toContain('অনুশীলন 1 / 1');
     expect(markup).not.toContain('Everyday sentence practice');

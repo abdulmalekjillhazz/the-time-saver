@@ -148,11 +148,11 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('aria-valuenow="0"');
     expect(markup).toContain('>0% done</span>');
     expect(markup).not.toContain('0 of 3 tries');
-    expect(markup).toContain('aria-label="Listen to example"');
+    expect(markup).not.toContain('aria-label="Listen to example"');
     expect(markup).toContain('aria-label="Read and check"');
     expect(markup).toContain('speech-practice-constellation');
     expect(markup).toContain('speech-practice-action-dock');
-    expect(markup).toContain('speech-practice-inline-listen');
+    expect(markup).not.toContain('speech-practice-inline-listen');
     expect(markup).toContain('aria-label="Say this sentence"');
     expect(markup).not.toContain('speech-practice-constellation-node');
   });

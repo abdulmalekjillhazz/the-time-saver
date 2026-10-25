@@ -52,12 +52,12 @@ test.describe('mobile header and home page at 360px', () => {
     await expect(practice).toBeVisible();
     await expect(practice.getByRole('heading', { name: 'Practice speaking story lines' })).toBeAttached();
     await expect(practice.getByText('Sentence difficulty adapts to your progress')).toHaveCount(0);
-    const listenButton = practice.locator('.speech-practice-inline-listen');
-    await listenButton.click();
+    const sentence = practice.locator('.speech-practice-sentence');
+    const firstWord = sentence.getByRole('button').first();
+    const firstWordText = (await firstWord.innerText()).replace(/[^a-z0-9']/gi, '').toLowerCase();
+    await firstWord.click();
     await expect.poll(() => page.evaluate(() => window.__spokenPracticeLines)).toHaveLength(1);
-    const practiceSentence = await practice.locator('.speech-practice-sentence').innerText();
-    expect(await page.evaluate(() => window.__spokenPracticeLines[0])).toBe(practiceSentence);
-    await practice.locator('.speech-practice-sentence').getByRole('button').first().click();
+    expect(await page.evaluate(() => window.__spokenPracticeLines[0])).toBe(firstWordText);
     const meaningPanel = page.getByRole('status').filter({ hasText: 'A sample meaning for a practice word.' });
     await expect(meaningPanel).toBeVisible();
     await expect(meaningPanel).toBeInViewport();
@@ -66,13 +66,8 @@ test.describe('mobile header and home page at 360px', () => {
     await expect(practice.getByRole('progressbar', { name: 'Practice progress' })).toBeVisible();
     await expect(practice.getByText('1 / 13', { exact: true })).toBeVisible();
     await expect(practice.getByText('0 of 3 tries')).toHaveCount(0);
-    await expect(listenButton).toBeVisible();
 
-    const sentence = practice.locator('.speech-practice-sentence');
     const sentenceBox = await sentence.boundingBox();
-    const speakerBox = await listenButton.boundingBox();
-    expect(speakerBox.x).toBeGreaterThanOrEqual(sentenceBox.x + sentenceBox.width);
-    expect(Math.abs(speakerBox.y - sentenceBox.y)).toBeLessThanOrEqual(4);
     const fontSize = Number.parseFloat(
       await sentence.evaluate((element) => element.ownerDocument.defaultView.getComputedStyle(element).fontSize),
     );
@@ -83,7 +78,7 @@ test.describe('mobile header and home page at 360px', () => {
     const buttonBox = await microphoneButton.boundingBox();
     expect(buttonBox.height).toBeGreaterThanOrEqual(48);
     expect(buttonBox.width).toBeGreaterThanOrEqual(48);
-    expect(buttonBox.y).toBeGreaterThan(speakerBox.y);
+    expect(buttonBox.y).toBeGreaterThan(sentenceBox.y);
     const practiceBox = await practice.boundingBox();
     expect(Math.abs((buttonBox.x + buttonBox.width / 2) - (practiceBox.x + practiceBox.width / 2))).toBeLessThanOrEqual(2);
     const skipButton = practice.getByRole('button', { name: 'Skip to next sentence' });
@@ -387,10 +382,10 @@ test.describe('mobile header and home page at 360px', () => {
 
   test('all Android app links point to the latest production APK download', async ({ page }) => {
     const downloadUrl = '/downloads/android';
-    const apkUrl = '/downloads/smart-routine-android-v1.13.apk';
+    const apkUrl = '/downloads/smart-routine-android-v1.14.apk';
     await page.goto('/en');
-    await expect(page.locator('#main').getByRole('link', { name: 'Download Android app (v1.13)' })).toHaveAttribute('href', downloadUrl);
-    await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app (v1.13)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.locator('#main').getByRole('link', { name: 'Download Android app (v1.14)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app (v1.14)' })).toHaveAttribute('href', downloadUrl);
     const redirectResponse = await page.request.head(new URL(downloadUrl, page.url()).href, { maxRedirects: 0 });
     expect(redirectResponse.status()).toBe(302);
     expect(new URL(redirectResponse.headers().location).pathname).toBe(apkUrl);
@@ -400,11 +395,11 @@ test.describe('mobile header and home page at 360px', () => {
     expect(Number(apkResponse.headers()['content-length'])).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: 'Menu' }).click();
-    const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app (v1.13)' });
+    const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app (v1.14)' });
     await expect(navigationLinks).toHaveAttribute('href', downloadUrl);
 
     await page.goto('/bn');
-    await expect(page.locator('#main').getByRole('link', { name: 'অ্যান্ড্রয়েড অ্যাপ ডাউনলোড (v1.13)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.locator('#main').getByRole('link', { name: 'অ্যান্ড্রয়েড অ্যাপ ডাউনলোড (v1.14)' })).toHaveAttribute('href', downloadUrl);
   });
 
   test('the home page has no axe violations', async ({ page }) => {

@@ -22,8 +22,8 @@ android {
         applicationId "com.madeyourdreambigger.smartroutine"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode providers.environmentVariable('ANDROID_VERSION_CODE').getOrElse('13').toInteger()
-        versionName providers.environmentVariable('ANDROID_VERSION_NAME').getOrElse('1.13')
+        versionCode providers.environmentVariable('ANDROID_VERSION_CODE').getOrElse('14').toInteger()
+        versionName providers.environmentVariable('ANDROID_VERSION_NAME').getOrElse('1.14')
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

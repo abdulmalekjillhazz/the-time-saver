@@ -464,7 +464,7 @@ function GoogleSignInButton({ clientId, lang, disabled, nativeAndroid, onCredent
       const credential = await signInWithGoogleNative(resolvedClientId);
       await credentialHandler.current(credential);
     } catch (err) {
-      onError(err);
+      if (err?.code !== 'USER_CANCELLED') onError(err);
     } finally {
       setNativeLoginPending(false);
     }

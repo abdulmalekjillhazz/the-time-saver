@@ -52,9 +52,16 @@ export async function signInWithGoogleNative(webClientId) {
       || code === 'user_canceled'
       || code === 'canceled'
       || code === 'cancelled'
+      || code === 'sign_in_cancelled'
+      || code === 'sign_in_canceled'
+      || code === 'cancelled_by_user'
+      || code === 'canceled_by_user'
       || code === '12501'
+      || /google sign[\s-]?in (?:was )?cancel{1,2}ed by (?:the )?user/i.test(error?.message || '')
     ) {
-      throw new Error('Google sign-in was canceled.', { cause: error });
+      throw Object.assign(new Error('Google sign-in was canceled.', { cause: error }), {
+        code: 'USER_CANCELLED',
+      });
     }
     throw error;
   }

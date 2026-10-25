@@ -62,9 +62,10 @@ describe('native Android Google sign-in', () => {
       Object.assign(new Error('Google Sign-In cancelled by user'), { code: 'USER_CANCELLED' }),
     );
 
-    await expect(signInWithGoogleNative('web-client-id')).rejects.toThrow(
-      'Google sign-in was canceled.',
-    );
+    await expect(signInWithGoogleNative('web-client-id')).rejects.toMatchObject({
+      message: 'Google sign-in was canceled.',
+      code: 'USER_CANCELLED',
+    });
   });
 
   it('does not misreport a configuration failure just because its message mentions cancellation', async () => {

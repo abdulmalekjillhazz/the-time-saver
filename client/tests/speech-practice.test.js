@@ -6,11 +6,24 @@ import {
   getPracticeExpression,
   getNextPracticeLineIndex,
   getSpeechPracticeAccuracy,
+  getPronunciationFeedbackTier,
   MAX_SPEECH_PRACTICE_ATTEMPTS,
+  MIN_PRONUNCIATION_SCORE_TO_SAVE,
+  shouldSubmitPronunciationScore,
   speechWords,
 } from '../lib/speechPractice.js';
 
 describe('story speech practice matching', () => {
+  it('uses clear pronunciation feedback tiers and only saves scores above 75%', () => {
+    expect(getPronunciationFeedbackTier(49)).toBe('retry');
+    expect(getPronunciationFeedbackTier(50)).toBe('good');
+    expect(getPronunciationFeedbackTier(79)).toBe('good');
+    expect(getPronunciationFeedbackTier(80)).toBe('great');
+    expect(MIN_PRONUNCIATION_SCORE_TO_SAVE).toBe(75);
+    expect(shouldSubmitPronunciationScore(75)).toBe(false);
+    expect(shouldSubmitPronunciationScore(76)).toBe(true);
+  });
+
   it('allows at most three attempts for each story line', () => {
     expect(MAX_SPEECH_PRACTICE_ATTEMPTS).toBe(3);
     expect([0, 1, 2].every(canAttemptSpeechPractice)).toBe(true);

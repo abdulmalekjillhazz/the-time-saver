@@ -40,6 +40,9 @@ public class NativeSpeechPlugin extends Plugin implements RecognitionListener {
 
     @PermissionCallback
     private void onMicrophonePermission(PluginCall call) {
+        if (call != pendingCall) {
+            return;
+        }
         if (getPermissionState("microphone") != PermissionState.GRANTED) {
             finishWithError("Microphone permission was not granted.", "PERMISSION_DENIED");
             return;
@@ -48,11 +51,17 @@ public class NativeSpeechPlugin extends Plugin implements RecognitionListener {
     }
 
     private void startRecognition(PluginCall call) {
+        if (call != pendingCall) {
+            return;
+        }
         if (!SpeechRecognizer.isRecognitionAvailable(getContext())) {
             finishWithError("Speech recognition is not available on this device.", "UNAVAILABLE");
             return;
         }
         getActivity().runOnUiThread(() -> {
+            if (call != pendingCall) {
+                return;
+            }
             try {
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(getContext());
                 speechRecognizer.setRecognitionListener(this);

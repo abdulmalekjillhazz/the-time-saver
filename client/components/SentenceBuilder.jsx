@@ -6,6 +6,7 @@ import { apiRequest } from '../lib/apiClient.js';
 import { announceLearningActivity } from '../lib/learningFeedback.js';
 import { playCongratulationsSound } from '../lib/notificationSound.js';
 import { speakNaturalSpeech } from '../lib/voiceBriefing.js';
+import { lookupStoryWordMeaning, normalizeWord } from './StoryReader.jsx';
 import { Card } from './ui/Card.jsx';
 
 const LEVELS = ['basic', 'intermediate', 'advanced'];
@@ -184,6 +185,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const [milestoneNotice, setMilestoneNotice] = useState('');
   const [pronunciationError, setPronunciationError] = useState('');
   const [speakingWord, setSpeakingWord] = useState('');
+  const [selectedWordMeaning, setSelectedWordMeaning] = useState(null);
+  const wordMeaningRequestRef = useRef(0);
   const speechRef = useRef(null);
 
   useEffect(() => () => speechRef.current?.stop(), []);
@@ -251,6 +254,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     setSessionFinished(false);
     setSelected([]);
     setResult('');
+    wordMeaningRequestRef.current += 1;
+    setSelectedWordMeaning(null);
     setMilestoneNotice('');
     setCompletionError('');
   };
@@ -262,6 +267,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     setSessionFinished(false);
     setSelected([]);
     setResult('');
+    wordMeaningRequestRef.current += 1;
+    setSelectedWordMeaning(null);
     setMilestoneNotice('');
     setCompletionError('');
   };
@@ -321,6 +328,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     }
     setSelected([]);
     setResult('');
+    wordMeaningRequestRef.current += 1;
+    setSelectedWordMeaning(null);
     setMilestoneNotice('');
     setCompletionError('');
   };
@@ -332,6 +341,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     setSessionFinished(false);
     setSelected([]);
     setResult('');
+    wordMeaningRequestRef.current += 1;
+    setSelectedWordMeaning(null);
     setMilestoneNotice('');
     setCompletionError('');
   };
@@ -339,6 +350,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   const resetSentence = () => {
     setSelected([]);
     setResult('');
+    wordMeaningRequestRef.current += 1;
+    setSelectedWordMeaning(null);
     setMilestoneNotice('');
   };
 
@@ -369,6 +382,35 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     }
   };
 
+  const handleWordTap = async (word, wordIndex) => {
+    chooseWord(wordIndex);
+    speakWord(word);
+    const clean = normalizeWord(word);
+    const requestId = ++wordMeaningRequestRef.current;
+    setSelectedWordMeaning({ word: clean, meaning: '', loading: true });
+    try {
+      const result = await lookupStoryWordMeaning(clean, [], lang);
+      if (requestId === wordMeaningRequestRef.current && result) {
+        setSelectedWordMeaning({ ...result, word: clean, loading: false });
+      }
+    } catch (error) {
+      if (requestId === wordMeaningRequestRef.current) {
+        setSelectedWordMeaning({
+          word: clean,
+          meaning: isBn
+            ? `শব্দের অর্থ আনা যায়নি: ${error.message}`
+            : `Could not load the word meaning: ${error.message}`,
+          loading: false,
+        });
+      }
+    }
+  };
+
+  const dismissWordMeaning = () => {
+    wordMeaningRequestRef.current += 1;
+    setSelectedWordMeaning(null);
+  };
+
   const milestonePct = Math.min(100, Math.round((Math.min(completedSentenceCount, 10) / 10) * 100));
 
   return (
@@ -385,8 +427,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-ink/75">
               {isBn
-                ? 'প্রতিটি স্তরে নতুন অনুশীলন আছে। আগের গল্পের বাক্যগুলো রাখা হয়েছে, আর প্রতিদিনের নতুন AI গল্প থেকেও বাক্য যোগ হয়।'
-                : 'Choose from a growing set of levelled challenges. Existing story sentences stay available, and new daily AI story sentences are added as they publish.'}
+                ? 'শব্দগুলো সঠিক ক্রমে সাজিয়ে বাক্য তৈরি করুন। শব্দে ট্যাপ করলে উচ্চারণ ও অর্থ পাবেন।'
+                : 'Arrange the words to build the sentence. Tap any word to hear it and see its meaning.'}
             </p>
           </div>
         </div>
@@ -407,6 +449,11 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
               </div>
             </div>
 
+            <details className="rounded-2xl border border-sapphire/20 bg-paper/60 p-3">
+              <summary className="cursor-pointer text-sm font-extrabold text-ink">
+                {isBn ? 'স্তর ও গল্প বেছে নিন' : 'Choose level and story'}
+              </summary>
+              <div className="mt-3 space-y-3">
             <div className="grid gap-2 sm:grid-cols-3" aria-label={isBn ? 'বাক্যের স্তর' : 'Sentence level'}>
               {LEVELS.map((item, levelIndex) => {
                 const unlocked = unlockedLevels.has(item);
@@ -452,6 +499,8 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                 ))}
               </select>
             </label>
+              </div>
+            </details>
 
             {exercise ? (
               <div className="duo-card space-y-4 rounded-2xl border-2 border-sapphire/25 bg-paper/85 p-4 sm:p-5">
@@ -495,28 +544,47 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                   {exercise.words.map((word, wordIndex) => {
                     const used = selected.includes(wordIndex);
                     return (
-                      <div key={`${exercise.slug}-${exerciseIndex}-${wordIndex}`} className="inline-flex items-stretch gap-1">
-                        <button
-                          type="button"
-                          disabled={used || result === 'correct'}
-                          onClick={() => chooseWord(wordIndex)}
-                          className="duo-word-chip inline-flex min-h-[44px] items-center justify-center rounded-xl border-2 border-gold/35 bg-gold/15 px-3.5 py-2 text-sm font-extrabold text-ink transition hover:-translate-y-0.5 hover:border-gold/75 hover:bg-gold/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-default disabled:opacity-30"
-                        >
-                          {word}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => speakWord(word)}
-                          aria-label={`${isBn ? 'শব্দের উচ্চারণ শুনুন' : 'Hear pronunciation'}: ${word}`}
-                          title={isBn ? 'শব্দের উচ্চারণ শুনুন' : 'Hear word pronunciation'}
-                          className="duo-word-chip inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border-2 border-sapphire/30 bg-sapphire/15 text-base text-sapphire transition hover:bg-sapphire/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sapphire/25"
-                        >
-                          <span className={speakingWord === word ? 'animate-pulse' : ''} aria-hidden="true">🔊</span>
-                        </button>
-                      </div>
+                      <button
+                        key={`${exercise.slug}-${exerciseIndex}-${wordIndex}`}
+                        type="button"
+                        disabled={result === 'correct'}
+                        onClick={() => { void handleWordTap(word, wordIndex); }}
+                        aria-label={`${isBn ? 'শব্দ বেছে নিন ও উচ্চারণ শুনুন' : 'Select word and hear pronunciation'}: ${word}`}
+                        aria-pressed={used}
+                        className={`duo-word-chip inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border-2 px-3.5 py-2 text-sm font-extrabold text-ink transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/35 disabled:cursor-default disabled:opacity-40 ${
+                          selectedWordMeaning?.word === normalizeWord(word)
+                            ? 'border-sapphire bg-sapphire/15'
+                            : 'border-gold/35 bg-gold/15 hover:border-gold/75 hover:bg-gold/25'
+                        }`}
+                      >
+                        <span>{word}</span>
+                        {speakingWord === word ? <span aria-hidden="true" className="animate-pulse text-xs">♪</span> : null}
+                      </button>
                     );
                   })}
                 </div>
+                {selectedWordMeaning ? (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="flex items-start justify-between gap-3 rounded-2xl border-2 border-gold/40 bg-gold/10 p-3.5 text-sm text-ink"
+                  >
+                    <span>
+                      <strong className="block text-base font-extrabold">{selectedWordMeaning.word}</strong>
+                      <span>{selectedWordMeaning.loading
+                        ? (isBn ? 'অর্থ খোঁজা হচ্ছে…' : 'Looking up meaning…')
+                        : selectedWordMeaning.meaning}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={dismissWordMeaning}
+                      aria-label={isBn ? 'শব্দের অর্থ বন্ধ করুন' : 'Close word meaning'}
+                      className="grid size-8 shrink-0 place-items-center rounded-lg font-bold hover:bg-gold/20"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : null}
                 {pronunciationError ? <p role="alert" className="text-sm font-semibold text-rose-400">{pronunciationError}</p> : null}
 
                 <div className="flex flex-wrap gap-2.5 pt-1">

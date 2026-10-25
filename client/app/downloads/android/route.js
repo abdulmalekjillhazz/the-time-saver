@@ -1,4 +1,4 @@
-const ANDROID_APK_PATH = '/downloads/smart-routine-android-v1.13.apk';
+const ANDROID_APK_PATH = '/downloads/smart-routine-android-v1.14.apk';
 
 export const runtime = 'nodejs';
 
