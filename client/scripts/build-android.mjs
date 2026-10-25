@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { renameSync, rmSync } from 'node:fs';
+import { readdirSync, renameSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const require = createRequire(import.meta.url);
@@ -22,6 +22,11 @@ try {
 
 if (result.error) throw result.error;
 if (result.status === 0) {
-  rmSync(resolve(process.cwd(), 'out', 'downloads', 'smart-routine-android.apk'), { force: true });
+  const downloadsDirectory = resolve(process.cwd(), 'out', 'downloads');
+  for (const entry of readdirSync(downloadsDirectory, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.toLowerCase().endsWith('.apk')) {
+      rmSync(resolve(downloadsDirectory, entry.name), { force: true });
+    }
+  }
 }
 process.exit(result.status ?? 1);

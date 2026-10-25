@@ -28,9 +28,6 @@ export async function signInWithGoogleNative(webClientId) {
     // নেটিভ গুগল প্লে সার্ভিসেস ডায়ালগ চালু করা
     const response = await SocialLogin.login({
       provider: 'google',
-      options: {
-        scopes: ['email', 'profile'],
-      },
     });
 
     // রেসপন্স যাচাইকরণ (সব সম্ভাব্য শেপ সাপোর্ট করে)

@@ -1,5 +1,7 @@
 {
     "workbench.editorAssociations": {
         "http://localhost:4096": "default"
-    }
+    },
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.import.gradle.wrapper.enabled": true
 }
