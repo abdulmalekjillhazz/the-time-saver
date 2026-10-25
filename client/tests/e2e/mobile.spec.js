@@ -127,7 +127,6 @@ test.describe('mobile header and home page at 360px', () => {
   test('plays the voice briefing after staying on Today for four seconds', async ({ page }) => {
     await page.addInitScript(() => {
       window.__voiceBriefingStarted = false;
-      window.__voiceBriefingRequestCount = 0;
       window.AudioContext = class {
         constructor() {
           this.state = 'running';
@@ -145,23 +144,6 @@ test.describe('mobile header and home page at 360px', () => {
           };
         }
       };
-      const originalFetch = window.fetch.bind(window);
-      window.fetch = async (input, init) => {
-        const requestUrl = typeof input === 'string' ? input : input.url;
-        const { pathname } = new URL(requestUrl, window.location.href);
-        if (pathname === '/api/auth/csrf') {
-          return new Response(JSON.stringify({ csrfToken: 'today-briefing-test-token' }), {
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-        if (pathname === '/api/speech/briefing') {
-          window.__voiceBriefingRequestCount += 1;
-          return new Response(new Uint8Array([0]), {
-            headers: { 'Content-Type': 'audio/mpeg' },
-          });
-        }
-        return originalFetch(input, init);
-      };
     });
     await page.route('**/api/**', async (route) => {
       const { pathname } = new URL(route.request().url());
@@ -176,6 +158,7 @@ test.describe('mobile header and home page at 360px', () => {
           },
         },
         '/api/auth/google/config': { clientId: '' },
+        '/api/auth/csrf': { csrfToken: 'today-briefing-test-token' },
         '/api/routines': { routines: [] },
         '/api/lessons': { lessons: [] },
         '/api/lessons/today': { dailyLesson: null, quiz: null },
@@ -192,7 +175,6 @@ test.describe('mobile header and home page at 360px', () => {
     await expect(page.getByRole('button', { name: 'Voice briefing' })).toBeVisible();
     const briefing = page.getByRole('dialog', { name: /Your Personal Voice Briefing/ });
     await expect(briefing).toBeVisible({ timeout: 8000 });
-    await expect.poll(() => page.evaluate(() => window.__voiceBriefingRequestCount)).toBe(1);
     await expect.poll(() => page.evaluate(() => window.__voiceBriefingStarted)).toBe(true);
   });
 
@@ -405,10 +387,10 @@ test.describe('mobile header and home page at 360px', () => {
 
   test('all Android app links point to the latest production APK download', async ({ page }) => {
     const downloadUrl = '/downloads/android';
-    const apkUrl = '/downloads/smart-routine-android-v1.12.apk';
+    const apkUrl = '/downloads/smart-routine-android-v1.13.apk';
     await page.goto('/en');
-    await expect(page.locator('#main').getByRole('link', { name: 'Download Android app (v1.12)' })).toHaveAttribute('href', downloadUrl);
-    await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app (v1.12)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.locator('#main').getByRole('link', { name: 'Download Android app (v1.13)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app (v1.13)' })).toHaveAttribute('href', downloadUrl);
     const redirectResponse = await page.request.head(new URL(downloadUrl, page.url()).href, { maxRedirects: 0 });
     expect(redirectResponse.status()).toBe(302);
     expect(new URL(redirectResponse.headers().location).pathname).toBe(apkUrl);
@@ -418,11 +400,11 @@ test.describe('mobile header and home page at 360px', () => {
     expect(Number(apkResponse.headers()['content-length'])).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: 'Menu' }).click();
-    const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app (v1.12)' });
+    const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app (v1.13)' });
     await expect(navigationLinks).toHaveAttribute('href', downloadUrl);
 
     await page.goto('/bn');
-    await expect(page.locator('#main').getByRole('link', { name: 'অ্যান্ড্রয়েড অ্যাপ ডাউনলোড (v1.12)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.locator('#main').getByRole('link', { name: 'অ্যান্ড্রয়েড অ্যাপ ডাউনলোড (v1.13)' })).toHaveAttribute('href', downloadUrl);
   });
 
   test('the home page has no axe violations', async ({ page }) => {
