@@ -43,11 +43,11 @@ describe('English sentence builder', () => {
   it('keeps a substantial original practice bank at every level', () => {
     const exercises = createCoreSentenceExercises();
 
-    expect(exercises).toHaveLength(24);
-    expect(exercises.filter(({ level }) => level === 'basic')).toHaveLength(8);
-    expect(exercises.filter(({ level }) => level === 'intermediate')).toHaveLength(8);
-    expect(exercises.filter(({ level }) => level === 'advanced')).toHaveLength(8);
-    expect(new Set(exercises.map(({ sentence }) => sentence.toLowerCase())).size).toBe(24);
+    expect(exercises).toHaveLength(90);
+    expect(exercises.filter(({ level }) => level === 'basic')).toHaveLength(30);
+    expect(exercises.filter(({ level }) => level === 'intermediate')).toHaveLength(30);
+    expect(exercises.filter(({ level }) => level === 'advanced')).toHaveLength(30);
+    expect(new Set(exercises.map(({ sentence }) => sentence.toLowerCase())).size).toBe(90);
     expect(exercises.every(({ storyBacked }) => !storyBacked)).toBe(true);
   });
 

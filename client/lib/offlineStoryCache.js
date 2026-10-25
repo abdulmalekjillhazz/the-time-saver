@@ -206,17 +206,20 @@ export async function cacheOfflineLesson(lesson, request) {
 
   for (let index = 0; index < missing.length; index += 200) {
     const batch = missing.slice(index, index + 200);
-    const result = await request('/api/word-meanings', {
-      method: 'POST',
-      body: { words: batch, lang: 'bn' },
-    });
-    if (!Array.isArray(result.meanings)) {
-      throw new Error('শব্দার্থের উত্তরটি বোঝা যায়নি; আবার চেষ্টা করুন।');
+    try {
+      const result = await request('/api/word-meanings', {
+        method: 'POST',
+        body: { words: batch, lang: 'bn' },
+      });
+      if (Array.isArray(result?.meanings)) {
+        if (getOfflineCacheConsent() !== true) return { lessonSaved: false, meaningsSaved: 0 };
+        await saveOfflineMeanings(result.meanings);
+        meaningsSaved += result.meanings.length;
+        meaningsMissing += Array.isArray(result.unavailable) ? result.unavailable.length : 0;
+      }
+    } catch {
+      // If batch word meanings is unreachable, continue with the stored lesson and vocabulary
     }
-    if (getOfflineCacheConsent() !== true) return { lessonSaved: false, meaningsSaved: 0 };
-    await saveOfflineMeanings(result.meanings);
-    meaningsSaved += result.meanings.length;
-    meaningsMissing += Array.isArray(result.unavailable) ? result.unavailable.length : 0;
   }
 
   return { lessonSaved: true, meaningsSaved, meaningsMissing };

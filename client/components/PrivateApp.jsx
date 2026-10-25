@@ -991,14 +991,13 @@ export function PrivateApp() {
   useEffect(() => {
     if (!user) return;
     Promise.all([loadRoutines(user), loadLessons()])
-      .catch(reportError);
+      .catch(() => {});
     request('/api/model/current')
       .then(setModel)
-      .catch((err) => {
-        if (err.status === 404) setModel(null);
-        else reportError(err);
+      .catch(() => {
+        setModel(null);
       });
-  }, [user, loadLessons, loadRoutines, reportError]);
+  }, [user, loadLessons, loadRoutines]);
 
   useEffect(() => {
     if (!user || !uiReady) return;
@@ -1006,10 +1005,10 @@ export function PrivateApp() {
       const allowed = getOfflineCacheConsent();
       setOfflineCacheAllowed(allowed === true);
       if (allowed === null) setOfflineConsentOpen(true);
-    } catch (consentError) {
-      reportError(consentError);
+    } catch {
+      // Ignore background consent check error
     }
-  }, [user, uiReady, reportError]);
+  }, [user, uiReady]);
 
   useEffect(() => {
     if (!uiReady) return undefined;
@@ -1023,12 +1022,12 @@ export function PrivateApp() {
         .then((savedLessons) => {
           if (active) setOfflineSavedLessons(savedLessons);
         })
-        .catch(reportError);
-    } catch (cacheError) {
-      reportError(cacheError);
+        .catch(() => {});
+    } catch {
+      // Ignore background cache reading error
     }
     return () => { active = false; };
-  }, [uiReady, offlineCacheAllowed, reportError]);
+  }, [uiReady, offlineCacheAllowed]);
 
   useEffect(() => {
     if (!offlineCacheAllowed || !dailyLesson?.slug || dailyLesson.isOffline) return;
@@ -1042,8 +1041,10 @@ export function PrivateApp() {
       .then(async ({ lessonSaved }) => {
         if (lessonSaved) setOfflineSavedLessons(await listOfflineLessons());
       })
-      .catch(reportError);
-  }, [dailyLesson, dailyQuiz, offlineCacheAllowed, reportError]);
+      .catch(() => {
+        // Background offline prefetch should never trigger intrusive error alerts
+      });
+  }, [dailyLesson, dailyQuiz, offlineCacheAllowed]);
 
   useEffect(() => {
     if (!user) return undefined;

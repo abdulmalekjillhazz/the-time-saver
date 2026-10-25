@@ -13,54 +13,81 @@ export function Header({ lang, dict }) {
 
   return (
     <header className="public-site-header">
-      <nav aria-label={dict.nav.label} className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 px-4 py-3">
-        <Link href={`/${lang}`} aria-label={dict.brand} className="inline-flex min-h-[44px] items-center gap-3 py-1 text-xl font-extrabold tracking-tight text-gold transition-opacity hover:opacity-90">
+      <nav aria-label={dict.nav.label} className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <Link
+          href={`/${lang}`}
+          aria-label={dict.brand}
+          className="group inline-flex min-h-[44px] shrink-0 items-center gap-2.5 py-1 text-lg font-black tracking-tight text-gold transition-opacity hover:opacity-90 sm:text-xl"
+        >
           <Image
             src={BRAND_LOGO_URL}
             alt={logoAlt}
-            width={48}
-            height={48}
+            width={40}
+            height={40}
             priority
-            className="idle-wobble h-12 w-12 rounded-full border-2 border-gold/80 object-cover shadow-[0_0_14px_rgba(242,193,78,0.35)] transition-shadow hover:shadow-[0_0_20px_rgba(242,193,78,0.55)]"
+            className="h-10 w-10 rounded-full border-2 border-gold/80 object-cover shadow-[0_0_12px_rgba(242,193,78,0.35)] transition-transform group-hover:scale-105"
           />
-          <span>{dict.brand}</span>
+          <span className="tracking-tight">{dict.brand}</span>
         </Link>
 
-        <div className="flex items-center gap-3 md:order-last">
+        {/* Desktop Navigation Links */}
+        <div className="hidden items-center gap-6 md:flex">
+          <Link href={`/${lang}`} className="text-sm font-semibold text-ink/90 transition-colors hover:text-gold">
+            {dict.nav.home}
+          </Link>
+          <Link href={`/${lang}/lessons`} className="text-sm font-semibold text-ink/90 transition-colors hover:text-gold">
+            {dict.nav.lessons}
+          </Link>
+          <Link href={`/${lang}/about`} className="text-sm font-semibold text-ink/90 transition-colors hover:text-gold">
+            {dict.nav.about}
+          </Link>
+          <Link href={`/${lang}/help`} className="text-sm font-semibold text-ink/90 transition-colors hover:text-gold">
+            {dict.nav.help}
+          </Link>
+        </div>
+
+        {/* Action Group: Desktop + Mobile */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href={`/${otherLang}`}
-            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-bold text-gold transition-colors hover:bg-gold/20"
+            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-bold text-gold transition-all hover:bg-gold/20 hover:scale-105"
             title={`Switch to ${otherLangLabel}`}
           >
             <span aria-hidden="true">🌐</span>
             <span>{otherLangLabel}</span>
           </Link>
 
-          <Link
-            href="/app"
-            className="hidden min-h-[40px] items-center rounded-xl bg-gold px-4 py-2 text-sm font-bold text-on-gold shadow-[0_0_14px_rgba(242,193,78,0.35)] transition-shadow hover:opacity-95 hover:shadow-[0_0_20px_rgba(242,193,78,0.5)] sm:inline-flex"
-          >
-            {dict.nav.app}
-          </Link>
           <a
             href={ANDROID_APK_DOWNLOAD_URL}
             download
-            className="hidden min-h-[40px] items-center rounded-xl border border-gold/50 px-4 py-2 text-sm font-bold text-gold transition-colors hover:bg-gold/10 lg:inline-flex"
+            className="hidden min-h-[38px] items-center gap-1.5 rounded-xl border border-gold/50 bg-paper/60 px-3.5 py-1.5 text-xs font-bold text-gold transition-all hover:border-gold hover:bg-gold/15 lg:inline-flex"
+            title={dict.nav.downloadAndroid}
           >
-            {dict.nav.downloadAndroid}
+            <span aria-hidden="true">📱</span>
+            <span>APK v1.15</span>
           </a>
-        </div>
 
-        <MobileMenu label={dict.nav.menu} closeLabel={dict.nav.close}>
-          <Link href={`/${lang}`} className="min-h-[44px] py-2 font-medium">{dict.nav.home}</Link>
-          <Link href={`/${lang}/lessons`} className="min-h-[44px] py-2 font-medium">{dict.nav.lessons}</Link>
-          <Link href={`/${lang}/about`} className="min-h-[44px] py-2 font-medium">{dict.nav.about}</Link>
-          <Link href={`/${lang}/help`} className="min-h-[44px] py-2 font-medium">{dict.nav.help}</Link>
-          <a href={ANDROID_APK_DOWNLOAD_URL} download className="min-h-[44px] py-2 font-medium">{dict.nav.downloadAndroid}</a>
-          <Link href="/app" className="min-h-[44px] rounded-lg bg-gold px-4 py-2 font-semibold text-on-gold sm:hidden">
-            {dict.nav.app}
+          <Link
+            href="/app"
+            className="hidden min-h-[38px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-1.5 text-xs font-black text-slate-950 shadow-[0_0_12px_rgba(242,193,78,0.35)] transition-all hover:scale-105 hover:shadow-[0_0_18px_rgba(242,193,78,0.55)] active:scale-95 sm:inline-flex"
+          >
+            <span>🚀</span>
+            <span>{dict.nav.app}</span>
           </Link>
-        </MobileMenu>
+
+          <MobileMenu label={dict.nav.menu} closeLabel={dict.nav.close}>
+            <Link href={`/${lang}`} className="min-h-[44px] py-2 font-medium">{dict.nav.home}</Link>
+            <Link href={`/${lang}/lessons`} className="min-h-[44px] py-2 font-medium">{dict.nav.lessons}</Link>
+            <Link href={`/${lang}/about`} className="min-h-[44px] py-2 font-medium">{dict.nav.about}</Link>
+            <Link href={`/${lang}/help`} className="min-h-[44px] py-2 font-medium">{dict.nav.help}</Link>
+            <a href={ANDROID_APK_DOWNLOAD_URL} download className="min-h-[44px] py-2 font-medium">
+              📱 {dict.nav.downloadAndroid}
+            </a>
+            <Link href="/app" className="min-h-[44px] rounded-lg bg-gold px-4 py-2 font-semibold text-on-gold">
+              🚀 {dict.nav.app}
+            </Link>
+          </MobileMenu>
+        </div>
       </nav>
     </header>
   );

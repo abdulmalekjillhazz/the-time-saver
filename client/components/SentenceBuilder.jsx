@@ -208,11 +208,17 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
   );
 
   const levelCounts = useMemo(
-    () => Object.fromEntries(LEVELS.map((item) => [
-      item,
-      practiceExercises.filter((exercise) => exercise.level === item).length,
-    ])),
-    [practiceExercises],
+    () => {
+      let pool = practiceExercises;
+      if (storySlug === 'core') {
+        pool = exercises.filter(({ storyBacked }) => !storyBacked);
+      }
+      return Object.fromEntries(LEVELS.map((item) => [
+        item,
+        pool.filter((exercise) => exercise.level === item).length,
+      ]));
+    },
+    [practiceExercises, exercises, storySlug],
   );
 
   const unlockedLevels = new Set(getUnlockedLevels(levelCounts, completedLevels));

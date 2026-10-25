@@ -164,67 +164,133 @@ export default async function HomePage(props) {
       <JsonLd data={structuredData} />
 
       <div className="landing-page space-y-16 py-4">
-        {/* Hero Section — matches app-hero in globals.css */}
+        {/* Masterclass Hero Section */}
         <section
-          className="landing-hero app-hero relative isolate overflow-hidden rounded-3xl border border-gold/60 p-6 shadow-xl sm:p-12"
+          className="landing-hero app-hero relative isolate overflow-hidden rounded-3xl p-6 sm:p-10 lg:p-14 shadow-2xl grid lg:grid-cols-12 gap-8 lg:gap-12 items-center"
         >
-          <div className="max-w-2xl">
-            <div className="eyebrow inline-flex items-center gap-2">
-              <span className="brand-spark">✦</span>
-              <span>{isBn ? 'দৈনিক রুটিন ও অভ্যাস গড়ার অ্যাপ' : 'Daily routine planner & habit tracker'}</span>
+          <div className="lg:col-span-7 space-y-6 relative z-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-gold/50 bg-gold/15 px-3.5 py-1 text-xs font-extrabold text-gold shadow-[0_0_15px_rgba(242,193,78,0.25)]">
+              <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{isBn ? '✨ দৈনিক রুটিন প্ল্যানার ও এআই অভ্যাস কোচ' : '✨ AI Daily Routine Planner & Habit Coach'}</span>
             </div>
 
-            <h1 className="display-1 mt-4 max-w-2xl">
+            <h1 className="text-3xl font-black tracking-tight text-ink sm:text-5xl lg:text-5xl leading-[1.14]">
               {home.h1}
             </h1>
 
-            <p className="hero-description mt-4 text-base font-medium leading-relaxed sm:text-lg">
+            <p className="hero-description text-base sm:text-lg leading-relaxed text-ink/85 max-w-xl">
               {home.lead}
             </p>
 
-            <div className="landing-actions mt-8 flex flex-wrap items-center gap-3">
-              <Link href="/app" className="landing-button primary-button bg-sapphire px-6 py-3 font-bold text-on-sapphire">
-                {isBn ? '🚀 বিনামূল্যে অ্যাকাউন্ট খুলুন' : '🚀 Create Free Account'}
+            <div className="landing-actions flex flex-wrap items-center gap-3.5 pt-2">
+              <Link
+                href="/app"
+                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 px-6 py-3 text-base font-black text-slate-950 shadow-[0_0_24px_rgba(242,193,78,0.5)] transition-all hover:scale-[1.03] hover:shadow-[0_0_32px_rgba(242,193,78,0.7)] active:scale-95"
+              >
+                <span>🚀</span>
+                <span>{isBn ? 'বিনামূল্যে শুরু করুন' : 'Get Started Free'}</span>
               </Link>
-              <Link href={`/${lang}/lessons`} className="landing-button secondary-button px-5 py-3 font-semibold">
-                {isBn ? '📚 আজকের পাঠ পড়ুন' : '📚 Explore Habit Lessons'}
-              </Link>
-              <a href={ANDROID_APK_DOWNLOAD_URL} className="landing-button secondary-button px-5 py-3 font-semibold">
-                {home.ctaAndroid}
+
+              <a
+                href={ANDROID_APK_DOWNLOAD_URL}
+                download
+                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-gold/70 bg-paper/80 backdrop-blur-md px-5 py-3 text-sm font-bold text-ink shadow-lg transition-all hover:border-gold hover:bg-gold/15 hover:scale-[1.02] active:scale-95"
+              >
+                <span>📱</span>
+                <span>{home.ctaAndroid}</span>
               </a>
+
+              <Link
+                href={`/${lang}/lessons`}
+                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-sapphire/45 bg-sapphire/15 px-4 py-3 text-sm font-bold text-sapphire transition-all hover:bg-sapphire/25 hover:border-sapphire hover:scale-[1.02]"
+              >
+                <span>📖</span>
+                <span>{isBn ? 'আজকের পাঠ পড়ুন' : 'Explore Lessons'}</span>
+              </Link>
             </div>
 
-            <p className="mt-4 text-xs font-semibold text-white/80">
-              ✓ {isBn ? 'কোনো ক্রেডিট কার্ড লাগবে না · ১০০% ফ্রি · বাংলা ও ইংরেজি' : 'No credit card needed · Free forever · Bangla & English'}
-            </p>
-            <p className="mt-2 max-w-xl text-xs text-white/75">{home.androidDownloadNote}</p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-bold text-ink/80 pt-1">
+              <span className="flex items-center gap-1.5"><span className="text-emerald-400 font-black">✓</span> {isBn ? '১০০% ফ্রি' : '100% Free'}</span>
+              <span className="opacity-40">•</span>
+              <span className="flex items-center gap-1.5"><span className="text-emerald-400 font-black">✓</span> {isBn ? 'কোনো কার্ড লাগবে না' : 'No Credit Card'}</span>
+              <span className="opacity-40">•</span>
+              <span className="flex items-center gap-1.5"><span className="text-emerald-400 font-black">✓</span> {isBn ? 'অফলাইন-ফার্স্ট' : 'Offline First'}</span>
+              <span className="opacity-40">•</span>
+              <span className="flex items-center gap-1.5"><span className="text-emerald-400 font-black">✓</span> {isBn ? 'বাংলা ও ইংরেজি' : 'Bangla & English'}</span>
+            </div>
+            <p className="text-xs text-ink/65 italic max-w-lg">{home.androidDownloadNote}</p>
           </div>
 
-          {/* Interactive Preview Widget — same tokens as app routine tiles */}
-          <div className="surface-card w-full max-w-xl justify-self-center p-4 sm:p-5 lg:max-w-none" aria-hidden="true">
-            <div className="flex items-center justify-between border-b border-gold/20 pb-3 text-xs font-bold">
-              <span className="eyebrow">✦ {isBn ? 'আজকের ফোকাস রুটিন' : "Today's Focus"}</span>
-              <span className="rounded-full border border-gold/50 bg-gold/15 px-2.5 py-0.5 text-gold-soft">🔥 7-Day Streak</span>
-            </div>
+          {/* Interactive Live App Simulator Card */}
+          <div className="lg:col-span-5 relative z-10 w-full" aria-hidden="true">
+            <div className="relative mx-auto w-full max-w-md rounded-2xl border-2 border-gold/45 bg-gradient-to-b from-[#0a1526]/95 via-[#06101e]/95 to-[#030813]/95 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+              {/* App Simulator Top Bar */}
+              <div className="flex items-center justify-between border-b border-gold/20 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                  <span className="text-xs font-black tracking-wide text-gold">SMART ROUTINE</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full border border-gold/50 bg-gold/15 px-2.5 py-0.5 text-xs font-extrabold text-gold shadow-sm">
+                    🔥 7-Day Streak
+                  </span>
+                </div>
+              </div>
 
-            <div className="mt-3 space-y-2.5">
-              <div className="routine-tile flex items-center justify-between p-2.5 text-sm font-semibold">
-                <span className="flex items-center gap-2">✅ <span>{isBn ? 'সকালের হাঁটা ও মেডিটেশন' : 'Morning Walk & Mind'}</span></span>
-                <span className="text-xs font-mono opacity-85">06:30</span>
+              {/* Today's Focus Routine Heading + Progress */}
+              <div className="mt-4 rounded-xl border border-sapphire/35 bg-sapphire/10 p-3">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-sapphire-light">✦ {isBn ? 'আজকের ফোকাস অগ্রগতি' : "Today's Routine Focus"}</span>
+                  <span className="text-emerald-400 font-black">75% {isBn ? 'সম্পন্ন' : 'Done'}</span>
+                </div>
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                  <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-amber-400 via-emerald-400 to-emerald-500 shadow-[0_0_10px_#10b981]" />
+                </div>
               </div>
-              <div className="focus-routine-row text-sm font-semibold">
-                <span className="flex items-center gap-2">⚡ <span>{isBn ? 'গণিত স্টাডি (৫-মি. সংস্করণ)' : 'Deep Work (5m micro)'}</span></span>
-                <span className="text-xs font-mono">09:00</span>
-              </div>
-              <div className="routine-tile flex items-center justify-between p-2.5 text-sm font-semibold">
-                <span className="flex items-center gap-2">🎧 <span>{isBn ? 'ঘুমের প্রস্তুতি এআই পাঠ' : 'Sleep Foundation Lesson'}</span></span>
-                <span className="text-xs font-mono opacity-85">22:00</span>
-              </div>
-            </div>
 
-            <div className="mt-4 flex items-center justify-between rounded-xl border border-gold/40 bg-gold/10 p-2.5 text-xs font-bold">
-              <span>🌟 {isBn ? 'লেভেল ২ · অটল শিক্ষার্থী' : 'Level 2 · Steadfast Learner'}</span>
-              <span>180/200 XP</span>
+              {/* Routine Items List */}
+              <div className="mt-3.5 space-y-2">
+                <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs font-semibold">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold">✓</span>
+                    <span className="text-ink font-bold">{isBn ? 'ফজর ও সকালের হাঁটা' : 'Morning Walk & Mind'}</span>
+                  </div>
+                  <span className="font-mono text-emerald-400/90 text-xs font-bold">06:00 AM</span>
+                </div>
+
+                <div className="relative flex items-center justify-between rounded-xl border-2 border-gold/60 bg-gold/15 p-2.5 text-xs font-bold shadow-[0_0_15px_rgba(242,193,78,0.2)]">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gold/30 text-gold text-xs">⚡</span>
+                    <span className="text-gold-light">{isBn ? 'ডিপ ওয়ার্ক ও গণিত (২৫ মি.)' : 'Deep Work & Study (25m)'}</span>
+                  </div>
+                  <span className="rounded bg-gold/30 px-1.5 py-0.5 font-mono text-[11px] text-gold font-bold">{isBn ? 'চলছে' : 'Active'}</span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-sapphire/30 bg-sapphire/10 p-2.5 text-xs font-semibold">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sapphire/20 text-sapphire text-xs">🎧</span>
+                    <span className="text-ink">{isBn ? 'এআই গল্প পাঠ ও কুইজ' : 'AI Habit Story & Quiz'}</span>
+                  </div>
+                  <span className="font-mono opacity-80 text-xs">08:00 PM</span>
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-gold/20 bg-paper/40 p-2.5 text-xs font-semibold">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-paper/60 text-xs">🌙</span>
+                    <span className="text-ink/80">{isBn ? 'দিনের মূল্যায়ন ও ঘুম' : 'Evening Review & Sleep'}</span>
+                  </div>
+                  <span className="font-mono opacity-70 text-xs">10:30 PM</span>
+                </div>
+              </div>
+
+              {/* Level & XP Footer Pill */}
+              <div className="mt-3.5 flex items-center justify-between rounded-xl border border-gold/40 bg-gradient-to-r from-gold/15 to-amber-500/10 p-2.5 text-xs font-black">
+                <span className="text-gold-soft flex items-center gap-1.5">
+                  <span>🌟</span>
+                  <span>{isBn ? 'লেভেল ২ · অটল শিক্ষার্থী' : 'Level 2 · Steadfast Learner'}</span>
+                </span>
+                <span className="font-mono text-gold">180 / 200 XP</span>
+              </div>
             </div>
           </div>
         </section>
@@ -450,21 +516,38 @@ export default async function HomePage(props) {
           </div>
         </section>
 
-        {/* Final Conversion CTA — brand banner + app-hero */}
+        {/* Final Conversion CTA */}
         <section
-          className="app-hero relative isolate overflow-hidden p-8 text-center sm:p-14"
+          className="app-hero relative isolate overflow-hidden rounded-3xl p-8 text-center sm:p-14 shadow-2xl"
         >
-          <p className="eyebrow mx-auto">✦ {isBn ? 'শুরু করুন' : 'Get started'}</p>
-          <h2 className="display-2 text-gold-shine mt-3">
-            {isBn ? 'আজই শুরু করুন আপনার প্রথম অভ্যাস' : 'Start with One Small Habit Today'}
-          </h2>
-          <p className="hero-description mt-3 text-sm sm:text-base max-w-lg mx-auto">
-            {isBn ? 'কোনো জটিলতা নেই। এক মিনিটেই রুটিন সেট করুন এবং এআই কোচের সাথে এগিয়ে যান।' : 'No complicated setups. Set your routine in 60 seconds and stay consistent.'}
-          </p>
-          <div className="mt-6">
-            <Link href="/app" className="primary-button inline-flex bg-sapphire px-7 py-3.5 text-base font-bold text-on-sapphire">
-              {isBn ? '🚀 বিনামূল্যে শুরু করুন' : '🚀 Get Started for Free'}
-            </Link>
+          <div className="relative z-10 max-w-2xl mx-auto space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/15 px-3.5 py-1 text-xs font-bold text-gold">
+              <span className="brand-spark">✦</span>
+              <span>{isBn ? 'সহজ সূচনা' : 'Instant Start'}</span>
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-black text-ink tracking-tight">
+              {isBn ? 'আজই শুরু করুন আপনার প্রথম অভ্যাস' : 'Start with One Small Habit Today'}
+            </h2>
+            <p className="text-sm sm:text-base leading-relaxed text-ink/85 max-w-lg mx-auto">
+              {isBn ? 'কোনো জটিলতা নেই। এক মিনিটেই রুটিন সেট করুন এবং এআই কোচের সাথে এগিয়ে যান।' : 'No complicated setups. Set your routine in 60 seconds and stay consistent.'}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <Link
+                href="/app"
+                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 px-7 py-3.5 text-base font-black text-slate-950 shadow-[0_0_24px_rgba(242,193,78,0.5)] transition-all hover:scale-[1.03] active:scale-95"
+              >
+                <span>🚀</span>
+                <span>{isBn ? 'বিনামূল্যে শুরু করুন' : 'Get Started for Free'}</span>
+              </Link>
+              <a
+                href={ANDROID_APK_DOWNLOAD_URL}
+                download
+                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-gold/60 bg-paper/80 backdrop-blur-md px-6 py-3.5 text-sm font-bold text-ink shadow-lg transition-all hover:border-gold hover:bg-gold/15 hover:scale-[1.02] active:scale-95"
+              >
+                <span>📱</span>
+                <span>{home.ctaAndroid}</span>
+              </a>
+            </div>
           </div>
         </section>
       </div>

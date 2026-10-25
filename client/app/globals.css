@@ -429,13 +429,19 @@ body:lang(en) {
 }
 
 .public-site-header {
-  border-bottom: 1px solid rgb(var(--c-gold) / 0.28);
-  background: linear-gradient(105deg, #071426 0%, #061a36 55%, #010a18 100%);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid rgb(var(--c-gold) / 0.2);
+  background: rgba(3, 9, 20, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.45);
 }
 
 .public-site-header nav a {
   color: rgb(var(--c-ink));
+  transition: color 140ms ease, opacity 140ms ease;
 }
 
 .public-site-header nav > a {
@@ -1394,9 +1400,24 @@ select:disabled {
 }
 
 .app-hero {
-  background-image: linear-gradient(100deg, rgb(0 0 0 / 72%), rgb(0 0 0 / 30%)), url("https://res.cloudinary.com/fnxzbafx/image/upload/f_auto,q_auto,w_1200,c_limit/v1791869396/smart-routine/branding/abdul-malek-background.png");
-  background-position: center;
-  background-size: cover;
+  position: relative;
+  background: radial-gradient(circle at 10% 20%, rgb(242 193 78 / 0.16), transparent 42%),
+              radial-gradient(circle at 90% 80%, rgb(37 99 235 / 0.22), transparent 48%),
+              linear-gradient(135deg, #050d1a 0%, #081730 45%, #030812 100%);
+  border: 1px solid rgb(var(--c-gold) / 0.35);
+  box-shadow: 0 25px 60px -15px rgb(0 0 0 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+.app-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(242, 193, 78, 0.1) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  opacity: 0.75;
+  mask-image: radial-gradient(ellipse at center, black 60%, transparent 95%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 60%, transparent 95%);
 }
 
 .landing-hero-copy {
