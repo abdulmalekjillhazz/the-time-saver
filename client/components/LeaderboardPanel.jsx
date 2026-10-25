@@ -14,6 +14,7 @@ const COPY = {
     empty: 'No learning points yet. Read a story or complete a quiz to join.',
     points: 'points',
     activeDays: 'active days',
+    pronunciation: 'pronunciation accuracy',
     nextLevel: (days) => `${days} active day${days === 1 ? '' : 's'} to next level`,
     level: 'Level',
   },
@@ -25,6 +26,7 @@ const COPY = {
     empty: 'এখনো শেখার পয়েন্ট নেই। গল্প পড়ুন বা কুইজ দিন।',
     points: 'পয়েন্ট',
     activeDays: 'সক্রিয় দিন',
+    pronunciation: 'উচ্চারণের গড়',
     nextLevel: (days) => `পরের লেভেলে যেতে আরও ${days} সক্রিয় দিন`,
     level: 'লেভেল',
   },
@@ -90,6 +92,11 @@ export function LeaderboardPanel({ lang = 'bn' }) {
                   <p className="mt-0.5 text-xs text-ink/70">
                     {levelIcon(member.level)} {copy.level} {member.level} · {member.activeDays} {copy.activeDays}
                   </p>
+                  {Number.isFinite(member.pronunciationScore) ? (
+                    <p className="text-xs font-semibold text-emerald-700">
+                      {copy.pronunciation}: {member.pronunciationScore}%
+                    </p>
+                  ) : null}
                   <p className="text-xs text-sapphire">{copy.nextLevel(member.daysToNextLevel)}</p>
                 </div>
                 <p className="shrink-0 text-right font-extrabold text-gold-soft">

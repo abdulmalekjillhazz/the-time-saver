@@ -6,11 +6,12 @@ import { Button } from './ui/Button.jsx';
 import { buildDetailedRoutineBriefing, speakWithGoogleTts } from '../lib/voiceBriefing.js';
 import { formatNaturalTime } from '../lib/prayerAnchors.js';
 
-export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }) {
+export function VoiceBriefingModal({ user, routines = [], lang = 'bn', autoPlay = false, onClose }) {
   const [speaking, setSpeaking] = useState(false);
   const [paused, setPaused] = useState(false);
   const [speechError, setSpeechError] = useState('');
   const controllerRef = useRef(null);
+  const autoPlayStartedRef = useRef(false);
   const isBn = lang === 'bn';
   const userName = user?.displayName || (isBn ? 'বন্ধু' : 'friend');
 
@@ -65,6 +66,12 @@ export function VoiceBriefingModal({ user, routines = [], lang = 'bn', onClose }
       setSpeechError(requestError?.message || copy.speechUnavailable);
     }
   }, [activeText, copy.speechUnavailable, isBn, lang]);
+
+  useEffect(() => {
+    if (!autoPlay || autoPlayStartedRef.current) return;
+    autoPlayStartedRef.current = true;
+    startSpeech();
+  }, [autoPlay, startSpeech]);
 
   useEffect(() => {
     return () => {

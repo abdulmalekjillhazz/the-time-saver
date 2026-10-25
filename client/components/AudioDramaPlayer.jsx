@@ -6,11 +6,14 @@ import { getStoryWordWeights, parseStoryScript, playDrama } from '../lib/audioDr
 import {
   canAttemptSpeechPractice,
   compareSpeechText,
-  getAdaptivePracticeLineIndex,
+  getConversationPracticeLines,
+  getPracticeExpression,
+  getNextPracticeLineIndex,
+  getSpeechPracticeAccuracy,
   MAX_SPEECH_PRACTICE_ATTEMPTS,
 } from '../lib/speechPractice.js';
+import { apiRequest } from '../lib/apiClient.js';
 import { isAndroidNativeApp, recognizeEnglishSpeech, stopEnglishSpeechRecognition } from '../lib/nativeSpeech.js';
-import { playCongratulationsSound } from '../lib/notificationSound.js';
 import { lookupStoryWordMeaning, normalizeWord } from './StoryReader.jsx';
 import {
   getOfflineStoryAudio,
@@ -115,7 +118,7 @@ export function spokenTextParts(
                         'aria-label': `${pronunciationLabel}: ${selectedWordState.term}`,
                         onClick: (event) => {
                           event.stopPropagation();
-                          onSpeakWord(selectedWordState.term);
+                          onSpeakWord(selectedWordState.term, selectedWordState.contextText);
                         },
                         className: 'mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-sapphire/35 bg-sapphire/15 px-2.5 py-1 text-[11px] font-bold text-sapphire hover:bg-sapphire/25',
                       },
@@ -173,7 +176,7 @@ function WordMeaningPanel({
             <button
               type="button"
               aria-label={`${pronunciationLabel}: ${selectedWord.term}`}
-              onClick={() => onSpeakWord(selectedWord.term)}
+              onClick={() => onSpeakWord(selectedWord.term, selectedWord.contextText)}
               className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sapphire/35 bg-sapphire/15 px-3 py-1.5 text-xs font-bold text-sapphire hover:bg-sapphire/25"
             >
               🔊 {pronunciationLabel}
@@ -215,7 +218,9 @@ export function AudioDramaPlayer({
     ? (lang === 'en' ? content : '')
     : practiceContent;
   const practiceLines = useMemo(
-    () => parseStoryScript(englishPracticeContent, 'Narrator'),
+    () => getConversationPracticeLines(
+      parseStoryScript(englishPracticeContent, 'Narrator', { addFallbackNarration: false }),
+    ),
     [englishPracticeContent],
   );
   const [isPlaying, setIsPlaying] = useState(false);
@@ -239,14 +244,15 @@ export function AudioDramaPlayer({
   const [speechPracticeOpen, setSpeechPracticeOpen] = useState(startInPracticeMode);
   const [microphoneConsentLine, setMicrophoneConsentLine] = useState(null);
   const [microphoneConsentAccepted, setMicrophoneConsentAccepted] = useState(false);
-  const [practiceFeedback, setPracticeFeedback] = useState('');
+  const [practiceScore, setPracticeScore] = useState(null);
+  const [practiceSuccessLineIndex, setPracticeSuccessLineIndex] = useState(null);
   const [attemptsByLine, setAttemptsByLine] = useState({});
   const [completedPracticeLineIndexes, setCompletedPracticeLineIndexes] = useState([]);
   const [microsoftVoices, setMicrosoftVoices] = useState([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
   const [speechPractice, setSpeechPractice] = useState({
     lineIndex: startInPracticeMode
-      ? getAdaptivePracticeLineIndex(practiceLines)
+      ? getNextPracticeLineIndex(practiceLines)
       : -1,
     status: 'idle',
     transcript: '',
@@ -289,6 +295,18 @@ export function AudioDramaPlayer({
   const recognizedTextRef = useRef('');
   const pronunciationRef = useRef(null);
   const pronunciationPlaybackIdRef = useRef(0);
+  const practiceComparisonsRef = useRef({});
+  const advancePracticeLineRef = useRef(null);
+  const rememberPracticeComparison = (lineIndex, comparison) => {
+    if (!comparison) return;
+    const previousComparison = practiceComparisonsRef.current[lineIndex];
+    if (!previousComparison || comparison.accuracy > previousComparison.accuracy) {
+      practiceComparisonsRef.current = {
+        ...practiceComparisonsRef.current,
+        [lineIndex]: comparison,
+      };
+    }
+  };
 
   const copy = {
     title: isBn ? 'গল্পের মাধ্যমে ইংরেজি শিখুন' : 'Learn English by Story',
@@ -313,6 +331,18 @@ export function AudioDramaPlayer({
     closePractice: isBn ? '✕ অনুশীলন বন্ধ' : '✕ Close practice',
     practiceTitle: isBn ? 'গল্পের লাইন পড়ে উচ্চারণ অনুশীলন করুন' : 'Practice speaking story lines',
     practiceProgressLabel: isBn ? 'অনুশীলনের অগ্রগতি' : 'Practice progress',
+    pronunciationScore: (score) => isBn ? `সঠিক উচ্চারণ: ${score}%` : `Pronunciation accuracy: ${score}%`,
+    pronunciationImprovement: (score) => isBn
+      ? (score ? `আরও ${score}% উন্নতির সুযোগ আছে।` : 'উচ্চারণে আর উন্নতির দরকার নেই।')
+      : (score ? `${score}% room to improve.` : 'Nothing left to improve.'),
+    scoreSaving: isBn ? 'স্কোর লিডারবোর্ডে জমা হচ্ছে…' : 'Saving score to the leaderboard…',
+    scoreSaved: (score, points) => isBn
+      ? `লিডারবোর্ডে আপনার সেরা স্কোর ${score}%; ${points} পয়েন্ট যোগ হয়েছে।`
+      : `Your best leaderboard score is ${score}%; ${points} points added.`,
+    scoreSaveFailed: isBn
+      ? 'স্কোর লিডারবোর্ডে জমা হয়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।'
+      : 'Your score was not saved. Check your connection and try again.',
+    retryScoreSave: isBn ? 'স্কোর আবার জমা দিন' : 'Retry score submission',
     microphonePermissionTitle: isBn ? 'মাইক্রোফোন ব্যবহারের অনুমতি' : 'Microphone permission',
     microphonePermissionHelp: isBn
       ? 'আপনার বলা ইংরেজি শব্দের সঙ্গে বাক্যটি মেলাতে মাইক্রোফোন দরকার। অডিও speech recognition-এর জন্য প্রক্রিয়াকৃত হবে; চালিয়ে গেলে ডিভাইসের অনুমতি চাওয়া হবে।'
@@ -347,7 +377,6 @@ export function AudioDramaPlayer({
     skipLine: isBn ? 'এড়িয়ে পরের বাক্য' : 'Skip to next sentence',
     finishPractice: isBn ? 'অনুশীলন শেষ করুন' : 'Finish practice',
     practiceFinished: isBn ? 'অনুশীলন শেষ হয়েছে।' : 'Practice session finished.',
-    practiceFeedback: isBn ? 'চমৎকার—পরের বাক্য!' : 'Nice work—next sentence!',
     voiceChoice: isBn ? 'উচ্চারণের কণ্ঠ' : 'Example voice',
     defaultVoice: isBn ? 'ডিভাইসের স্বাভাবিক কণ্ঠ' : 'Device default',
     practiceActions: isBn ? 'বাক্যটি বলুন' : 'Say this sentence',
@@ -363,17 +392,17 @@ export function AudioDramaPlayer({
     if (!clean) return;
 
     const requestId = ++wordLookupRequestRef.current;
-    handleSpeakWord(clean, contextText);
     setSelectedWord((prev) => (prev?.keyId === keyId && prev?.meaning ? prev : {
       keyId,
       term: clean,
       meaning: '',
       loading: true,
+      contextText,
     }));
     try {
       const result = await lookupStoryWordMeaning(clean, vocabulary, lang);
       if (requestId === wordLookupRequestRef.current && result) {
-        setSelectedWord({ ...result, keyId });
+        setSelectedWord({ ...result, keyId, contextText });
       }
     } catch (lookupError) {
       if (requestId === wordLookupRequestRef.current) {
@@ -384,6 +413,7 @@ export function AudioDramaPlayer({
             ? `শব্দার্থ লোড করা যায়নি: ${lookupError.message}`
             : `Meaning could not be loaded: ${lookupError.message}`,
           isOffline: false,
+          contextText,
         });
       }
     }
@@ -863,11 +893,13 @@ export function AudioDramaPlayer({
         const transcript = await recognizeEnglishSpeech();
         if (!activeRecognitionRef.current) return;
         activeRecognitionRef.current = false;
+        const comparison = compareSpeechText(practiceLines[lineIndex]?.text, transcript);
+        rememberPracticeComparison(lineIndex, comparison);
         setSpeechPractice({
           lineIndex,
           status: 'result',
           transcript,
-          comparison: compareSpeechText(practiceLines[lineIndex]?.text, transcript),
+          comparison,
           message: '',
         });
       } catch (recognitionError) {
@@ -943,11 +975,13 @@ export function AudioDramaPlayer({
         });
         return;
       }
+      const comparison = compareSpeechText(practiceLines[lineIndex]?.text, transcript);
+      rememberPracticeComparison(lineIndex, comparison);
       setSpeechPractice({
         lineIndex,
         status: 'result',
         transcript,
-        comparison: compareSpeechText(practiceLines[lineIndex]?.text, transcript),
+        comparison,
         message: '',
       });
     };
@@ -1015,19 +1049,44 @@ export function AudioDramaPlayer({
     }
   };
 
+  const submitPracticeScore = async (accuracy) => {
+    if (!slug) {
+      setPracticeScore((score) => ({ ...score, status: 'error' }));
+      return;
+    }
+    setPracticeScore((score) => ({ ...score, status: 'saving' }));
+    try {
+      const result = await apiRequest('/api/gamification/pronunciation', {
+        method: 'POST',
+        body: { slug, accuracy },
+        locale: lang,
+      });
+      setPracticeScore((score) => ({
+        ...score,
+        status: 'saved',
+        bestAccuracy: result.bestAccuracy,
+        earnedPoints: result.earnedPoints,
+      }));
+    } catch {
+      setPracticeScore((score) => ({ ...score, status: 'error' }));
+    }
+  };
+
   const advancePracticeLine = (lineIndex, completed = false) => {
     const pronunciationSucceeded = completed && speechPractice.comparison?.accuracy >= 80;
+    const currentComparison = speechPractice.lineIndex === lineIndex
+      ? speechPractice.comparison
+      : null;
+    rememberPracticeComparison(lineIndex, currentComparison);
     const completedIndexes = [...completedPracticeLineIndexes, lineIndex];
-    const nextLineIndex = getAdaptivePracticeLineIndex(
-      practiceLines,
-      completedIndexes,
-      lineIndex,
-      speechPractice.comparison?.accuracy ?? 0,
-    );
+    const nextLineIndex = getNextPracticeLineIndex(practiceLines, lineIndex);
     setCompletedPracticeLineIndexes(completedIndexes);
     setSelectedWord(null);
     wordLookupRequestRef.current += 1;
     if (nextLineIndex < 0) {
+      const accuracy = getSpeechPracticeAccuracy(practiceLines, practiceComparisonsRef.current);
+      setPracticeScore({ accuracy, status: 'saving', bestAccuracy: null, earnedPoints: 0 });
+      void submitPracticeScore(accuracy);
       setSpeechPractice({
         lineIndex,
         status: 'complete',
@@ -1036,9 +1095,7 @@ export function AudioDramaPlayer({
         message: '',
       });
       if (pronunciationSucceeded) {
-        playCongratulationsSound();
-        setPracticeFeedback(copy.practiceFeedback);
-        globalThis.window?.setTimeout(() => setPracticeFeedback(''), 2200);
+        setPracticeSuccessLineIndex(lineIndex);
       }
       return;
     }
@@ -1051,11 +1108,25 @@ export function AudioDramaPlayer({
     });
     setMicrophoneConsentLine(null);
     if (pronunciationSucceeded) {
-      playCongratulationsSound();
-      setPracticeFeedback(copy.practiceFeedback);
-      globalThis.window?.setTimeout(() => setPracticeFeedback(''), 2200);
+      setPracticeSuccessLineIndex(lineIndex);
     }
   };
+  advancePracticeLineRef.current = advancePracticeLine;
+
+  useEffect(() => {
+    if (speechPractice.status !== 'result' || speechPractice.comparison?.accuracy < 80) {
+      setPracticeSuccessLineIndex(null);
+      return undefined;
+    }
+    const lineIndex = speechPractice.lineIndex;
+    setPracticeSuccessLineIndex(lineIndex);
+    const timer = globalThis.window?.setTimeout(() => {
+      advancePracticeLineRef.current?.(lineIndex, true);
+    }, 900);
+    return () => {
+      if (timer !== undefined) globalThis.window?.clearTimeout(timer);
+    };
+  }, [speechPractice.comparison?.accuracy, speechPractice.lineIndex, speechPractice.status]);
 
   const displayLines = timedSegments
     ? timedSegments.map((segment) => ({
@@ -1198,10 +1269,13 @@ export function AudioDramaPlayer({
                 } else {
                   setCompletedPracticeLineIndexes([]);
                   setAttemptsByLine({});
+                  practiceComparisonsRef.current = {};
+                  setPracticeScore(null);
+                  setPracticeSuccessLineIndex(null);
                   setSelectedWord(null);
                   wordLookupRequestRef.current += 1;
                   setSpeechPractice({
-                    lineIndex: getAdaptivePracticeLineIndex(practiceLines),
+                    lineIndex: getNextPracticeLineIndex(practiceLines),
                     status: 'idle',
                     transcript: '',
                     comparison: null,
@@ -1226,14 +1300,35 @@ export function AudioDramaPlayer({
           >
             <h2 className="sr-only">{copy.practiceTitle}</h2>
             {speechPractice.status === 'complete' ? (
-              <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center text-lg font-extrabold text-emerald-800">
-                {copy.practiceFinished}
+              <div className="space-y-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center text-emerald-900 sm:p-6">
+                <h3 className="text-lg font-extrabold">{copy.practiceFinished}</h3>
+                {practiceScore ? (
+                  <div role="status" aria-live="polite" className="space-y-2">
+                    <p className="text-xl font-extrabold">{copy.pronunciationScore(practiceScore.accuracy)}</p>
+                    <p className="text-sm font-semibold">
+                      {copy.pronunciationImprovement(100 - practiceScore.accuracy)}
+                    </p>
+                    {practiceScore.status === 'saving' ? (
+                      <p>{copy.scoreSaving}</p>
+                    ) : null}
+                    {practiceScore.status === 'saved' ? (
+                      <p>{copy.scoreSaved(practiceScore.bestAccuracy, practiceScore.earnedPoints)}</p>
+                    ) : null}
+                    {practiceScore.status === 'error' ? (
+                      <div className="space-y-2">
+                        <p role="alert">{copy.scoreSaveFailed}</p>
+                        <button
+                          type="button"
+                          onClick={() => { void submitPracticeScore(practiceScore.accuracy); }}
+                          className="secondary-button min-h-10 px-4 py-2 text-sm font-bold"
+                        >
+                          {copy.retryScoreSave}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-            {practiceFeedback ? (
-              <p role="status" className="practice-completion-feedback rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-center font-bold text-emerald-800">
-                🎉 {practiceFeedback}
-              </p>
             ) : null}
             {speechPractice.status !== 'complete' ? <div className="speech-practice-step space-y-3 sm:space-y-5">
               {practiceLines.slice(activePracticeLineIndex, activePracticeLineIndex + 1).map((line, visiblePracticeIndex) => {
@@ -1244,6 +1339,9 @@ export function AudioDramaPlayer({
                 const attempts = attemptsByLine[lineIndex] || 0;
                 const attemptsExhausted = !canAttemptSpeechPractice(attempts);
                 const hasResult = isCurrentPractice && speechPractice.status === 'result';
+                const showSuccessMark = hasResult
+                  && comparison?.accuracy >= 80
+                  && practiceSuccessLineIndex === lineIndex;
                 const currentStep = completedPracticeLineIndexes.length + 1;
                 const progress = Math.round((completedPracticeLineIndexes.length / practiceLines.length) * 100);
                 return (
@@ -1271,6 +1369,19 @@ export function AudioDramaPlayer({
                           : 'border-ink/10 bg-paper/70'
                     }`}
                   >
+                    <div className="mb-2 flex items-center gap-3">
+                      <span className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-gold/40 bg-gold/10 text-3xl" aria-hidden="true">
+                        {characterIcon(line.role)}
+                      </span>
+                      <span
+                        className="grid size-12 shrink-0 place-items-center rounded-full bg-paper text-4xl shadow-inner"
+                        role="img"
+                        aria-label={isBn ? 'চরিত্রের অভিব্যক্তি' : 'Character expression'}
+                      >
+                        {getPracticeExpression(line.text)}
+                      </span>
+                      <span className="min-w-0 truncate text-sm font-extrabold text-gold-soft">{line.character}</span>
+                    </div>
                     <div className="flex items-start gap-2">
                       <p className="speech-practice-sentence min-w-0 max-w-[46ch] flex-1 text-lg font-bold leading-relaxed text-ink sm:text-2xl sm:leading-[1.85]">
                         {spokenTextParts(
@@ -1373,7 +1484,13 @@ export function AudioDramaPlayer({
                     {isCurrentPractice && speechPractice.status === 'error' ? (
                       <p role="alert" className="rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm font-semibold leading-relaxed text-ink">{speechPractice.message}</p>
                     ) : null}
-                    {isCurrentPractice && speechPractice.status === 'result' && comparison ? (
+                    {showSuccessMark ? (
+                      <div role="status" aria-live="assertive" className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-2xl bg-emerald-500/10 py-4 text-emerald-700">
+                        <span aria-hidden="true" className="grid size-20 place-items-center rounded-full border-4 border-emerald-500 bg-emerald-500/15 text-6xl font-black leading-none">✓</span>
+                        <span className="text-sm font-extrabold">{isBn ? 'সঠিক হয়েছে' : 'Correct'}</span>
+                      </div>
+                    ) : null}
+                    {isCurrentPractice && speechPractice.status === 'result' && comparison && !showSuccessMark ? (
                       <div role="status" aria-live="polite" className="speech-practice-result space-y-3 text-sm text-ink">
                         <p className="text-center font-bold">{copy.wordMatch}: {comparison.accuracy}%</p>
                         <p className="text-center text-ink/70">{speechPractice.transcript}</p>

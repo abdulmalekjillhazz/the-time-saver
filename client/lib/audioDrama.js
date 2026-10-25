@@ -19,8 +19,8 @@ function characterSettings(name = '') {
   return CHARACTERS.narrator;
 }
 
-export function parseStoryScript(content = '', defaultSpeaker = 'Narrator') {
-  return parseStoryNarration(content, defaultSpeaker).map(({ character, text }) => {
+export function parseStoryScript(content = '', defaultSpeaker = 'Narrator', options) {
+  return parseStoryNarration(content, defaultSpeaker, options).map(({ character, text }) => {
     const settings = characterSettings(character);
     return {
       character,

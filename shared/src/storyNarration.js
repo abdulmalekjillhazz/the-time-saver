@@ -62,7 +62,9 @@ function parseSpeakerTag(line) {
   return null;
 }
 
-export function parseStoryNarration(content = '', defaultSpeaker = 'Narrator') {
+export function parseStoryNarration(content = '', defaultSpeaker = 'Narrator', {
+  addFallbackNarration = true,
+} = {}) {
   if (typeof content !== 'string' || !content.trim()) return [];
 
   const segments = [];
@@ -83,7 +85,7 @@ export function parseStoryNarration(content = '', defaultSpeaker = 'Narrator') {
     }
   }
 
-  if (segments.length && !segments.some(({ speaker }) => speaker === 'storyteller')) {
+  if (addFallbackNarration && segments.length && !segments.some(({ speaker }) => speaker === 'storyteller')) {
     const isBengali = /[\u0980-\u09ff]/.test(content);
     const narrator = (text) => ({
       speaker: 'storyteller',

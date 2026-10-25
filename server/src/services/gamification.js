@@ -106,6 +106,10 @@ export function getQuizLearningPoints(score, total) {
   return total > 0 ? Math.round((QUIZ_POINTS * score) / total) : 0;
 }
 
+export function getPronunciationPracticePoints(accuracy) {
+  return Math.round(accuracy / 2);
+}
+
 export function learningLevelForActiveDays(activeDays) {
   return Math.floor(Math.max(0, activeDays) / 3) + 1;
 }
@@ -405,6 +409,79 @@ export async function recordLearningActivity({ userId, activityType, contentId, 
   return { earnedPoints, recorded, awardedBadges };
 }
 
+export async function recordPronunciationPractice({ userId, slug, accuracy, timezone }) {
+  const [publishedStory, dailyStory] = await Promise.all([
+    Lesson.exists({ slug, status: 'published' }),
+    DailyLesson.exists({ slug }),
+  ]);
+  if (!publishedStory && !dailyStory) {
+    throw new AppError(404, 'NOT_FOUND', MSG.notFound);
+  }
+
+  const activeDate = todayInZone(timezone || 'Asia/Dhaka');
+  const contentId = `story:${slug}`;
+  const points = getPronunciationPracticePoints(accuracy);
+  await recordLearningDay(userId, 'pronunciation', activeDate);
+
+  let activity = await LearningActivity.findOne({
+    userId,
+    activityType: 'pronunciation',
+    contentId,
+  }).select('accuracy points').lean();
+  let earnedPoints = 0;
+
+  if (!activity) {
+    try {
+      await LearningActivity.create({
+        userId,
+        activityType: 'pronunciation',
+        contentId,
+        points,
+        accuracy,
+        activeDate,
+      });
+      earnedPoints = points;
+    } catch (err) {
+      if (err.code !== 11000) throw err;
+      activity = await LearningActivity.findOne({
+        userId,
+        activityType: 'pronunciation',
+        contentId,
+      }).select('accuracy points').lean();
+      if (!activity) throw err;
+    }
+  }
+
+  if (activity && accuracy > (activity.accuracy ?? -1)) {
+    const accuracyFilter = activity.accuracy === undefined
+      ? { accuracy: { $exists: false } }
+      : { accuracy: { $lt: accuracy } };
+    const updated = await LearningActivity.findOneAndUpdate(
+      {
+        userId,
+        activityType: 'pronunciation',
+        contentId,
+        ...accuracyFilter,
+      },
+      { $set: { accuracy, points, activeDate } },
+      { new: true },
+    ).select('accuracy points').lean();
+    if (updated) earnedPoints = Math.max(0, updated.points - (activity.points || 0));
+  }
+
+  const best = await LearningActivity.findOne({
+    userId,
+    activityType: 'pronunciation',
+    contentId,
+  }).select('accuracy').lean();
+  const awardedBadges = await evaluateAndAwardBadges(userId, timezone);
+  return {
+    bestAccuracy: best?.accuracy ?? accuracy,
+    earnedPoints,
+    awardedBadges,
+  };
+}
+
 async function recordLearningDay(userId, activityType, activeDate) {
   const contentId = `learning-day:${activeDate}`;
   try {
@@ -435,15 +512,38 @@ export async function recordQuizPoints({ userId, quizId, score, total, timezone 
 
 export async function getLearningLeaderboard() {
   const rows = await LearningActivity.aggregate([
-    { $match: { points: { $gt: 0 } } },
+    {
+      $match: {
+        $or: [
+          { points: { $gt: 0 } },
+          { activityType: 'pronunciation', accuracy: { $gte: 0 } },
+        ],
+      },
+    },
     {
       $group: {
         _id: '$userId',
         points: { $sum: '$points' },
         activeDates: { $addToSet: '$activeDate' },
+        pronunciationScore: {
+          $avg: {
+            $cond: [
+              { $eq: ['$activityType', 'pronunciation'] },
+              '$accuracy',
+              null,
+            ],
+          },
+        },
       },
     },
-    { $match: { points: { $gt: 0 } } },
+    {
+      $match: {
+        $or: [
+          { points: { $gt: 0 } },
+          { pronunciationScore: { $ne: null } },
+        ],
+      },
+    },
     {
       $lookup: {
         from: User.collection.name,
@@ -462,6 +562,7 @@ export async function getLearningLeaderboard() {
         avatarId: '$profile.avatarId',
         points: 1,
         activeDays: { $size: '$activeDates' },
+        pronunciationScore: { $round: ['$pronunciationScore', 0] },
       },
     },
     { $sort: { points: -1, activeDays: -1, name: 1 } },
@@ -473,6 +574,6 @@ export async function getLearningLeaderboard() {
     rank: index + 1,
     level: learningLevelForActiveDays(row.activeDays),
     daysToNextLevel: 3 - (row.activeDays % 3),
-    isKing: row.points === highestPoints,
+    isKing: highestPoints > 0 && row.points === highestPoints,
   }));
 }

@@ -51,6 +51,14 @@ describe('shared story narration parsing', () => {
       .toEqual(['The story begins.']);
   });
 
+  it('can parse story dialogue without adding synthetic narrator lines', () => {
+    expect(parseStoryNarration('[Mina]: Hello there.', 'Narrator', {
+      addFallbackNarration: false,
+    })).toEqual([
+      { speaker: 'narrator', character: 'Mina', text: 'Hello there.' },
+    ]);
+  });
+
   it('uses the narrator as the default speaker without adding text absent from the display', () => {
     expect(parseStoryNarration('An untagged story line.')).toEqual([
       { speaker: 'storyteller', character: 'Narrator', text: 'An untagged story line.' },

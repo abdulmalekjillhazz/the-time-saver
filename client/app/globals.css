@@ -907,7 +907,6 @@ button:disabled {
   .app-tabs-utilities .app-header-controls .app-header-language,
   .app-tabs-utilities .app-header-controls .app-header-settings,
   .app-tabs-utilities .app-header-controls .app-header-focus,
-  .app-tabs-utilities .app-header-controls .app-header-voice,
   .app-tabs-utilities .app-header-controls .app-header-leaderboard,
   .app-tabs-utilities .app-header-controls .app-header-theme {
     width: 100%;
@@ -1271,7 +1270,6 @@ select:disabled {
   .app-header-controls .app-header-language,
   .app-header-controls .app-header-settings,
   .app-header-controls .app-header-focus,
-  .app-header-controls .app-header-voice,
   .app-header-controls .app-header-leaderboard,
   .app-header-controls .app-header-theme {
     width: 2.35rem;
@@ -1694,7 +1692,6 @@ select:disabled {
 
 .app-header-settings,
 .app-header-focus,
-.app-header-voice,
 .app-header-leaderboard,
 .app-header-theme {
   display: inline-flex;
@@ -1779,7 +1776,7 @@ select:disabled {
 .audio-drama-story-stage {
   display: grid;
   min-height: 7.5rem;
-  align-content: start;
+  align-content: center;
   gap: 0.85rem;
 }
 
@@ -1939,7 +1936,7 @@ select:disabled {
 
   .audio-drama-story-stage {
     min-height: 8.5rem;
-    align-content: start;
+    align-content: center;
   }
 
   .word-meaning-popover {
@@ -3516,6 +3513,74 @@ select:disabled {
 
 .speech-practice-fullscreen::before {
   display: none;
+}
+
+:root,
+body,
+.app-shell-main,
+.app-shell-main .surface-card,
+.app-shell-main .routine-tile,
+.app-shell-main .primary-button,
+.app-shell-main .secondary-button,
+.app-shell-main .tab-button {
+  transition-duration: 320ms;
+  transition-timing-function: ease;
+}
+
+:root.theme-wave-light::after,
+:root.theme-wave-dark::after {
+  position: fixed;
+  z-index: 999;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  clip-path: circle(0 at 50% 50%);
+  animation: theme-wave-reveal 720ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+:root.theme-wave-light::after {
+  background: rgb(248 250 252 / 0.72);
+}
+
+:root.theme-wave-dark::after {
+  background: rgb(3 8 23 / 0.76);
+}
+
+@keyframes theme-wave-reveal {
+  0% {
+    clip-path: circle(0 at 50% 50%);
+    opacity: 0;
+  }
+
+  16% {
+    opacity: 1;
+  }
+
+  100% {
+    clip-path: circle(150% at 50% 50%);
+    opacity: 0;
+  }
+}
+
+:root[data-theme="light"] .app-shell-main :is(.primary-button, .secondary-button, .tab-button) {
+  border-color: rgb(15 23 42 / 0.14) !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 4px rgb(15 23 42 / 0.08), 0 5px 12px rgb(15 23 42 / 0.08) !important;
+}
+
+:root[data-theme="light"] .app-shell-main :is(.primary-button, .secondary-button, .tab-button):hover:not(:disabled) {
+  border-color: rgb(15 23 42 / 0.22) !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 8px rgb(15 23 42 / 0.1), 0 8px 16px rgb(15 23 42 / 0.1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root.theme-wave-light::after,
+  :root.theme-wave-dark::after {
+    animation: none;
+  }
 }
 
 .speech-practice-layout {

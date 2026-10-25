@@ -64,7 +64,7 @@ test.describe('mobile header and home page at 360px', () => {
     await page.getByRole('button', { name: 'Close word meaning' }).click();
     await expect(meaningPanel).toBeHidden();
     await expect(practice.getByRole('progressbar', { name: 'Practice progress' })).toBeVisible();
-    await expect(practice.getByText('1 / 14', { exact: true })).toBeVisible();
+    await expect(practice.getByText('1 / 13', { exact: true })).toBeVisible();
     await expect(practice.getByText('0 of 3 tries')).toHaveCount(0);
     await expect(listenButton).toBeVisible();
 
@@ -124,6 +124,78 @@ test.describe('mobile header and home page at 360px', () => {
     expect(results.violations).toEqual([]);
   });
 
+  test('plays the voice briefing after staying on Today for four seconds', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__voiceBriefingStarted = false;
+      window.__voiceBriefingRequestCount = 0;
+      window.AudioContext = class {
+        constructor() {
+          this.state = 'running';
+          this.currentTime = 0;
+          this.destination = {};
+        }
+        resume() { return Promise.resolve(); }
+        close() { this.state = 'closed'; return Promise.resolve(); }
+        decodeAudioData() { return Promise.resolve({}); }
+        createBufferSource() {
+          return {
+            connect() {},
+            start() { window.__voiceBriefingStarted = true; },
+            stop() {},
+          };
+        }
+      };
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const requestUrl = typeof input === 'string' ? input : input.url;
+        const { pathname } = new URL(requestUrl, window.location.href);
+        if (pathname === '/api/auth/csrf') {
+          return new Response(JSON.stringify({ csrfToken: 'today-briefing-test-token' }), {
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        if (pathname === '/api/speech/briefing') {
+          window.__voiceBriefingRequestCount += 1;
+          return new Response(new Uint8Array([0]), {
+            headers: { 'Content-Type': 'audio/mpeg' },
+          });
+        }
+        return originalFetch(input, init);
+      };
+    });
+    await page.route('**/api/**', async (route) => {
+      const { pathname } = new URL(route.request().url());
+      const responses = {
+        '/api/me': {
+          user: {
+            id: 'today-briefing-test',
+            displayName: 'Ayesha',
+            email: 'ayesha@example.com',
+            timezone: 'Asia/Dhaka',
+            locale: 'en',
+          },
+        },
+        '/api/auth/google/config': { clientId: '' },
+        '/api/routines': { routines: [] },
+        '/api/lessons': { lessons: [] },
+        '/api/lessons/today': { dailyLesson: null, quiz: null },
+        '/api/assistant/predict-hybrid': { predictions: [] },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(responses[pathname] || {}),
+      });
+    });
+
+    await page.goto('/app');
+    await expect(page.getByRole('button', { name: 'Voice briefing' })).toBeVisible();
+    const briefing = page.getByRole('dialog', { name: /Your Personal Voice Briefing/ });
+    await expect(briefing).toBeVisible({ timeout: 8000 });
+    await expect.poll(() => page.evaluate(() => window.__voiceBriefingRequestCount)).toBe(1);
+    await expect.poll(() => page.evaluate(() => window.__voiceBriefingStarted)).toBe(true);
+  });
+
   test('requests microphone permission before starting browser speech recognition', async ({ page }) => {
     await page.addInitScript(() => {
       window.__micPermissionRequested = false;
@@ -154,22 +226,117 @@ test.describe('mobile header and home page at 360px', () => {
     await expect(practice.getByText(/Word match:/)).toBeVisible();
   });
 
+  test('scores the complete pronunciation session and submits it to the leaderboard', async ({ page }) => {
+    let submittedScore;
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = async () => ({
+        getTracks: () => [{ stop() {} }],
+      });
+      window.SpeechRecognition = class {
+        start() {
+          const transcript = document.querySelector('.speech-practice-sentence')?.innerText || '';
+          this.onresult?.({ results: [[{ transcript }]] });
+          this.onend?.();
+        }
+        stop() {}
+        abort() {}
+      };
+    });
+    await page.route('**/api/auth/csrf', (route) => route.fulfill({
+      json: { csrfToken: 'practice-test-token' },
+    }));
+    await page.route('**/api/gamification/pronunciation', async (route) => {
+      submittedScore = route.request().postDataJSON();
+      await route.fulfill({
+        json: { bestAccuracy: submittedScore.accuracy, earnedPoints: 50, awardedBadges: [] },
+      });
+    });
+    await page.route('**/api/word-meaning**', (route) => route.fulfill({
+      json: { ok: true, meaning: 'A meaning on this device.' },
+    }));
+    await page.goto('/en/lessons/the-energy-drip-discovery');
+    await page.getByRole('button', { name: '📄 Show full story' }).click();
+    await page.getByRole('button', { name: '🎙 Practice pronunciation' }).click();
+    const practice = page.getByRole('region', { name: 'Practice speaking story lines' });
+    const stepCount = Number((await practice.locator('.speech-practice-progress-row > span').first().innerText()).split(' / ')[1]);
+    const firstPracticeSentence = await practice.locator('.speech-practice-sentence').innerText();
+    expect(firstPracticeSentence).not.toMatch(/^The story begins\./i);
+
+    for (let index = 0; index < stepCount; index += 1) {
+      const currentSentence = await practice.locator('.speech-practice-sentence').innerText();
+      await expect(practice.getByRole('img', { name: 'Character expression' })).toBeVisible();
+      if (index === 0) {
+        await practice.locator('.speech-practice-sentence').getByRole('button').first().click();
+        await expect(page.getByRole('status').filter({ hasText: 'A meaning on this device.' })).toBeVisible();
+        await page.getByRole('button', { name: 'Close word meaning' }).click();
+      }
+      await practice.getByRole('button', { name: 'Read and check' }).click();
+      if (index === 0) {
+        await page.getByRole('dialog', { name: 'Microphone permission' }).getByRole('button', { name: 'Allow and start' }).click();
+      }
+      await expect(practice.getByText('Correct', { exact: true })).toBeVisible();
+      if (index < stepCount - 1) {
+        await expect(practice.locator('.speech-practice-sentence')).not.toHaveText(currentSentence, { timeout: 2500 });
+        await expect(practice.locator('.speech-practice-progress-row > span').first()).toHaveText(`${index + 2} / ${stepCount}`);
+      }
+    }
+
+    await expect(practice.getByText('Pronunciation accuracy: 100%', { exact: true })).toBeVisible();
+    await expect(practice.getByText('Nothing left to improve.', { exact: true })).toBeVisible();
+    await expect.poll(() => submittedScore).toEqual({
+      slug: 'the-energy-drip-discovery',
+      accuracy: 100,
+    });
+    await expect(practice.getByText('Your best leaderboard score is 100%; 50 points added.', { exact: true })).toBeVisible();
+  });
+
   test('choosing a speaking situation keeps its player inline on mobile', async ({ page }) => {
+    await page.route('**/api/**', async (route) => {
+      const { pathname } = new URL(route.request().url());
+      const responses = {
+        '/api/me': {
+          user: {
+            id: 'speaking-situation-test',
+            displayName: 'Ayesha',
+            email: 'ayesha@example.com',
+            timezone: 'Asia/Dhaka',
+            locale: 'en',
+          },
+        },
+        '/api/auth/google/config': { clientId: '' },
+        '/api/routines': { routines: [] },
+        '/api/lessons': { lessons: [] },
+        '/api/lessons/today': { dailyLesson: null, quiz: null },
+        '/api/assistant/predict-hybrid': { predictions: [] },
+        '/api/auth/csrf': { csrfToken: 'speaking-situation-test-token' },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(responses[pathname] || {}),
+      });
+    });
     await page.goto('/app');
+    const offlinePrompt = page.getByRole('dialog', { name: /অফলাইনে পড়ার জন্য গল্প/ });
+    await expect(offlinePrompt).toBeVisible();
+    await offlinePrompt.getByRole('button', { name: 'এখন নয়' }).click();
+    const briefing = page.getByRole('dialog', { name: /Your Personal Voice Briefing/ });
+    await expect(briefing).toBeVisible({ timeout: 8000 });
+    await briefing.getByRole('button', { name: 'Close' }).first().click();
     await page.getByRole('button', { name: 'Learn to speak' }).click();
 
     const situation = page.getByRole('button', { name: /Meeting someone new/ });
     await situation.click();
 
     await expect(page.locator('#speaking-practice-panel')).toBeHidden();
-    const start = page.getByRole('button', { name: '▶ Start' });
+    const start = page.getByRole('button', { name: 'Start', exact: true });
     await expect(start).toBeVisible();
     await start.click();
-    await expect(page.getByRole('region', { name: 'Learn English by Story' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '⏸ Pause' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Practice speaking story lines' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Read and check' })).toBeVisible();
   });
 
-  test('tapping a story word speaks it slowly with its conversation context using the Google voice', async ({ page }) => {
+  test('speaking a tapped story word includes its conversation context', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.addInitScript(() => {
       window.__spokenWords = [];
@@ -203,6 +370,7 @@ test.describe('mobile header and home page at 360px', () => {
     await expect(meaningPanel).toBeVisible();
     await expect(meaningPanel).toBeInViewport();
     await expect(page.getByRole('button', { name: 'Close word meaning' })).toBeVisible();
+    await page.getByRole('button', { name: 'Hear pronunciation: The' }).click();
     await page.getByRole('button', { name: 'Close word meaning' }).click();
     await expect(meaningPanel).toBeHidden();
 
@@ -216,7 +384,7 @@ test.describe('mobile header and home page at 360px', () => {
   test('audio drama controls reflow for phone and desktop layouts', async ({ page }) => {
     await page.goto('/en/lessons/the-energy-drip-discovery');
     const player = page.getByRole('region', { name: 'Learn English by Story' });
-    const toolbar = player.locator('div.sticky').first();
+    const toolbar = player.locator('.audio-drama-toolbar');
     const storyStage = player.getByRole('list', { name: 'Story dialogue' });
     const storyCard = storyStage.getByRole('listitem').first();
 

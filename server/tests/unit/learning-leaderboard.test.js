@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   getQuizLearningPoints,
+  getPronunciationPracticePoints,
   learningStreakForDates,
   learningLevelForActiveDays,
 } from '../../src/services/gamification.js';
 
 describe('learning leaderboard scoring', () => {
+  it('converts pronunciation accuracy into up to 50 leaderboard points', () => {
+    expect(getPronunciationPracticePoints(0)).toBe(0);
+    expect(getPronunciationPracticePoints(1)).toBe(1);
+    expect(getPronunciationPracticePoints(81)).toBe(41);
+    expect(getPronunciationPracticePoints(100)).toBe(50);
+  });
+
   it('awards quiz points proportional to accuracy, rounded to a whole point', () => {
     expect(getQuizLearningPoints(0, 4)).toBe(0);
     expect(getQuizLearningPoints(1, 4)).toBe(8);

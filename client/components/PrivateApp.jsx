@@ -627,6 +627,7 @@ export function PrivateApp() {
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [pwaInstallPrompt, setPwaInstallPrompt] = useState(null);
   const [reflectionModalOpen, setReflectionModalOpen] = useState(false);
+  const [voiceBriefingAutoPlay, setVoiceBriefingAutoPlay] = useState(false);
 
   const [replanRoutine, setReplanRoutine] = useState(null);
   const [activeRoutineTask, setActiveRoutineTask] = useState(null);
@@ -637,9 +638,35 @@ export function PrivateApp() {
   const firingAlarmRef = useRef(null);
   const catchupSpokenRef = useRef(false);
   const snoozeLinkHandledRef = useRef(false);
+  const themeWaveTimerRef = useRef(null);
+  const voiceBriefingTimerRef = useRef(null);
   const copy = COPY[lang];
   const nativeAndroid = isAndroidNativeApp();
   const immersiveTab = ['focus', 'speaking', 'grammar'].includes(tab) || Boolean(activeRoutineTask);
+
+  const toggleTheme = useCallback(() => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    const root = document.documentElement;
+    root.dataset.theme = nextTheme;
+    root.classList.remove('theme-wave-light', 'theme-wave-dark');
+    void root.offsetWidth;
+    root.classList.add(`theme-wave-${nextTheme}`);
+    if (themeWaveTimerRef.current !== null) window.clearTimeout(themeWaveTimerRef.current);
+    themeWaveTimerRef.current = window.setTimeout(() => {
+      root.classList.remove('theme-wave-light', 'theme-wave-dark');
+      themeWaveTimerRef.current = null;
+    }, 760);
+    setTheme(nextTheme);
+  }, [setTheme, theme]);
+
+  const openVoiceBriefing = useCallback(() => {
+    if (voiceBriefingTimerRef.current !== null) {
+      window.clearTimeout(voiceBriefingTimerRef.current);
+      voiceBriefingTimerRef.current = null;
+    }
+    setVoiceBriefingAutoPlay(false);
+    setVoiceModalOpen(true);
+  }, []);
 
   const reportError = useCallback((err) => {
     setError(messageFrom(err, lang));
@@ -1159,6 +1186,36 @@ export function PrivateApp() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    if (!user || tab !== 'today') {
+      if (voiceBriefingTimerRef.current !== null) {
+        window.clearTimeout(voiceBriefingTimerRef.current);
+        voiceBriefingTimerRef.current = null;
+      }
+      setVoiceModalOpen(false);
+      setVoiceBriefingAutoPlay(false);
+      return undefined;
+    }
+
+    voiceBriefingTimerRef.current = window.setTimeout(() => {
+      voiceBriefingTimerRef.current = null;
+      setVoiceBriefingAutoPlay(true);
+      setVoiceModalOpen(true);
+    }, 4000);
+
+    return () => {
+      if (voiceBriefingTimerRef.current !== null) {
+        window.clearTimeout(voiceBriefingTimerRef.current);
+        voiceBriefingTimerRef.current = null;
+      }
+    };
+  }, [tab, user?.id]);
+
+  useEffect(() => () => {
+    if (themeWaveTimerRef.current !== null) window.clearTimeout(themeWaveTimerRef.current);
+    document.documentElement.classList.remove('theme-wave-light', 'theme-wave-dark');
+  }, []);
 
   useEffect(() => {
     if (!nativeAndroid) return undefined;
@@ -2043,7 +2100,7 @@ export function PrivateApp() {
               className="icon-button min-h-[40px] min-w-[40px]"
               aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
               title={theme === 'dark' ? copy.themeLight : copy.themeDark}
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              onClick={toggleTheme}
             >
               <span key={theme} className="coin-flip" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
             </Button>
@@ -2240,15 +2297,6 @@ export function PrivateApp() {
       </Button>
       <Button
         variant="secondary"
-        className="tab-button app-header-voice"
-        aria-label={copy.voiceBriefing}
-        title={copy.voiceBriefing}
-        onClick={() => setVoiceModalOpen(true)}
-      >
-        <span aria-hidden="true" className="tab-icon text-2xl leading-none">🌹</span>
-      </Button>
-      <Button
-        variant="secondary"
         className={`tab-button app-header-leaderboard ${tab === 'leaderboard' ? 'tab-button-active' : ''}`}
         aria-label={copy.leaderboard}
         title={copy.leaderboard}
@@ -2268,7 +2316,7 @@ export function PrivateApp() {
         aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
         title={theme === 'dark' ? copy.themeLight : copy.themeDark}
         aria-pressed={theme === 'dark'}
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        onClick={toggleTheme}
       >
         <span key={theme} className="tab-icon coin-flip" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
       </Button>
@@ -2446,6 +2494,18 @@ export function PrivateApp() {
             onScrollToAddRoutine={() => setTab('plan')}
             onScrollToAlarms={() => setTab('focus')}
           />
+
+          <Card className="surface-card glass-panel glow-border flex flex-wrap items-center justify-between gap-3 p-4">
+            <div>
+              <h2 className="font-bold text-ink">{copy.voiceBriefing}</h2>
+              <p className="text-sm text-ink/70">
+                {lang === 'bn' ? 'আজকের রুটিনের সংক্ষিপ্ত কণ্ঠস্বরের বিবরণ শুনুন' : 'Listen to a spoken overview of today’s routines'}
+              </p>
+            </div>
+            <Button variant="secondary" className="settings-action-button" onClick={openVoiceBriefing}>
+              <span aria-hidden="true">🎧</span><span>{copy.voiceBriefing}</span>
+            </Button>
+          </Card>
 
           {reminders.length ? (
             <Card className="border-gold bg-gold-soft glass-panel" role="status">
@@ -2994,55 +3054,6 @@ export function PrivateApp() {
               </button>
             </div>
           </Card>
-          <Card className="surface-card glass-panel glow-border space-y-3 p-5">
-            <h2 className="text-lg font-semibold">{lang === 'bn' ? 'দ্রুত সেটিংস' : 'Quick settings'}</h2>
-            <div className="grid grid-cols-2 gap-2">
-              {pwaInstallPrompt ? (
-                <Button
-                  variant="secondary"
-                  className="settings-action-button"
-                  aria-label={lang === 'bn' ? 'অ্যাপ ইনস্টল করুন' : 'Install app'}
-                  onClick={async () => {
-                    pwaInstallPrompt.prompt();
-                    await pwaInstallPrompt.userChoice.catch(() => {});
-                    setPwaInstallPrompt(null);
-                  }}
-                >
-                  <span aria-hidden="true">📲</span><span>{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install app'}</span>
-                </Button>
-              ) : null}
-              <Button
-                variant="secondary"
-                className="settings-action-button"
-                aria-label={copy.voiceBriefing}
-                onClick={() => setVoiceModalOpen(true)}
-              >
-                <span aria-hidden="true">🎧</span><span>{copy.voiceBriefing}</span>
-              </Button>
-              <Button
-                variant="secondary"
-                className="settings-action-button"
-                aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                <span key={theme} className="coin-flip" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
-                <span>{theme === 'dark' ? copy.themeLight : copy.themeDark}</span>
-              </Button>
-              <Button
-                variant="secondary"
-                className="settings-action-button"
-                aria-label={copy.logout}
-                onClick={signOut}
-                disabled={busy}
-              >
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10" />
-                  <path d="M14 16l4-4-4-4M18 12H9" />
-                </svg>
-                <span>{copy.logout}</span>
-              </Button>
-            </div>
-          </Card>
           <PrayerTimesCard lang={lang} />
           <Card className="surface-card glass-panel glow-border space-y-3 p-5">
             <h2 className="text-2xl font-semibold">{copy.settings}</h2>
@@ -3082,6 +3093,47 @@ export function PrivateApp() {
               if (updatedUser) setUser((currentUser) => ({ ...currentUser, ...updatedUser }));
             }}
           />
+          <Card className="surface-card glass-panel glow-border space-y-3 p-5">
+            <h2 className="text-lg font-semibold">{lang === 'bn' ? 'দ্রুত সেটিংস' : 'Quick settings'}</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {pwaInstallPrompt ? (
+                <Button
+                  variant="secondary"
+                  className="settings-action-button"
+                  aria-label={lang === 'bn' ? 'অ্যাপ ইনস্টল করুন' : 'Install app'}
+                  onClick={async () => {
+                    pwaInstallPrompt.prompt();
+                    await pwaInstallPrompt.userChoice.catch(() => {});
+                    setPwaInstallPrompt(null);
+                  }}
+                >
+                  <span aria-hidden="true">📲</span><span>{lang === 'bn' ? 'অ্যাপ ইনস্টল' : 'Install app'}</span>
+                </Button>
+              ) : null}
+              <Button
+                variant="secondary"
+                className="settings-action-button"
+                aria-label={theme === 'dark' ? copy.themeLight : copy.themeDark}
+                onClick={toggleTheme}
+              >
+                <span key={theme} className="coin-flip" aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+                <span>{theme === 'dark' ? copy.themeLight : copy.themeDark}</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="settings-action-button"
+                aria-label={copy.logout}
+                onClick={signOut}
+                disabled={busy}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10" />
+                  <path d="M14 16l4-4-4-4M18 12H9" />
+                </svg>
+                <span>{copy.logout}</span>
+              </Button>
+            </div>
+          </Card>
       </section>
       {replanRoutine && (
         <AdaptiveReplanModal
@@ -3096,7 +3148,11 @@ export function PrivateApp() {
           user={user}
           routines={routines}
           lang={lang}
-          onClose={() => setVoiceModalOpen(false)}
+          autoPlay={voiceBriefingAutoPlay}
+          onClose={() => {
+            setVoiceModalOpen(false);
+            setVoiceBriefingAutoPlay(false);
+          }}
         />
       )}
       <PointsAwardToast lang={lang} />

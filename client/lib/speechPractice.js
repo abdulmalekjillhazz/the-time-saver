@@ -10,48 +10,42 @@ export function speechWords(text) {
   return String(text || '').toLowerCase().match(/[a-z0-9]+(?:['’][a-z0-9]+)*/g) || [];
 }
 
-export function getAdaptivePracticeLineIndex(lines, completedIndexes = [], currentIndex = -1, accuracy = null) {
-  const completed = new Set([...completedIndexes, currentIndex]);
-  const candidates = lines
-    .map((line, index) => ({
-      index,
-      difficulty: speechWords(line.text).reduce(
-        (score, word) => score + 1 + (word.length >= 7 ? 2 : 0),
-        0,
-      ),
-    }))
-    .filter(({ index }) => !completed.has(index));
+export function getNextPracticeLineIndex(lines, currentIndex = -1) {
+  const nextIndex = currentIndex + 1;
+  return nextIndex < lines.length ? nextIndex : -1;
+}
 
-  if (!candidates.length) return -1;
-  if (currentIndex < 0 || accuracy === null) {
-    return candidates.reduce((easiest, candidate) => (
-      candidate.difficulty < easiest.difficulty ? candidate : easiest
-    )).index;
+export function getConversationPracticeLines(lines) {
+  const firstDialogueIndex = lines.findIndex(({ character }) => (
+    !/^(?:narrator|storyteller|story teller|narration|scene|speaker)$/i.test(String(character || '').trim())
+  ));
+  return firstDialogueIndex < 0 ? lines : lines.slice(firstDialogueIndex);
+}
+
+export function getPracticeExpression(text) {
+  if (/\b(?:haha|hahaha|lol|laugh|funny|joke|hilarious|amazing|great|wonderful|happy|glad|excited)\b/i.test(text)) {
+    return '😄';
   }
+  if (/\b(?:sad|sorry|cry|cried|tears|miss you|missed|unhappy|lost)\b/i.test(text)) return '😢';
+  if (/\b(?:wow|really|surprised|surprise|unexpected|what\?|no way)\b/i.test(text)) return '😮';
+  if (/\b(?:worried|worry|afraid|scared|nervous|anxious|problem|danger)\b/i.test(text)) return '😟';
+  if (/\b(?:angry|annoyed|furious|upset|mad)\b/i.test(text)) return '😠';
+  return '🙂';
+}
 
-  const currentDifficulty = speechWords(lines[currentIndex]?.text).reduce(
-    (score, word) => score + 1 + (word.length >= 7 ? 2 : 0),
-    0,
-  );
-  if (accuracy >= 80) {
-    const harderCandidates = candidates.filter(({ difficulty }) => difficulty > currentDifficulty);
-    if (harderCandidates.length) {
-      return harderCandidates.reduce((easiest, candidate) => (
-        candidate.difficulty < easiest.difficulty ? candidate : easiest
-      )).index;
-    }
-  } else {
-    const easierCandidates = candidates.filter(({ difficulty }) => difficulty < currentDifficulty);
-    if (easierCandidates.length) {
-      return easierCandidates.reduce((hardest, candidate) => (
-        candidate.difficulty > hardest.difficulty ? candidate : hardest
-      )).index;
-    }
-  }
+export function getSpeechPracticeAccuracy(lines, comparisonsByIndex = {}) {
+  let errors = 0;
+  let totalWords = 0;
 
-  return candidates.reduce((easiest, candidate) => (
-    candidate.difficulty < easiest.difficulty ? candidate : easiest
-  )).index;
+  lines.forEach((line, index) => {
+    const targetWordCount = speechWords(line.text).length;
+    const comparison = comparisonsByIndex[index];
+    const lineErrors = comparison ? comparison.errors : targetWordCount;
+    totalWords += targetWordCount;
+    errors += Math.min(targetWordCount, lineErrors);
+  });
+
+  return totalWords ? Math.round(((totalWords - errors) / totalWords) * 100) : 0;
 }
 
 export function compareSpeechText(expected, recognized) {
@@ -99,5 +93,5 @@ export function compareSpeechText(expected, recognized) {
     ? Math.max(0, Math.round(((targetWords.length - errors) / targetWords.length) * 100))
     : 0;
 
-  return { accuracy, targetWords, matchedWords };
+  return { accuracy, errors, targetWords, matchedWords };
 }

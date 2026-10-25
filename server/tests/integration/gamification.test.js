@@ -133,6 +133,50 @@ describe.skipIf(!uri)('Gamification and activity analytics', () => {
     expect(invalid.status).toBe(404);
   }, 30_000);
 
+  it('saves pronunciation accuracy to the leaderboard and awards points for score improvements', async () => {
+      await Lesson.create({
+        slug: 'pronunciation-score-story',
+        status: 'published',
+        title: { bn: 'Pronunciation score story', en: 'Pronunciation score story' },
+        body: { bn: 'A short story.', en: 'A short story.' },
+        createdBy: userId,
+      });
+
+      const first = await request(app)
+        .post('/api/gamification/pronunciation')
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', csrf)
+        .send({ slug: 'pronunciation-score-story', accuracy: 72 });
+      const lowerRetake = await request(app)
+        .post('/api/gamification/pronunciation')
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', csrf)
+        .send({ slug: 'pronunciation-score-story', accuracy: 64 });
+      const improvedRetake = await request(app)
+        .post('/api/gamification/pronunciation')
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', csrf)
+        .send({ slug: 'pronunciation-score-story', accuracy: 90 });
+      const leaderboard = await request(app)
+        .get('/api/gamification/leaderboard')
+        .set('Cookie', cookie);
+      const savedActivity = await LearningActivity.findOne({
+        userId,
+        activityType: 'pronunciation',
+        contentId: 'story:pronunciation-score-story',
+      }).lean();
+
+      expect(first.status).toBe(201);
+      expect(first.body).toMatchObject({ bestAccuracy: 72, earnedPoints: 36 });
+      expect(lowerRetake.status).toBe(200);
+      expect(lowerRetake.body).toMatchObject({ bestAccuracy: 72, earnedPoints: 0 });
+      expect(improvedRetake.status).toBe(201);
+      expect(improvedRetake.body).toMatchObject({ bestAccuracy: 90, earnedPoints: 9 });
+      expect(savedActivity).toMatchObject({ accuracy: 90, points: 45 });
+      expect(leaderboard.body.members.find(({ userId: memberId }) => memberId === String(userId)))
+        .toMatchObject({ pronunciationScore: 90 });
+  });
+
   it('stores paired microfallback settings and records fallback completion', async () => {
     const created = await request(app)
       .post('/api/routines')

@@ -9,6 +9,7 @@ import { EveningReflection } from '../models/EveningReflection.js';
 import {
   getGrammarSentenceProgress,
   getLearningLeaderboard,
+  recordPronunciationPractice,
   recordGrammarSentenceCompletion,
 } from '../services/gamification.js';
 import { calculateGamificationStats } from '../services/gamificationStats.js';
@@ -20,6 +21,10 @@ const grammarSentenceSchema = z.object({
   sentence: z.string().trim().min(1).max(400)
     .refine((value) => (value.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []).length >= 3)
     .refine((value) => !/[\u0980-\u09ff]/.test(value)),
+}).strict();
+const pronunciationPracticeSchema = z.object({
+  slug: z.string().trim().min(1).max(80),
+  accuracy: z.number().int().min(0).max(100),
 }).strict();
 
 export function gamificationRouter() {
@@ -50,6 +55,20 @@ export function gamificationRouter() {
   r.get('/grammar-sentences', async (req, res, next) => {
     try {
       res.json(await getGrammarSentenceProgress(req.userId));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  r.post('/pronunciation', validate({ body: pronunciationPracticeSchema }), async (req, res, next) => {
+    try {
+      const result = await recordPronunciationPractice({
+        userId: req.userId,
+        slug: req.body.slug,
+        accuracy: req.body.accuracy,
+        timezone: req.user.timezone,
+      });
+      res.status(result.earnedPoints > 0 ? 201 : 200).json(result);
     } catch (err) {
       next(err);
     }
