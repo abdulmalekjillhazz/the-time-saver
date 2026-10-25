@@ -212,6 +212,7 @@ export function AudioDramaPlayer({
   onClose,
   onComplete,
   startInPracticeMode = false,
+  initialChunkMode = true,
 }) {
   const isBn = lang === 'bn';
   const lines = useMemo(() => parseStoryScript(content, isBn ? 'বর্ণনাকারী' : 'Narrator'), [content, isBn]);
@@ -236,7 +237,7 @@ export function AudioDramaPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedWord, setSelectedWord] = useState(null);
   const [pronunciationPlaying, setPronunciationPlaying] = useState(false);
-  const [chunkMode, setChunkMode] = useState(true);
+  const [chunkMode, setChunkMode] = useState(initialChunkMode);
   const [offlineAudio, setOfflineAudio] = useState(null);
   const [offlineAudioSaving, setOfflineAudioSaving] = useState(false);
   const [offlineAudioStatus, setOfflineAudioStatus] = useState('');

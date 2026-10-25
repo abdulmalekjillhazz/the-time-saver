@@ -26,6 +26,12 @@ export const googleLoginSchema = z
   })
   .strict();
 
+export const googleHandoffExchangeSchema = z
+  .object({
+    code: z.string().min(32).max(128),
+  })
+  .strict();
+
 export const profileAvatarIds = [
   'sunrise',
   'wave',

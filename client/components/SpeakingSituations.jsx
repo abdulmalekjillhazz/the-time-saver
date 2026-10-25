@@ -163,6 +163,7 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
                         lang={lang}
                         autoPlaySignal={autoPlaySignal}
                         startInPracticeMode
+                        initialChunkMode={false}
                         onComplete={selectedSituation.completionId && onStoryComplete
                           ? () => onStoryComplete(selectedSituation.completionId)
                           : undefined}
@@ -201,6 +202,7 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
             audioUrl={selectedSituation.audioUrl || ''}
             lang={lang}
             autoPlaySignal={autoPlaySignal}
+            initialChunkMode={false}
             onComplete={selectedSituation.completionId && onStoryComplete
               ? () => onStoryComplete(selectedSituation.completionId)
               : undefined}

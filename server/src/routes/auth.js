@@ -1,14 +1,20 @@
 import { Router } from 'express';
 import { OAuth2Client } from 'google-auth-library';
-import { registerSchema, loginSchema, googleLoginSchema } from '@smart-routine/shared';
+import {
+  registerSchema,
+  loginSchema,
+  googleLoginSchema,
+  googleHandoffExchangeSchema,
+} from '@smart-routine/shared';
 import { validate } from '../middleware/validate.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { extractSessionToken } from '../middleware/requireAuth.js';
-import { randomToken } from '../lib/crypto.js';
+import { randomToken, sha256 } from '../lib/crypto.js';
 import { AppError, MSG } from '../lib/AppError.js';
 import { logger } from '../lib/logger.js';
 import { setCsrfCookie, setSessionCookies, clearSessionCookies } from '../lib/cookies.js';
 import { registerUser, loginUser, loginGoogleUser } from '../services/account.js';
+import { AuthHandoff } from '../models/AuthHandoff.js';
 import {
   createSession,
   loadSession,
@@ -20,6 +26,7 @@ import { toPublicUser } from '../services/dto.js';
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
+const HANDOFF_TTL_MS = 2 * MINUTE;
 
 export function parseGoogleClientIds(config = {}) {
   const rawList = [
@@ -47,6 +54,36 @@ export function authRouter(config) {
   const googleClientIds = parseGoogleClientIds(config);
   const primaryWebClientId = googleClientIds[0] || null;
   const googleClient = primaryWebClientId ? new OAuth2Client(primaryWebClientId) : null;
+
+  async function getGoogleUser(credential) {
+    if (!googleClient || !googleClientIds.length) throw new AppError(503, 'UNAVAILABLE', MSG.unavailable);
+    let claims;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: googleClientIds.length === 1 ? googleClientIds[0] : googleClientIds,
+      });
+      claims = ticket.getPayload();
+    } catch (err) {
+      logger.warn({ errName: err.name, code: err.code }, 'Google ID token verification failed');
+      if (['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENETUNREACH'].includes(err.code)) {
+        throw new AppError(503, 'UNAVAILABLE', MSG.unavailable);
+      }
+      throw new AppError(401, 'UNAUTHENTICATED', MSG.loginFailed);
+    }
+    if (!claims?.sub || !claims.email || claims.email_verified !== true) {
+      throw new AppError(401, 'UNAUTHENTICATED', MSG.loginFailed);
+    }
+
+    const email = claims.email.toLowerCase();
+    const displayName = String(claims.name || email.split('@')[0]).trim().slice(0, 60) || email;
+    return loginGoogleUser({
+      email,
+      googleId: claims.sub,
+      displayName,
+      avatarUrl: claims.picture,
+    });
+  }
 
   r.get('/google/config', (_req, res) => {
     res.json({ clientId: primaryWebClientId });
@@ -90,35 +127,53 @@ export function authRouter(config) {
     validate({ body: googleLoginSchema }),
     async (req, res, next) => {
       try {
-        if (!googleClient || !googleClientIds.length) throw new AppError(503, 'UNAVAILABLE', MSG.unavailable);
-        let claims;
-        try {
-          const ticket = await googleClient.verifyIdToken({
-            idToken: req.body.credential,
-            audience: googleClientIds.length === 1 ? googleClientIds[0] : googleClientIds,
-          });
-          claims = ticket.getPayload();
-        } catch (err) {
-          logger.warn({ errName: err.name, code: err.code }, 'Google ID token verification failed');
-          if (['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENETUNREACH'].includes(err.code)) {
-            throw new AppError(503, 'UNAVAILABLE', MSG.unavailable);
-          }
-          throw new AppError(401, 'UNAUTHENTICATED', MSG.loginFailed);
-        }
-        if (!claims?.sub || !claims.email || claims.email_verified !== true) {
-          throw new AppError(401, 'UNAUTHENTICATED', MSG.loginFailed);
-        }
-
-        const email = claims.email.toLowerCase();
-        const displayName = String(claims.name || email.split('@')[0]).trim().slice(0, 60) || email;
-        const user = await loginGoogleUser({
-          email,
-          googleId: claims.sub,
-          displayName,
-          avatarUrl: claims.picture,
-        });
+        const user = await getGoogleUser(req.body.credential);
         const { token, csrf } = await createSession(user._id);
         setSessionCookies(res, config, token, csrf);
+        res.json({ user: toPublicUser(user), csrfToken: csrf, sessionToken: token });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  r.post(
+    '/google/handoff',
+    rateLimit({ name: 'google-handoff-create', limit: 10, windowMs: 15 * MINUTE }),
+    validate({ body: googleLoginSchema }),
+    async (req, res, next) => {
+      try {
+        const user = await getGoogleUser(req.body.credential);
+        const code = randomToken(32);
+        await AuthHandoff.create({
+          tokenHash: sha256(code),
+          userId: user._id,
+          expiresAt: new Date(Date.now() + HANDOFF_TTL_MS),
+        });
+        res.set('Cache-Control', 'no-store');
+        res.json({ code });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  r.post(
+    '/google/handoff/exchange',
+    rateLimit({ name: 'google-handoff-exchange', limit: 20, windowMs: 15 * MINUTE }),
+    validate({ body: googleHandoffExchangeSchema }),
+    async (req, res, next) => {
+      try {
+        const handoff = await AuthHandoff.findOneAndDelete({
+          tokenHash: sha256(req.body.code),
+          expiresAt: { $gt: new Date() },
+        }).lean();
+        if (!handoff) throw new AppError(401, 'UNAUTHENTICATED', MSG.loginFailed);
+
+        const user = await loadUserForSession({ userId: handoff.userId });
+        const { token, csrf } = await createSession(user._id);
+        setSessionCookies(res, config, token, csrf);
+        res.set('Cache-Control', 'no-store');
         res.json({ user: toPublicUser(user), csrfToken: csrf, sessionToken: token });
       } catch (err) {
         next(err);

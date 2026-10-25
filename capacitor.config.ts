@@ -8,7 +8,7 @@ const capacitorServerUrl = (
 const config: CapacitorConfig = {
   appId: 'com.madeyourdreambigger.smartroutine',
   appName: 'Smart Routine',
-  includePlugins: ['@capgo/capacitor-social-login'],
+  includePlugins: ['@capacitor/app', '@capacitor/browser', '@capgo/capacitor-social-login'],
   plugins: {
     SocialLogin: {
       providers: {

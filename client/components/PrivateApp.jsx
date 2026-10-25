@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Script from 'next/script';
+import { App } from '@capacitor/app';
 import { createUuidV4, predictMissProbability, routineFeatures, TRAINING_CONSENT_VERSION, todayInZone } from '@smart-routine/shared';
 import { enqueueAndFlush } from '../lib/outboxClient.js';
 import { announceLearningActivity } from '../lib/learningFeedback.js';
@@ -24,6 +25,7 @@ import {
 } from '../lib/offlineStoryCache.js';
 import { cacheOfflineUser, clearOfflineUser, isOfflineFailure, readOfflineUser } from '../lib/offlineSession.js';
 import { requireUserProfile } from '../lib/userProfile.js';
+import { SITE_URL } from '../lib/seo.js';
 import { clearCachedRoutines, loadCachedRoutinesForOffline, saveCachedRoutines } from '../lib/routineCache.js';
 import { buildRoutineAlarms } from '../lib/routineAlarms.js';
 import { base64UrlToBytes, bengaliCalendarMonthRange, buildCalendarDays } from '../lib/calendar.js';
@@ -414,6 +416,7 @@ function GoogleSignInButton({ clientId, lang, disabled, nativeAndroid, onCredent
   const credentialHandler = useRef(onCredential);
   const lastRenderKeyRef = useRef('');
   const [nativeLoginPending, setNativeLoginPending] = useState(false);
+  const [browserLoginPending, setBrowserLoginPending] = useState(false);
   credentialHandler.current = onCredential;
 
   const renderGoogleButton = useCallback(() => {
@@ -464,53 +467,79 @@ function GoogleSignInButton({ clientId, lang, disabled, nativeAndroid, onCredent
       const credential = await signInWithGoogleNative(resolvedClientId);
       await credentialHandler.current(credential);
     } catch (err) {
-      if (err?.code !== 'USER_CANCELLED') onError(err);
+      onError(err);
     } finally {
       setNativeLoginPending(false);
     }
   }
 
+  async function handleBrowserSignIn() {
+    if (browserLoginPending || disabled) return;
+    setBrowserLoginPending(true);
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      const siteUrl = new URL(`/${lang === 'en' ? 'en' : 'bn'}/mobile-login`, SITE_URL);
+      await Browser.open({ url: siteUrl.toString() });
+    } catch (err) {
+      onError(err);
+    } finally {
+      setBrowserLoginPending(false);
+    }
+  }
+
   if (nativeAndroid) {
     return (
-      <button
-        type="button"
-        disabled={disabled || nativeLoginPending}
-        onClick={handleNativeSignIn}
-        className="mx-auto flex min-h-[48px] w-full max-w-[380px] items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-        aria-label={lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}
-      >
-        {nativeLoginPending ? (
-          <span className="flex items-center gap-2 text-sm text-slate-500">
-            <svg className="h-5 w-5 animate-spin text-slate-600" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            {lang === 'bn' ? 'অপেক্ষা করুন...' : 'Signing in...'}
-          </span>
-        ) : (
-          <>
-            <svg className="h-5 w-5" viewBox="0 0 24 24">
-              <path
-                fill="rgb(var(--brand-google-blue))"
-                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.87c2.26-2.09 3.67-5.17 3.67-9.15z"
-              />
-              <path
-                fill="rgb(var(--brand-google-green))"
-                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.87-3.05c-1.08.72-2.45 1.16-4.06 1.16-3.13 0-5.78-2.11-6.73-4.96H1.26v3.15C3.25 21.36 7.35 24 12 24z"
-              />
-              <path
-                fill="rgb(var(--brand-google-yellow))"
-                d="M5.27 14.24A7.18 7.18 0 0 1 4.9 12c0-.78.14-1.54.37-2.24V6.61H1.26C.46 8.23 0 10.06 0 12c0 1.94.46 3.77 1.26 5.39l4.01-3.15z"
-              />
-              <path
-                fill="rgb(var(--brand-google-red))"
-                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.25 2.64 1.26 6.61l4.01 3.15c.95-2.85 3.6-4.96 6.73-4.96z"
-              />
-            </svg>
-            <span>{lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}</span>
-          </>
-        )}
-      </button>
+      <div className="space-y-2">
+        <button
+          type="button"
+          disabled={disabled || nativeLoginPending || browserLoginPending}
+          onClick={handleNativeSignIn}
+          className="mx-auto flex min-h-[48px] w-full max-w-[380px] items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label={lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}
+        >
+          {nativeLoginPending ? (
+            <span className="flex items-center gap-2 text-sm text-slate-500">
+              <svg className="h-5 w-5 animate-spin text-slate-600" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              {lang === 'bn' ? 'অপেক্ষা করুন...' : 'Signing in...'}
+            </span>
+          ) : (
+            <>
+              <svg className="h-5 w-5" viewBox="0 0 24 24">
+                <path
+                  fill="rgb(var(--brand-google-blue))"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.87c2.26-2.09 3.67-5.17 3.67-9.15z"
+                />
+                <path
+                  fill="rgb(var(--brand-google-green))"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.87-3.05c-1.08.72-2.45 1.16-4.06 1.16-3.13 0-5.78-2.11-6.73-4.96H1.26v3.15C3.25 21.36 7.35 24 12 24z"
+                />
+                <path
+                  fill="rgb(var(--brand-google-yellow))"
+                  d="M5.27 14.24A7.18 7.18 0 0 1 4.9 12c0-.78.14-1.54.37-2.24V6.61H1.26C.46 8.23 0 10.06 0 12c0 1.94.46 3.77 1.26 5.39l4.01-3.15z"
+                />
+                <path
+                  fill="rgb(var(--brand-google-red))"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.25 2.64 1.26 6.61l4.01 3.15c.95-2.85 3.6-4.96 6.73-4.96z"
+                />
+              </svg>
+              <span>{lang === 'bn' ? 'Google দিয়ে চালিয়ে যান' : 'Continue with Google'}</span>
+            </>
+          )}
+        </button>
+        <button
+          type="button"
+          disabled={disabled || nativeLoginPending || browserLoginPending}
+          onClick={handleBrowserSignIn}
+          className="mx-auto block min-h-[40px] w-full max-w-[380px] rounded-xl border border-gold/30 px-4 py-2 text-sm font-semibold text-ink/80 hover:bg-gold/10 disabled:opacity-60"
+        >
+          {browserLoginPending
+            ? (lang === 'bn' ? 'ব্রাউজার খুলছে...' : 'Opening browser...')
+            : (lang === 'bn' ? 'ব্রাউজার দিয়ে সাইন ইন করুন' : 'Sign in with browser')}
+        </button>
+      </div>
     );
   }
 
@@ -640,6 +669,7 @@ export function PrivateApp() {
   const snoozeLinkHandledRef = useRef(false);
   const themeWaveTimerRef = useRef(null);
   const voiceBriefingTimerRef = useRef(null);
+  const handledHandoffCodesRef = useRef(new Set());
   const copy = COPY[lang];
   const nativeAndroid = isAndroidNativeApp();
   const immersiveTab = ['focus', 'speaking', 'grammar'].includes(tab) || Boolean(activeRoutineTask);
@@ -1734,6 +1764,60 @@ export function PrivateApp() {
       setBusy(false);
     }
   }
+
+  const completeGoogleHandoff = useCallback(async (url) => {
+    if (!nativeAndroid) return;
+    let handoffCode;
+    try {
+      const link = new URL(url);
+      if (link.protocol !== 'smartroutine:' || link.hostname !== 'auth' || link.pathname !== '/callback') return;
+      handoffCode = link.searchParams.get('code') || '';
+    } catch {
+      return;
+    }
+    if (!/^[A-Za-z0-9_-]{32,128}$/.test(handoffCode) || handledHandoffCodesRef.current.has(handoffCode)) return;
+    handledHandoffCodesRef.current.add(handoffCode);
+
+    setBusy(true);
+    setError('');
+    try {
+      const result = await apiRequest('/api/auth/google/handoff/exchange', {
+        method: 'POST',
+        body: { code: handoffCode },
+        locale: lang,
+      });
+      const authenticatedUser = requireUserProfile(result);
+      setUser(authenticatedUser);
+      setProfileName(authenticatedUser.displayName);
+      setProfileAvatarId(authenticatedUser.avatarId || 'sunrise');
+      if (!useAppStore.getState().language) setStoredLanguage(authenticatedUser.locale === 'en' ? 'en' : 'bn');
+      setNotice('');
+    } catch (err) {
+      reportError(err);
+    } finally {
+      setBusy(false);
+    }
+  }, [lang, nativeAndroid, reportError]);
+
+  useEffect(() => {
+    if (!nativeAndroid) return undefined;
+    let disposed = false;
+    let listener;
+    App.addListener('appUrlOpen', ({ url }) => {
+      void completeGoogleHandoff(url);
+    }).then((handle) => {
+      listener = handle;
+      if (disposed) void handle.remove();
+    }).catch(reportError);
+    App.getLaunchUrl().then((launch) => {
+      if (launch?.url) void completeGoogleHandoff(launch.url);
+    }).catch(reportError);
+
+    return () => {
+      disposed = true;
+      if (listener) void listener.remove();
+    };
+  }, [completeGoogleHandoff, nativeAndroid, reportError]);
 
   async function signOut() {
     setBusy(true);
