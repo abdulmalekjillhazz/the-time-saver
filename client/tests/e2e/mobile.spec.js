@@ -127,15 +127,19 @@ test.describe('mobile header and home page at 360px', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 
-  test('all Android app links point to the Cloudinary-backed production APK download', async ({ page }) => {
+  test('all Android app links point to the latest production APK download', async ({ page }) => {
     const downloadUrl = '/downloads/android';
+    const apkUrl = '/downloads/smart-routine-android-v1.7.apk';
     await page.goto('/en');
     await expect(page.locator('#main').getByRole('link', { name: 'Download Android app' })).toHaveAttribute('href', downloadUrl);
     await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app' })).toHaveAttribute('href', downloadUrl);
-    const apkResponse = await page.request.head(new URL(downloadUrl, page.url()).href);
+    const redirectResponse = await page.request.head(new URL(downloadUrl, page.url()).href, { maxRedirects: 0 });
+    expect(redirectResponse.status()).toBe(302);
+    expect(new URL(redirectResponse.headers().location).pathname).toBe(apkUrl);
+    const apkResponse = await page.request.head(new URL(apkUrl, page.url()).href);
     expect(apkResponse.ok()).toBeTruthy();
     expect(apkResponse.headers()['content-type']).toContain('application/vnd.android.package-archive');
-    expect(apkResponse.headers()['content-disposition']).toContain('Smart-Routine-Android-v1.6.apk');
+    expect(Number(apkResponse.headers()['content-length'])).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: 'Menu' }).click();
     const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app' });
