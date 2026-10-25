@@ -481,7 +481,8 @@ async function createAudioDramaAsset({ content, config, signal }) {
   const contentHash = crypto.createHash('sha256').update(`${voiceConfigVersion}\n${content}`).digest('hex').slice(0, 24);
   const folder = 'smart-routine/audio-dramas';
   const publicId = `drama-${contentHash}`;
-  const existingManifest = await cloudinary().client.resourceInfo(`${folder}/${publicId}`, 'raw');
+  const existingManifest = (await cloudinary().client.resourceInfo(`${folder}/${publicId}.json`, 'raw'))
+    || (await cloudinary().client.resourceInfo(`${folder}/${publicId}`, 'raw'));
   if (existingManifest?.secure_url) {
     const response = await fetch(existingManifest.secure_url, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) throw new Error('The saved story audio manifest could not be loaded from Cloudinary.');

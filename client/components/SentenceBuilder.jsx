@@ -11,30 +11,30 @@ import { Card } from './ui/Card.jsx';
 
 const LEVELS = ['basic', 'intermediate', 'advanced'];
 const CORE_SENTENCES = [
-  { level: 'basic', sentence: 'I wake up early.' },
-  { level: 'basic', sentence: 'She drinks warm tea.' },
-  { level: 'basic', sentence: 'We walk after lunch.' },
-  { level: 'basic', sentence: 'The bus arrives soon.' },
-  { level: 'basic', sentence: 'Please open the window now.' },
-  { level: 'basic', sentence: 'My sister reads daily.' },
-  { level: 'basic', sentence: 'They share their food.' },
-  { level: 'basic', sentence: 'He rests after work.' },
-  { level: 'intermediate', sentence: 'I review my notes before class begins.' },
-  { level: 'intermediate', sentence: 'She practices English with a friend after work.' },
-  { level: 'intermediate', sentence: 'We packed some fruit for the long journey.' },
-  { level: 'intermediate', sentence: 'The manager explained the schedule during our morning meeting.' },
-  { level: 'intermediate', sentence: 'He checks the bus time before leaving home.' },
-  { level: 'intermediate', sentence: 'They take short breaks to protect their focus.' },
-  { level: 'intermediate', sentence: 'My neighbor waters the plants every other morning.' },
-  { level: 'intermediate', sentence: 'Please send the report before the office closes today.' },
-  { level: 'advanced', sentence: 'Although the first answer seemed correct, Maya checked every detail again.' },
-  { level: 'advanced', sentence: 'If the train arrives late, we will call the hotel reception.' },
-  { level: 'advanced', sentence: 'Because Omar practiced each difficult sound, his presentation became easier to follow.' },
-  { level: 'advanced', sentence: 'The team finished the project early because everyone shared updates regularly.' },
-  { level: 'advanced', sentence: 'After the rain stopped, we walked through the market to find the library.' },
-  { level: 'advanced', sentence: 'Unless you save your work often, a sudden restart can erase your changes.' },
-  { level: 'advanced', sentence: 'She asked for clearer instructions before starting the unfamiliar task.' },
-  { level: 'advanced', sentence: 'While my friend prepared lunch, I finished the report and answered two messages.' },
+  { level: 'basic', sentence: 'My cat hates mornings.', translation: 'আমার বিড়াল সকালবেলা একদম পছন্দ করে না।' },
+  { level: 'basic', sentence: 'Where is my phone?', translation: 'আমার ফোনটা কোথায় গেল?' },
+  { level: 'basic', sentence: 'I need more coffee.', translation: 'আমার আরেকটু কফি দরকার।' },
+  { level: 'basic', sentence: 'Why are you laughing?', translation: 'তুমি হাসছ কেন?' },
+  { level: 'basic', sentence: 'He fell asleep fast.', translation: 'সে দ্রুত ঘুমিয়ে পড়ল।' },
+  { level: 'basic', sentence: 'The dog stole bread.', translation: 'কুকুরটি পাউরুটি চুরি করে নিয়ে গেল।' },
+  { level: 'basic', sentence: 'Just five more minutes!', translation: 'আর মাত্র পাঁচটা মিনিট!' },
+  { level: 'basic', sentence: 'We forgot the keys.', translation: 'আমরা চাবিটা ভুলে ফেলে এসেছি।' },
+  { level: 'intermediate', sentence: 'I was searching for glasses on my head.', translation: 'আমি মাথায় চশমা রেখে সারা বাড়ি খুঁজছিলাম।' },
+  { level: 'intermediate', sentence: 'He set five alarms and still woke late.', translation: 'সে পাঁচটা অ্যালার্ম দিয়েও দেরিতে ঘুম থেকে উঠল।' },
+  { level: 'intermediate', sentence: 'I walked in and forgot why I came.', translation: 'আমি ঘরে ঢুকে ভুলেই গেলাম কেন এসেছিলাম।' },
+  { level: 'intermediate', sentence: 'The waiter said enjoy, and I said you.', translation: 'ওয়েটার বলল খাবার উপভোগ করুন, আমি বললাম আপনিও!' },
+  { level: 'intermediate', sentence: 'My tea got cold while waiting for it.', translation: 'চা ঠান্ডা হওয়ার অপেক্ষায় থাকতে থাকতে একেবারে বরফ হয়ে গেল।' },
+  { level: 'intermediate', sentence: 'She smiled and nodded without understanding a word.', translation: 'একটা কথাও না বুঝে সে শুধু মাথা নেড়ে হাসল।' },
+  { level: 'intermediate', sentence: 'I went for bananas and bought chocolate cake.', translation: 'কলা কিনতে গিয়ে চকোলেট কেক কিনে বাড়ি ফিরলাম।' },
+  { level: 'intermediate', sentence: 'The cat walked straight across my warm keyboard.', translation: 'বিড়ালটি সোজা এসে আমার গরম কিবোর্ডের ওপর হেঁটে গেল।' },
+  { level: 'advanced', sentence: 'I thought today was Friday until my friend laughed and said it was Tuesday.', translation: 'বন্ধু হেসে মনে করিয়ে দেওয়ার আগ পর্যন্ত আমি ভাবছিলাম আজ শুক্রবার, অথচ আজ কেবল মঙ্গলবার!' },
+  { level: 'advanced', sentence: 'He searched for his mobile in panic while talking to his mother on that same phone.', translation: 'মায়ের সাথে ফোনে কথা বলতে বলতেই সে ভয়ে পাগলের মতো নিজের ফোন খুঁজছিল!' },
+  { level: 'advanced', sentence: 'I tried to steal a midnight snack quietly, but the loud metal spoon crashed onto the floor.', translation: 'মধ্যরাতে চুপিচুপি খাবার নিতে গিয়ে দেখি ধাতব চামচটা সশব্দে মেঝেতে আছড়ে পড়ল!' },
+  { level: 'advanced', sentence: 'The internet stopped working right at the most exciting minute of my favorite cricket match.', translation: 'প্রিয় ক্রিকেট ম্যাচের সবথেকে উত্তেজনাপূর্ণ মুহূর্তে ঠিক তখনই ইন্টারনেট সংযোগ চলে গেল!' },
+  { level: 'advanced', sentence: 'She promised to study for ten minutes, but spent two hours watching funny cat videos instead.', translation: 'সে দশ মিনিট পড়ার কথা বলে দুই ঘণ্টা কাটিয়ে দিল মজার সব বিড়ালের ভিডিও দেখে।' },
+  { level: 'advanced', sentence: 'He pretended to answer an urgent phone call just to avoid an awkward conversation in the lift.', translation: 'লিফটের মধ্যে অস্বস্তিকর কথাবার্তা এড়াতে সে জরুরি ফোনে কথা বলার ভান করল।' },
+  { level: 'advanced', sentence: 'I carefully ironed my shirt in the morning, only to spill hot breakfast tea down the front.', translation: 'সকালে যত্ন করে শার্ট ইস্ত্রি করলাম, আর খাবার টেবিলে বসতেই গরম চা শার্টের ওপর চলকে পড়ল!' },
+  { level: 'advanced', sentence: 'After opening the refrigerator five times in one hour, he realized no magical food was appearing.', translation: 'এক ঘণ্টায় পাঁচবার ফ্রিজ খোলার পর সে বুঝতে পারল জাদুকরী কোনো খাবার নিজে থেকে তৈরি হচ্ছে না।' },
 ];
 
 export function shuffleItems(items, random = Math.random) {
@@ -135,13 +135,14 @@ export function extractGrammarExercises(stories = []) {
 }
 
 export function createCoreSentenceExercises() {
-  return CORE_SENTENCES.map(({ level, sentence }) => {
+  return CORE_SENTENCES.map(({ level, sentence, translation }) => {
     const answer = sentence.split(/\s+/);
     return {
       slug: 'everyday-sentence-practice',
       sourceTitle: 'Everyday sentence practice',
       storyBacked: false,
       sentence,
+      translation,
       words: shuffleSentenceWords(answer),
       answer,
       wordCount: (sentence.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []).length,
@@ -519,6 +520,43 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                     : (exercise.storyBacked ? 'From story:' : 'Practice:')}{' '}
                   <span className="font-extrabold text-ink">{exercise.sourceTitle}</span>
                 </p>
+
+                {exercise.translation ? (
+                  <div className="rounded-2xl border-2 border-gold/40 bg-gradient-to-r from-gold/15 via-paper to-sapphire/10 p-3.5 sm:p-4 text-center shadow-sm">
+                    <span className="block text-[11px] font-extrabold uppercase tracking-widest text-gold-soft">
+                      {isBn ? '🎯 বাক্যটির অর্থ বুঝে সাজাও:' : '🎯 Meaning to build:'}
+                    </span>
+                    <p className="mt-1 text-base sm:text-lg font-black leading-snug text-ink">
+                      “{exercise.translation}”
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <span className="text-xs font-extrabold uppercase tracking-wide text-ink/65">
+                    {isBn ? 'আপনার সাজানো বাক্য:' : 'Your built sentence:'}
+                  </span>
+                  {selected.length > 0 && result !== 'correct' ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => removeWordAtPosition(selected.length - 1)}
+                        className="rounded-lg border border-sapphire/35 bg-sapphire/10 px-2.5 py-1 text-xs font-bold text-ink hover:bg-sapphire/20"
+                        title={isBn ? 'শেষ শব্দটি মুছুন' : 'Undo last word'}
+                      >
+                        ↩ {isBn ? 'আনডু' : 'Undo'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearSelection}
+                        className="rounded-lg border border-rose-400/35 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-500 hover:bg-rose-500/20"
+                        title={isBn ? 'সব মুছুন' : 'Clear all'}
+                      >
+                        ✕ {isBn ? 'রিসেট' : 'Reset'}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="duo-answer-tray flex min-h-24 flex-wrap items-center gap-2 rounded-2xl border-2 border-dashed border-gold/45 bg-paper/80 p-3.5" aria-live="polite">
                   {selected.length ? (

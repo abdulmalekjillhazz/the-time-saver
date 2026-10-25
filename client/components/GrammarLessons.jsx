@@ -248,6 +248,7 @@ export function getGrammarLevelAvailability(completedCounts) {
 
 export function GrammarLessons({ lang = 'bn', stories = [] }) {
   const isBn = lang === 'bn';
+  const [activeView, setActiveView] = useState('all');
   const [levelId, setLevelId] = useState('basic');
   const [lessonId, setLessonId] = useState(GRAMMAR_LEVELS[0].lessons[0].id);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -368,136 +369,195 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-2" aria-label={isBn ? 'Grammar-এর স্তর' : 'Grammar levels'}>
-          {levels.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              disabled={!item.unlocked}
-              aria-pressed={levelId === item.id}
-              onClick={() => chooseLevel(item.id)}
-              className={`duo-word-chip min-h-12 rounded-2xl border-2 px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-45 ${
-                levelId === item.id
-                  ? 'border-gold bg-gold/20 text-ink shadow-sm'
-                  : 'border-sapphire/25 bg-paper/75 text-ink/75 hover:border-gold/50'
-              }`}
-            >
-              <span className="block truncate">{item.title[isBn ? 'bn' : 'en']}</span>
-              <span className="mt-0.5 block text-[10px] font-semibold opacity-70">
-                {completedCounts[item.id]}/{item.lessons.length} {isBn ? 'পাঠ শেষ' : 'lessons complete'}
-              </span>
-            </button>
-          ))}
+        <div className="flex rounded-2xl border-2 border-sapphire/25 bg-paper/70 p-1 gap-1" role="tablist" aria-label={isBn ? 'অনুশীলন মোড' : 'Practice mode'}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'all'}
+            onClick={() => setActiveView('all')}
+            className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-extrabold transition ${
+              activeView === 'all'
+                ? 'border-2 border-sapphire/40 bg-sapphire text-on-sapphire shadow-sm'
+                : 'text-ink/75 hover:bg-gold/15'
+            }`}
+          >
+            {isBn ? '📑 পুরো কোর্স' : '📑 Full Course'}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'lessons'}
+            onClick={() => setActiveView('lessons')}
+            className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-extrabold transition ${
+              activeView === 'lessons'
+                ? 'border-2 border-sapphire/40 bg-sapphire text-on-sapphire shadow-sm'
+                : 'text-ink/75 hover:bg-gold/15'
+            }`}
+          >
+            {isBn ? '📘 নিয়ম ও কুইজ' : '📘 Grammar & Quiz'}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'puzzle'}
+            onClick={() => setActiveView('puzzle')}
+            className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-extrabold transition ${
+              activeView === 'puzzle'
+                ? 'border-2 border-sapphire/40 bg-sapphire text-on-sapphire shadow-sm'
+                : 'text-ink/75 hover:bg-gold/15'
+            }`}
+          >
+            {isBn ? '🧩 বাক্য তৈরির খেলা' : '🧩 Sentence Builder'}
+          </button>
         </div>
 
-        <div className="flex flex-wrap gap-2" aria-label={isBn ? 'পাঠ বেছে নিন' : 'Choose a lesson'}>
-          {level.lessons.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={lesson.id === item.id}
-              onClick={() => chooseLesson(item)}
-              className={`min-h-10 rounded-full border-2 px-3.5 py-1.5 text-xs font-extrabold transition ${
-                lesson.id === item.id
-                  ? 'border-sapphire bg-sapphire text-on-sapphire shadow-sm'
-                  : completedLessons.includes(item.id)
-                    ? 'border-emerald-500/45 bg-emerald-500/10 text-ink'
-                    : 'border-sapphire/20 bg-paper/65 text-ink/75 hover:border-gold/50'
-              }`}
-            >
-              {index + 1}. {item.title[isBn ? 'bn' : 'en']}
-              {completedLessons.includes(item.id) ? ' ✓' : ''}
-            </button>
-          ))}
-        </div>
-
-        <article className="duo-card space-y-4 rounded-2xl border-2 border-sapphire/25 bg-paper/85 p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <h3 className="text-lg font-extrabold text-ink">{lesson.title[isBn ? 'bn' : 'en']}</h3>
-            <span className="rounded-full bg-sapphire/15 px-2.5 py-0.5 text-xs font-extrabold text-sapphire">
-              {level.title[isBn ? 'bn' : 'en']}
-            </span>
-          </div>
-          <p className="text-sm leading-relaxed text-ink/85">{lesson.rule[isBn ? 'bn' : 'en']}</p>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-gold/35 bg-gold/10 px-4 py-3">
-            <p className="text-base font-extrabold text-ink" lang="en">
-              “{lesson.example}”
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={playLesson} className="primary-button min-h-10 rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-3.5 py-2 text-xs font-extrabold text-white shadow-md sm:text-sm">
-                🔊 {isBn ? 'স্বাভাবিক কণ্ঠে শুনুন' : 'Listen naturally'}
-              </button>
-              {voiceStatus === 'Playing…' || voiceStatus === 'শুনছি…' ? (
-                <button type="button" onClick={stopLesson} className="secondary-button min-h-10 rounded-xl px-3.5 py-2 text-xs font-bold text-ink sm:text-sm">
-                  {isBn ? 'থামান' : 'Stop'}
+        {activeView !== 'puzzle' ? (
+          <>
+            <div className="grid grid-cols-3 gap-2" aria-label={isBn ? 'Grammar-এর স্তর' : 'Grammar levels'}>
+              {levels.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={!item.unlocked}
+                  aria-pressed={levelId === item.id}
+                  onClick={() => chooseLevel(item.id)}
+                  className={`duo-word-chip min-h-12 rounded-2xl border-2 px-3 py-2 text-left text-xs font-extrabold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                    levelId === item.id
+                      ? 'border-gold bg-gold/20 text-ink shadow-sm'
+                      : 'border-sapphire/25 bg-paper/75 text-ink/75 hover:border-gold/50'
+                  }`}
+                >
+                  <span className="block truncate">{item.title[isBn ? 'bn' : 'en']}</span>
+                  <span className="mt-0.5 block text-[10px] font-semibold opacity-70">
+                    {completedCounts[item.id]}/{item.lessons.length} {isBn ? 'পাঠ শেষ' : 'lessons complete'}
+                  </span>
                 </button>
-              ) : null}
+              ))}
             </div>
-          </div>
-          {voiceStatus ? <span role="status" className="block text-xs font-semibold text-ink/70">{voiceStatus}</span> : null}
 
-          <fieldset className="space-y-2.5">
-            <legend className="text-sm font-extrabold text-ink">{lesson.prompt[isBn ? 'bn' : 'en']}</legend>
-            {lesson.choices.map((choice, index) => (
-              <label key={choice} className={`duo-choice-tile flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border-2 px-3.5 py-2.5 text-sm font-semibold transition ${
-                selectedAnswer === index
-                  ? 'border-sapphire bg-sapphire/15 text-ink ring-2 ring-gold/60'
-                  : 'border-sapphire/20 bg-paper/70 text-ink hover:border-sapphire/50'
-              }`}>
-                <input
-                  type="radio"
-                  className="accent-sapphire"
-                  name={`grammar-${lesson.id}`}
-                  checked={selectedAnswer === index}
-                  onChange={() => {
-                    setSelectedAnswer(index);
-                    setHasChecked(false);
-                  }}
-                />
-                <span lang="en" className="flex-1">{choice}</span>
-              </label>
-            ))}
-          </fieldset>
+            <div className="flex flex-wrap gap-2" aria-label={isBn ? 'পাঠ বেছে নিন' : 'Choose a lesson'}>
+              {level.lessons.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={lesson.id === item.id}
+                  onClick={() => chooseLesson(item)}
+                  className={`min-h-10 rounded-full border-2 px-3.5 py-1.5 text-xs font-extrabold transition ${
+                    lesson.id === item.id
+                      ? 'border-sapphire bg-sapphire text-on-sapphire shadow-sm'
+                      : completedLessons.includes(item.id)
+                        ? 'border-emerald-500/45 bg-emerald-500/10 text-ink'
+                        : 'border-sapphire/20 bg-paper/65 text-ink/75 hover:border-gold/50'
+                  }`}
+                >
+                  {index + 1}. {item.title[isBn ? 'bn' : 'en']}
+                  {completedLessons.includes(item.id) ? ' ✓' : ''}
+                </button>
+              ))}
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 pt-1">
-            <button
-              type="button"
-              onClick={checkAnswer}
-              disabled={selectedAnswer === null || hasChecked || isCompleted}
-              className="primary-button min-h-11 rounded-xl border border-gold/40 bg-sapphire px-5 py-2.5 text-sm font-extrabold text-on-sapphire disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isBn ? 'উত্তর যাচাই' : 'Check answer'}
-            </button>
-            {selectedAnswer !== null && hasChecked ? (
-              <p role="status" className={`rounded-xl border px-3.5 py-2 text-sm font-extrabold ${
-                correct
-                  ? 'border-emerald-500/40 bg-emerald-500/15 text-ink'
-                  : 'border-rose-500/40 bg-rose-500/15 text-ink'
-              }`}>
-                {correct
-                  ? (isBn ? `✓ ঠিক উত্তর! ${lesson.feedback.bn}` : `✓ That's right! ${lesson.feedback.en}`)
-                  : (isBn ? '✗ আবার চেষ্টা করুন। নিয়মটি মনে করুন।' : '✗ Not quite. Think about the rule and try again.')}
-              </p>
-            ) : null}
-            {isCompleted ? (
-              <button type="button" onClick={nextLesson} className="secondary-button min-h-11 rounded-xl px-4 py-2.5 text-sm font-extrabold text-ink">
-                {isBn ? 'পরের পাঠ →' : 'Next lesson →'}
-              </button>
-            ) : null}
-          </div>
-        </article>
+            <article className="duo-card space-y-4 rounded-2xl border-2 border-sapphire/25 bg-paper/85 p-4 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h3 className="text-lg font-extrabold text-ink">{lesson.title[isBn ? 'bn' : 'en']}</h3>
+                <span className="rounded-full bg-sapphire/15 px-2.5 py-0.5 text-xs font-extrabold text-sapphire">
+                  {level.title[isBn ? 'bn' : 'en']}
+                </span>
+              </div>
+              <p className="text-sm leading-relaxed text-ink/85">{lesson.rule[isBn ? 'bn' : 'en']}</p>
+
+              <div className="rounded-2xl border-2 border-gold/35 bg-gold/10 p-3.5 sm:p-4 space-y-2">
+                <span className="block text-[11px] font-extrabold uppercase tracking-wider text-gold-soft">
+                  {isBn ? '📌 ধাপ ১: নিয়ম ও স্বাভাবিক কণ্ঠে পাঠ' : '📌 Step 1: Rule & Example'}
+                </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-base font-extrabold text-ink" lang="en">
+                    “{lesson.example}”
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={playLesson} className="primary-button min-h-10 rounded-xl bg-gradient-to-r from-sapphire-deep to-sapphire px-3.5 py-2 text-xs font-extrabold text-white shadow-md sm:text-sm">
+                      🔊 {isBn ? 'স্বাভাবিক কণ্ঠে শুনুন' : 'Listen naturally'}
+                    </button>
+                    {voiceStatus === 'Playing…' || voiceStatus === 'শুনছি…' ? (
+                      <button type="button" onClick={stopLesson} className="secondary-button min-h-10 rounded-xl px-3.5 py-2 text-xs font-bold text-ink sm:text-sm">
+                        {isBn ? 'থামান' : 'Stop'}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+              {voiceStatus ? <span role="status" className="block text-xs font-semibold text-ink/70">{voiceStatus}</span> : null}
+
+              <fieldset className="space-y-2.5 rounded-2xl border-2 border-sapphire/20 bg-paper/60 p-3.5 sm:p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="rounded-md bg-sapphire/20 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-sapphire">
+                    {isBn ? '💡 ধাপ ২: প্রয়োগ ও কুইজ যাচাই' : '💡 Step 2: Practice & Quiz'}
+                  </span>
+                </div>
+                <legend className="text-sm font-extrabold text-ink">{lesson.prompt[isBn ? 'bn' : 'en']}</legend>
+                {lesson.choices.map((choice, index) => (
+                  <label key={choice} className={`duo-choice-tile flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl border-2 px-3.5 py-2.5 text-sm font-semibold transition ${
+                    selectedAnswer === index
+                      ? 'border-sapphire bg-sapphire/15 text-ink ring-2 ring-gold/60'
+                      : 'border-sapphire/20 bg-paper/70 text-ink hover:border-sapphire/50'
+                  }`}>
+                    <input
+                      type="radio"
+                      className="accent-sapphire"
+                      name={`grammar-${lesson.id}`}
+                      checked={selectedAnswer === index}
+                      onChange={() => {
+                        setSelectedAnswer(index);
+                        setHasChecked(false);
+                      }}
+                    />
+                    <span lang="en" className="flex-1">{choice}</span>
+                  </label>
+                ))}
+              </fieldset>
+
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={checkAnswer}
+                  disabled={selectedAnswer === null || hasChecked || isCompleted}
+                  className="primary-button min-h-11 rounded-xl border border-gold/40 bg-sapphire px-5 py-2.5 text-sm font-extrabold text-on-sapphire disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isBn ? 'উত্তর যাচাই' : 'Check answer'}
+                </button>
+                {selectedAnswer !== null && hasChecked ? (
+                  <p role="status" className={`rounded-xl border px-3.5 py-2 text-sm font-extrabold ${
+                    correct
+                      ? 'border-emerald-500/40 bg-emerald-500/15 text-ink'
+                      : 'border-rose-500/40 bg-rose-500/15 text-ink'
+                  }`}>
+                    {correct
+                      ? (isBn ? `✓ ঠিক উত্তর! ${lesson.feedback.bn}` : `✓ That's right! ${lesson.feedback.en}`)
+                      : (isBn ? '✗ আবার চেষ্টা করুন। নিয়মটি মনে করুন।' : '✗ Not quite. Think about the rule and try again.')}
+                  </p>
+                ) : null}
+                {isCompleted ? (
+                  <button type="button" onClick={nextLesson} className="secondary-button min-h-11 rounded-xl px-4 py-2.5 text-sm font-extrabold text-ink">
+                    {isBn ? 'পরের পাঠ →' : 'Next lesson →'}
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          </>
+        ) : null}
       </Card>
 
-      <details className="group" open>
-        <summary className="duo-card cursor-pointer rounded-2xl border-2 border-gold/30 bg-paper/90 px-4 py-3.5 font-extrabold text-ink shadow-sm">
-          🧩 {isBn
-            ? 'গল্প থেকে বাক্য সাজানোর অনুশীলন · ১০টি বাক্যে ৩০ পয়েন্ট'
-            : 'Practice building sentences from stories · earn 30 points at 10'}
-        </summary>
-        <div className="pt-4">
-          <SentenceBuilder lang={lang} stories={stories} />
-        </div>
-      </details>
+      {activeView !== 'lessons' ? (
+        <details className="group" open>
+          <summary className="duo-card cursor-pointer rounded-2xl border-2 border-gold/30 bg-paper/90 px-4 py-3.5 font-extrabold text-ink shadow-sm">
+            🧩 {isBn
+              ? 'গল্প থেকে বাক্য সাজানোর অনুশীলন · ১০টি বাক্যে ৩০ পয়েন্ট'
+              : 'Practice building sentences from stories · earn 30 points at 10'}
+          </summary>
+          <div className="pt-4">
+            <SentenceBuilder lang={lang} stories={stories} />
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

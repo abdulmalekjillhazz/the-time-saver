@@ -11,7 +11,7 @@ const temporarilyDisabledRoute = resolve(process.cwd(), '.android-download-route
 renameSync(downloadRoute, temporarilyDisabledRoute);
 let result;
 try {
-  result = spawnSync(process.execPath, [nextCli, 'build'], {
+  result = spawnSync(process.execPath, [nextCli, 'build', '--webpack'], {
     cwd: process.cwd(),
     env: { ...process.env, CAPACITOR_BUNDLE: '1' },
     stdio: 'inherit',
