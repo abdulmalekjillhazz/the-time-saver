@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canAttemptSpeechPractice,
   compareSpeechText,
+  getAdaptivePracticeLineIndex,
   MAX_SPEECH_PRACTICE_ATTEMPTS,
   speechWords,
 } from '../lib/speechPractice.js';
@@ -12,6 +13,19 @@ describe('story speech practice matching', () => {
     expect([0, 1, 2].every(canAttemptSpeechPractice)).toBe(true);
     expect(canAttemptSpeechPractice(3)).toBe(false);
     expect(canAttemptSpeechPractice(-1)).toBe(false);
+  });
+
+  it('starts with the easiest sentence and adapts the next choice to speaking accuracy', () => {
+    const lines = [
+      { text: 'Extraordinary vocabulary challenges learners.' },
+      { text: 'We learn.' },
+      { text: 'Today we practice speaking.' },
+    ];
+
+    expect(getAdaptivePracticeLineIndex(lines)).toBe(1);
+    expect(getAdaptivePracticeLineIndex(lines, [1], 1, 100)).toBe(2);
+    expect(getAdaptivePracticeLineIndex(lines, [2], 0, 40)).toBe(1);
+    expect(getAdaptivePracticeLineIndex(lines, [0, 1, 2], 2, 100)).toBe(-1);
   });
 
   it('normalizes English words and punctuation for comparison', () => {

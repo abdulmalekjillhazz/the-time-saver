@@ -10,6 +10,50 @@ export function speechWords(text) {
   return String(text || '').toLowerCase().match(/[a-z0-9]+(?:['’][a-z0-9]+)*/g) || [];
 }
 
+export function getAdaptivePracticeLineIndex(lines, completedIndexes = [], currentIndex = -1, accuracy = null) {
+  const completed = new Set([...completedIndexes, currentIndex]);
+  const candidates = lines
+    .map((line, index) => ({
+      index,
+      difficulty: speechWords(line.text).reduce(
+        (score, word) => score + 1 + (word.length >= 7 ? 2 : 0),
+        0,
+      ),
+    }))
+    .filter(({ index }) => !completed.has(index));
+
+  if (!candidates.length) return -1;
+  if (currentIndex < 0 || accuracy === null) {
+    return candidates.reduce((easiest, candidate) => (
+      candidate.difficulty < easiest.difficulty ? candidate : easiest
+    )).index;
+  }
+
+  const currentDifficulty = speechWords(lines[currentIndex]?.text).reduce(
+    (score, word) => score + 1 + (word.length >= 7 ? 2 : 0),
+    0,
+  );
+  if (accuracy >= 80) {
+    const harderCandidates = candidates.filter(({ difficulty }) => difficulty > currentDifficulty);
+    if (harderCandidates.length) {
+      return harderCandidates.reduce((easiest, candidate) => (
+        candidate.difficulty < easiest.difficulty ? candidate : easiest
+      )).index;
+    }
+  } else {
+    const easierCandidates = candidates.filter(({ difficulty }) => difficulty < currentDifficulty);
+    if (easierCandidates.length) {
+      return easierCandidates.reduce((hardest, candidate) => (
+        candidate.difficulty > hardest.difficulty ? candidate : hardest
+      )).index;
+    }
+  }
+
+  return candidates.reduce((easiest, candidate) => (
+    candidate.difficulty < easiest.difficulty ? candidate : easiest
+  )).index;
+}
+
 export function compareSpeechText(expected, recognized) {
   const targetWords = speechWords(expected);
   const spokenWords = speechWords(recognized);

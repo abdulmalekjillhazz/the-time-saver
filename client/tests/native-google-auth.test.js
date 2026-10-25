@@ -56,4 +56,14 @@ describe('native Android Google sign-in', () => {
       'Google sign-in did not return a valid ID token. Ensure your Android SHA-1 is added in Google Cloud Console.'
     );
   });
+
+  it('handles the cancellation code returned by the Android Google credential picker', async () => {
+    SocialLogin.login.mockRejectedValue(
+      Object.assign(new Error('Google Sign-In cancelled by user'), { code: 'USER_CANCELLED' }),
+    );
+
+    await expect(signInWithGoogleNative('web-client-id')).rejects.toThrow(
+      'Google sign-in was canceled.',
+    );
+  });
 });

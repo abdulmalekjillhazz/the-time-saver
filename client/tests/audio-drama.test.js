@@ -133,7 +133,7 @@ describe('Cloudinary audio drama', () => {
     expect(markup).toContain('গল্প শুরু হলো।');
   });
 
-  it('renders the refreshed speaking practice cards and listening prompt', () => {
+  it('renders a minimal speaking practice screen with essential controls', () => {
     const markup = renderToStaticMarkup(createElement(AudioDramaPlayer, {
       content: '[Narrator]: The story begins.',
       practiceContent: '[Narrator]: The story begins.',
@@ -141,19 +141,19 @@ describe('Cloudinary audio drama', () => {
       lang: 'en',
     }));
 
-    expect(markup).toContain('Listen · Speak · Grow');
     expect(markup).toContain('Practice speaking story lines');
-    expect(markup).toContain('Sentence 1');
+    expect(markup).not.toContain('Listen · Speak · Grow');
+    expect(markup).not.toContain('Sentence difficulty adapts to your progress');
+    expect(markup).not.toContain('Sentence 1');
     expect(markup).toContain('aria-valuenow="100"');
-    expect(markup).toContain('0 of 3 tries');
+    expect(markup).not.toContain('0 of 3 tries');
     expect(markup).toContain('aria-label="Listen to example"');
     expect(markup).toContain('aria-label="Read and check"');
-    expect(markup).not.toContain('🔊 Listen to example');
-    expect(markup).not.toContain('Read and check</button>');
-    expect(markup).not.toContain('Listen to the example, then say the sentence.');
     expect(markup).toContain('speech-practice-constellation');
     expect(markup).toContain('speech-practice-action-dock');
-    expect(markup).toContain('aria-label="Listen and speak"');
+    expect(markup).toContain('speech-practice-inline-listen');
+    expect(markup).toContain('aria-label="Say this sentence"');
+    expect(markup).not.toContain('speech-practice-constellation-node');
   });
 
   it('shows only the current sentence in full-screen practice before asking for microphone access', () => {
@@ -181,9 +181,9 @@ describe('Cloudinary audio drama', () => {
     }));
 
     expect(markup).toContain('অনুশীলনের অগ্রগতি');
-    expect(markup).toContain('বাক্য 1 / 2');
+    expect(markup).toContain('>1 / 2</span>');
     expect(markup).toContain('aria-valuenow="50"');
-    expect(markup).toContain('0 / 3 বার চেষ্টা');
+    expect(markup).not.toContain('0 / 3 বার চেষ্টা');
   });
 
   it('does not offer English pronunciation practice for Bengali-only daily stories', () => {

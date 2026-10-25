@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getStoryWordWeights, parseStoryScript, playDrama } from '../lib/audioDrama.js';
 import {
   canAttemptSpeechPractice,
   compareSpeechText,
+  getAdaptivePracticeLineIndex,
   MAX_SPEECH_PRACTICE_ATTEMPTS,
 } from '../lib/speechPractice.js';
 import { isAndroidNativeApp, recognizeEnglishSpeech, stopEnglishSpeechRecognition } from '../lib/nativeSpeech.js';
@@ -44,6 +46,7 @@ export function spokenTextParts(
   onSpeakWord,
   pronunciationLabel = 'Hear pronunciation',
   activeWordIndex = null,
+  showMeaningPopover = true,
 ) {
   const parts = String(text || '').split(/(\s+)/);
   const wordWeights = getStoryWordWeights(text);
@@ -88,7 +91,7 @@ export function spokenTextParts(
         key: index,
         className: 'relative inline-block',
       },
-      isSelected && selectedWordState?.meaning
+      showMeaningPopover && isSelected && selectedWordState?.meaning
         ? React.createElement(
             'span',
             {
@@ -147,6 +150,51 @@ export function spokenTextParts(
   });
 }
 
+function WordMeaningPanel({
+  selectedWord,
+  onSpeakWord,
+  onClose,
+  isBn,
+  pronunciationLabel,
+  floating = false,
+}) {
+  if (!selectedWord) return null;
+  const panel = (
+    <div className={`rounded-2xl border-2 border-gold/40 bg-paper px-4 py-3 text-sm text-ink shadow-lg${floating ? ' word-meaning-panel-floating' : ' mt-3'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div role="status" aria-live="polite" className="min-w-0">
+          <strong className="block text-base font-extrabold text-gold-soft">{selectedWord.term}</strong>
+          <span className="mt-1 block leading-relaxed">
+            {selectedWord.loading
+              ? (isBn ? 'শব্দার্থ লোড হচ্ছে…' : 'Loading meaning…')
+              : selectedWord.meaning}
+          </span>
+          {onSpeakWord ? (
+            <button
+              type="button"
+              aria-label={`${pronunciationLabel}: ${selectedWord.term}`}
+              onClick={() => onSpeakWord(selectedWord.term)}
+              className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-sapphire/35 bg-sapphire/15 px-3 py-1.5 text-xs font-bold text-sapphire hover:bg-sapphire/25"
+            >
+              🔊 {pronunciationLabel}
+            </button>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={isBn ? 'শব্দার্থ বন্ধ করুন' : 'Close word meaning'}
+          className="grid size-9 shrink-0 place-items-center rounded-lg border border-ink/15 text-lg font-bold hover:bg-gold/15"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+  if (!floating) return panel;
+  return typeof document === 'undefined' ? null : createPortal(panel, document.body);
+}
+
 export function AudioDramaPlayer({
   title = '',
   slug = '',
@@ -193,10 +241,13 @@ export function AudioDramaPlayer({
   const [microphoneConsentAccepted, setMicrophoneConsentAccepted] = useState(false);
   const [practiceFeedback, setPracticeFeedback] = useState('');
   const [attemptsByLine, setAttemptsByLine] = useState({});
+  const [completedPracticeLineIndexes, setCompletedPracticeLineIndexes] = useState([]);
   const [microsoftVoices, setMicrosoftVoices] = useState([]);
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
   const [speechPractice, setSpeechPractice] = useState({
-    lineIndex: startInPracticeMode && practiceLines.length ? 0 : -1,
+    lineIndex: startInPracticeMode
+      ? getAdaptivePracticeLineIndex(practiceLines)
+      : -1,
     status: 'idle',
     transcript: '',
     comparison: null,
@@ -225,6 +276,7 @@ export function AudioDramaPlayer({
     }
   }, [vocabulary, lang]);
   const controllerRef = useRef(null);
+  const wordLookupRequestRef = useRef(0);
   const lineRefs = useRef([]);
   const playbackRequestIdRef = useRef(0);
   const isPlayingRef = useRef(false);
@@ -260,9 +312,7 @@ export function AudioDramaPlayer({
     practice: isBn ? '🎙 উচ্চারণ অনুশীলন' : '🎙 Practice pronunciation',
     closePractice: isBn ? '✕ অনুশীলন বন্ধ' : '✕ Close practice',
     practiceTitle: isBn ? 'গল্পের লাইন পড়ে উচ্চারণ অনুশীলন করুন' : 'Practice speaking story lines',
-    practiceProgress: isBn ? 'বাক্য' : 'Sentence',
     practiceProgressLabel: isBn ? 'অনুশীলনের অগ্রগতি' : 'Practice progress',
-    attemptCount: (current, total) => isBn ? `${current} / ${total} বার চেষ্টা` : `${current} of ${total} tries`,
     microphonePermissionTitle: isBn ? 'মাইক্রোফোন ব্যবহারের অনুমতি' : 'Microphone permission',
     microphonePermissionHelp: isBn
       ? 'আপনার বলা ইংরেজি শব্দের সঙ্গে বাক্যটি মেলাতে মাইক্রোফোন দরকার। অডিও speech recognition-এর জন্য প্রক্রিয়াকৃত হবে; চালিয়ে গেলে ডিভাইসের অনুমতি চাওয়া হবে।'
@@ -291,17 +341,15 @@ export function AudioDramaPlayer({
     speechNoAudio: isBn ? 'কোনো কথা শোনা যায়নি। আবার চেষ্টা করুন।' : 'No speech was heard. Please try again.',
     speechMicMissing: isBn ? 'মাইক্রোফোন পাওয়া যায়নি।' : 'No microphone was found.',
     speechUnavailable: isBn ? 'কথা শনাক্ত করা যায়নি। আবার চেষ্টা করুন।' : 'Speech could not be recognized. Please try again.',
-    attempts: isBn ? 'চেষ্টা' : 'Attempt',
     attemptsLimit: isBn ? 'এই লাইনে ৩টি চেষ্টা শেষ। লাইনটি এড়িয়ে যান।' : 'All 3 tries used for this line. Skip the sentence.',
     completeLine: isBn ? 'বাক্যটি সম্পন্ন' : 'Complete sentence',
     skipLine: isBn ? 'এড়িয়ে পরের বাক্য' : 'Skip to next sentence',
     finishPractice: isBn ? 'অনুশীলন শেষ করুন' : 'Finish practice',
     practiceFinished: isBn ? 'অনুশীলন শেষ হয়েছে।' : 'Practice session finished.',
     practiceFeedback: isBn ? 'চমৎকার—পরের বাক্য!' : 'Nice work—next sentence!',
-    speakingAnimation: isBn ? 'মাইক্রোফোন শুনছে' : 'Microphone listening',
     voiceChoice: isBn ? 'উচ্চারণের কণ্ঠ' : 'Example voice',
     defaultVoice: isBn ? 'ডিভাইসের স্বাভাবিক কণ্ঠ' : 'Device default',
-    practiceActions: isBn ? 'শোনা ও বলা' : 'Listen and speak',
+    practiceActions: isBn ? 'বাক্যটি বলুন' : 'Say this sentence',
     pronunciationUnavailable: isBn ? 'এই ডিভাইসে ইংরেজি উচ্চারণ শোনা যাচ্ছে না।' : 'English pronunciation is unavailable on this device.',
     pronunciationLabel: isBn ? 'শব্দটি শুনুন' : 'Hear pronunciation',
     previousChunk: isBn ? '← আগের অংশ' : '← Previous chunk',
@@ -313,26 +361,36 @@ export function AudioDramaPlayer({
     const clean = normalizeWord(rawWord);
     if (!clean) return;
 
+    const requestId = ++wordLookupRequestRef.current;
     handleSpeakWord(clean, contextText);
     setSelectedWord((prev) => (prev?.keyId === keyId && prev?.meaning ? prev : {
       keyId,
       term: clean,
-      meaning: '...',
+      meaning: '',
       loading: true,
     }));
     try {
       const result = await lookupStoryWordMeaning(clean, vocabulary, lang);
-      if (result) setSelectedWord({ ...result, keyId });
+      if (requestId === wordLookupRequestRef.current && result) {
+        setSelectedWord({ ...result, keyId });
+      }
     } catch (lookupError) {
-      setSelectedWord({
-        keyId,
-        term: clean,
-        meaning: isBn
-          ? `শব্দার্থ লোড করা যায়নি: ${lookupError.message}`
-          : `Meaning could not be loaded: ${lookupError.message}`,
-        isOffline: false,
-      });
+      if (requestId === wordLookupRequestRef.current) {
+        setSelectedWord({
+          keyId,
+          term: clean,
+          meaning: isBn
+            ? `শব্দার্থ লোড করা যায়নি: ${lookupError.message}`
+            : `Meaning could not be loaded: ${lookupError.message}`,
+          isOffline: false,
+        });
+      }
     }
+  };
+
+  const closeWordMeaning = () => {
+    wordLookupRequestRef.current += 1;
+    setSelectedWord(null);
   };
 
   const handleSpeakText = (text, rate = 0.88) => {
@@ -937,7 +995,17 @@ export function AudioDramaPlayer({
 
   const advancePracticeLine = (lineIndex, completed = false) => {
     const pronunciationSucceeded = completed && speechPractice.comparison?.accuracy >= 80;
-    if (lineIndex >= practiceLines.length - 1) {
+    const completedIndexes = [...completedPracticeLineIndexes, lineIndex];
+    const nextLineIndex = getAdaptivePracticeLineIndex(
+      practiceLines,
+      completedIndexes,
+      lineIndex,
+      speechPractice.comparison?.accuracy ?? 0,
+    );
+    setCompletedPracticeLineIndexes(completedIndexes);
+    setSelectedWord(null);
+    wordLookupRequestRef.current += 1;
+    if (nextLineIndex < 0) {
       setSpeechPractice({
         lineIndex,
         status: 'complete',
@@ -953,7 +1021,7 @@ export function AudioDramaPlayer({
       return;
     }
     setSpeechPractice({
-      lineIndex: lineIndex + 1,
+      lineIndex: nextLineIndex,
       status: 'idle',
       transcript: '',
       comparison: null,
@@ -975,7 +1043,7 @@ export function AudioDramaPlayer({
       }))
     : lines;
   const currentLineIndex = Math.min(Math.floor(position), Math.max(displayLines.length - 1, 0));
-  const practiceFullscreen = startInPracticeMode && speechPracticeOpen;
+  const practiceFullscreen = speechPracticeOpen;
   const fullScreenReaderOpen = practiceFullscreen || isFullscreen;
   const activePracticeLineIndex = Math.max(0, speechPractice.lineIndex);
   const offlineAudioNotice = offlineAudioSaving
@@ -1021,13 +1089,14 @@ export function AudioDramaPlayer({
           <div className="speech-practice-exit sticky z-40 flex justify-end bg-paper/95 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:px-6" style={{ top: 0 }}>
             <button
               type="button"
+              aria-label={isBn ? 'অনুশীলন থেকে বের হন' : 'Exit practice'}
               onClick={() => {
                 if (!cancelSpeechPractice()) return;
                 setSpeechPracticeOpen(false);
               }}
-              className="secondary-button min-h-[44px] px-4 py-2 text-sm font-bold"
+              className="speech-practice-exit-button secondary-button min-h-[44px] px-4 py-2 text-sm font-bold"
             >
-              ← {isBn ? 'বের হন' : 'Exit practice'}
+              ⛷️
             </button>
           </div>
         ) : null}
@@ -1105,10 +1174,18 @@ export function AudioDramaPlayer({
                   if (!cancelSpeechPractice()) return;
                   setSpeechPracticeOpen(false);
                 } else {
+                  setCompletedPracticeLineIndexes([]);
+                  setAttemptsByLine({});
+                  setSelectedWord(null);
+                  wordLookupRequestRef.current += 1;
+                  setSpeechPractice({
+                    lineIndex: getAdaptivePracticeLineIndex(practiceLines),
+                    status: 'idle',
+                    transcript: '',
+                    comparison: null,
+                    message: '',
+                  });
                   setSpeechPracticeOpen(true);
-                  setSpeechPractice((current) => current.lineIndex < 0
-                    ? { ...current, lineIndex: 0 }
-                    : current);
                 }
               }}
               aria-expanded={speechPracticeOpen}
@@ -1123,18 +1200,9 @@ export function AudioDramaPlayer({
         {speechPracticeOpen ? (
           <section
             aria-label={copy.practiceTitle}
-            className={`speech-practice-panel relative isolate mx-auto flex w-full max-w-3xl flex-1 flex-col space-y-3 overflow-hidden rounded-[1.75rem] border-2 border-gold/35 bg-gradient-to-br from-sapphire/15 via-paper to-gold/15 p-3 shadow-xl sm:space-y-5 sm:p-8${practiceFullscreen ? ' max-w-4xl rounded-none border-0 pt-3 sm:rounded-[1.75rem]' : ''}`}
+            className={`speech-practice-panel mx-auto flex w-full max-w-3xl flex-1 flex-col${practiceFullscreen ? ' max-w-4xl' : ''}`}
           >
-            <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 -z-10 size-40 rounded-full bg-gold/15 blur-3xl" />
-            <div className="speech-practice-heading flex items-start gap-3.5">
-              <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl border border-gold/30 bg-gold/15 text-2xl sm:size-14 sm:text-3xl">🎙️</span>
-              <div className="min-w-0 flex-1">
-                <span className="inline-flex rounded-full border border-sapphire/25 bg-sapphire/10 px-3 py-1 text-xs font-extrabold uppercase tracking-[0.12em] text-ink">
-                  {isBn ? 'শুনুন · বলুন · শিখুন' : 'Listen · Speak · Grow'}
-                </span>
-                <h2 className="speech-practice-title mt-2 text-lg font-black leading-snug tracking-tight text-ink sm:text-2xl">{copy.practiceTitle}</h2>
-              </div>
-            </div>
+            <h2 className="sr-only">{copy.practiceTitle}</h2>
             {speechPractice.status === 'complete' ? (
               <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center text-lg font-extrabold text-emerald-800">
                 {copy.practiceFinished}
@@ -1154,13 +1222,12 @@ export function AudioDramaPlayer({
                 const attempts = attemptsByLine[lineIndex] || 0;
                 const attemptsExhausted = !canAttemptSpeechPractice(attempts);
                 const hasResult = isCurrentPractice && speechPractice.status === 'result';
-                const progress = Math.round(((lineIndex + 1) / practiceLines.length) * 100);
+                const currentStep = completedPracticeLineIndexes.length + 1;
+                const progress = Math.round((currentStep / practiceLines.length) * 100);
                 return (
-                  <div key={`practice-step-${lineIndex}-${line.character}`} className="space-y-3">
-                    <div className="space-y-2 px-1" aria-label={copy.practiceProgressLabel}>
-                      <div className="text-sm font-semibold text-ink">
-                        <span>{copy.practiceProgress} {lineIndex + 1} / {practiceLines.length}</span>
-                      </div>
+                  <div key={`practice-step-${lineIndex}-${line.character}`} className="speech-practice-step">
+                    <div className="speech-practice-progress-row" aria-label={copy.practiceProgressLabel}>
+                      <span>{currentStep} / {practiceLines.length}</span>
                       <div
                         role="progressbar"
                         aria-label={copy.practiceProgressLabel}
@@ -1168,74 +1235,34 @@ export function AudioDramaPlayer({
                         aria-valuemax={100}
                         aria-valuenow={progress}
                         className="speech-practice-constellation"
-                        style={{
-                          '--practice-progress': `${progress}%`,
-                          '--practice-node-count': practiceLines.length,
-                        }}
                       >
-                        {practiceLines.map((_, nodeIndex) => (
-                          <span
-                            key={`practice-node-${nodeIndex}`}
-                            aria-hidden="true"
-                            className={`speech-practice-constellation-node${nodeIndex <= lineIndex ? ' is-lit' : ''}${nodeIndex === lineIndex ? ' is-current' : ''}`}
-                          />
-                        ))}
+                        <span aria-hidden="true" style={{ width: `${progress}%` }} />
                       </div>
                     </div>
                     <article
-                    className={`speech-practice-card duo-card relative space-y-3 rounded-3xl border-2 p-3 shadow-sm transition-colors duration-300 sm:space-y-5 sm:p-7 ${
+                    className={`speech-practice-card duo-card space-y-3 rounded-2xl border p-4 transition-colors duration-300 sm:p-6 ${
                       isListening
                         ? 'border-sapphire/60 bg-sapphire/10 shadow-lg shadow-sapphire/10'
                         : hasResult
                           ? 'border-emerald-500/35 bg-emerald-500/5'
-                          : 'border-gold/25 bg-paper/85'
+                          : 'border-ink/10 bg-paper/70'
                     }`}
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="inline-flex min-h-8 items-center rounded-full bg-gold/15 px-3 text-xs font-extrabold uppercase tracking-wide text-ink">
-                        {isBn ? `বাক্য ${lineIndex + 1}` : `Sentence ${lineIndex + 1}`}
-                      </span>
-                      <div className="flex items-center gap-2" aria-label={`${copy.attempts}: ${attempts}/${MAX_SPEECH_PRACTICE_ATTEMPTS}`}>
-                        {Array.from({ length: MAX_SPEECH_PRACTICE_ATTEMPTS }, (_, attemptIndex) => (
-                          <span
-                            key={attemptIndex}
-                            aria-hidden="true"
-                            className={`size-3 rounded-full transition-colors ${attemptIndex < attempts ? 'bg-gold' : 'bg-ink/20'}`}
-                          />
-                        ))}
-                        <span className="text-sm font-semibold text-ink/85">{copy.attemptCount(attempts, MAX_SPEECH_PRACTICE_ATTEMPTS)}</span>
-                      </div>
-                    </div>
-                    <p className="speech-practice-sentence max-w-[46ch] text-lg font-bold leading-relaxed text-ink sm:text-2xl sm:leading-[1.85]">
-                      {spokenTextParts(
-                        line.text,
-                        0,
-                        false,
-                        (word, keyId) => handleWordLookup(word, keyId, line.text),
-                        selectedWord,
-                        `practice-${lineIndex}`,
-                        handleSpeakWord,
-                        copy.pronunciationLabel,
-                      )}
-                    </p>
-                    {microsoftVoices.length ? (
-                      <label className="speech-practice-voice-picker">
-                        <span>{copy.voiceChoice}</span>
-                        <select
-                          aria-label={copy.voiceChoice}
-                          value={selectedVoiceURI}
-                          onChange={(event) => setSelectedVoiceURI(event.target.value)}
-                        >
-                          <option value="">{copy.defaultVoice}</option>
-                          {microsoftVoices.map((voice) => (
-                            <option key={speechVoiceKey(voice)} value={speechVoiceKey(voice)}>
-                              {voice.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-                    <div className="speech-practice-action-dock" role="group" aria-label={copy.practiceActions}>
+                    <div className="flex items-start gap-2">
+                      <p className="speech-practice-sentence min-w-0 max-w-[46ch] flex-1 text-lg font-bold leading-relaxed text-ink sm:text-2xl sm:leading-[1.85]">
+                        {spokenTextParts(
+                          line.text,
+                          0,
+                          false,
+                          (word, keyId) => handleWordLookup(word, keyId, line.text),
+                          selectedWord,
+                          `practice-${lineIndex}`,
+                          handleSpeakWord,
+                          copy.pronunciationLabel,
+                          null,
+                          false,
+                        )}
+                      </p>
                       <button
                         type="button"
                         onClick={() => {
@@ -1244,7 +1271,8 @@ export function AudioDramaPlayer({
                         }}
                         aria-label={pronunciationPlaying ? copy.stopExample : copy.listenExample}
                         aria-pressed={pronunciationPlaying}
-                        className="speech-practice-action speech-practice-listen"
+                        disabled={isListening}
+                        className="speech-practice-action speech-practice-listen speech-practice-inline-listen"
                       >
                         {pronunciationPlaying ? (
                           <span aria-hidden="true" className="speech-practice-stop-mark" />
@@ -1255,6 +1283,43 @@ export function AudioDramaPlayer({
                           </svg>
                         )}
                       </button>
+                    </div>
+                    {selectedWord?.keyId?.startsWith(`practice-${lineIndex}-`) ? (
+                      <WordMeaningPanel
+                        selectedWord={selectedWord}
+                        onSpeakWord={handleSpeakWord}
+                        onClose={closeWordMeaning}
+                        isBn={isBn}
+                        pronunciationLabel={copy.pronunciationLabel}
+                        floating
+                      />
+                    ) : null}
+                    {microsoftVoices.length ? (
+                      <details className="speech-practice-voice-settings">
+                        <summary aria-label={copy.voiceChoice} title={copy.voiceChoice}>
+                          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.2a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.4 15a1.7 1.7 0 0 0-1.56-1.03H6v-2.4h.84A1.7 1.7 0 0 0 8.4 10a1.7 1.7 0 0 0-.34-1.88L8 8.06l1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 12.67 5.2V5h2.4v.2a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.34 10a1.7 1.7 0 0 0 1.56 1.03h.1v2.4h-.1A1.7 1.7 0 0 0 19.4 15Z" />
+                          </svg>
+                        </summary>
+                        <label>
+                          <span className="sr-only">{copy.voiceChoice}</span>
+                          <select
+                            aria-label={copy.voiceChoice}
+                            value={selectedVoiceURI}
+                            onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                          >
+                            <option value="">{copy.defaultVoice}</option>
+                            {microsoftVoices.map((voice) => (
+                              <option key={speechVoiceKey(voice)} value={speechVoiceKey(voice)}>
+                                {voice.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </details>
+                    ) : null}
+                    <div className="speech-practice-action-dock" role="group" aria-label={copy.practiceActions}>
                       <button
                         type="button"
                         onClick={() => { void practiceLine(lineIndex); }}
@@ -1266,7 +1331,7 @@ export function AudioDramaPlayer({
                               : attemptsExhausted ? copy.attemptsLimit : copy.speakLine
                         }
                         aria-pressed={isListening}
-                        disabled={attemptsExhausted && !isListening}
+                        disabled={(attemptsExhausted && !isListening) || pronunciationPlaying}
                         className={`speech-practice-action speech-practice-speak${isListening ? ' is-listening' : ''}`}
                       >
                         {isListening ? (
@@ -1280,30 +1345,16 @@ export function AudioDramaPlayer({
                       </button>
                     </div>
                     {isListening ? (
-                      <p role="status" className="flex items-center gap-3 rounded-xl border border-sapphire/25 bg-sapphire/10 px-4 py-3 text-sm font-bold text-ink">
-                        <span className="relative inline-flex h-4 items-center gap-0.5" aria-hidden="true">
-                          <span className="h-2 w-1 animate-pulse rounded-full bg-sapphire" />
-                          <span className="h-4 w-1 animate-pulse rounded-full bg-sapphire [animation-delay:120ms]" />
-                          <span className="h-3 w-1 animate-pulse rounded-full bg-sapphire [animation-delay:240ms]" />
-                          <span className="h-2 w-1 animate-pulse rounded-full bg-sapphire [animation-delay:360ms]" />
-                        </span>
-                        {copy.listening} · {copy.speakingAnimation}
-                      </p>
+                      <p role="status" className="text-center text-sm font-semibold text-ink/70">{copy.listening}</p>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'error' ? (
                       <p role="alert" className="rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm font-semibold leading-relaxed text-ink">{speechPractice.message}</p>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'result' && comparison ? (
-                      <div role="status" aria-live="polite" className="space-y-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm leading-relaxed text-ink sm:p-5">
-                        <p className="flex items-center gap-3 font-extrabold text-ink">
-                          <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-emerald-500/15 font-bold text-ink">✓</span>
-                          {copy.wordMatch}: {comparison.accuracy}%
-                        </p>
-                        <p>
-                          <span className="font-bold">{copy.recognized}: </span>
-                          {speechPractice.transcript}
-                        </p>
-                        <p className="flex flex-wrap gap-1" aria-label={`${copy.wordMatch}: ${comparison.accuracy}%`}>
+                      <div role="status" aria-live="polite" className="speech-practice-result space-y-3 text-sm text-ink">
+                        <p className="text-center font-bold">{copy.wordMatch}: {comparison.accuracy}%</p>
+                        <p className="text-center text-ink/70">{speechPractice.transcript}</p>
+                        <p className="flex flex-wrap justify-center gap-1" aria-label={`${copy.wordMatch}: ${comparison.accuracy}%`}>
                           {comparison.targetWords.map((word, wordIndex) => (
                             <span
                               key={`${word}-${wordIndex}`}
@@ -1319,24 +1370,20 @@ export function AudioDramaPlayer({
                             </span>
                           ))}
                         </p>
-                        <p className="flex flex-wrap gap-x-3 gap-y-1">
-                          <span className="font-semibold text-ink">✓ {copy.matchedWord}</span>
-                          <span className="font-semibold text-ink">✕ {copy.missedWord}</span>
-                        </p>
-                        <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-3">
+                        <div className="flex flex-col items-center gap-2">
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex, true)}
-                            className="primary-button min-h-12 w-full px-5 py-3 text-sm font-bold sm:w-auto"
+                            className="primary-button min-h-11 w-full px-4 py-2 text-sm font-bold"
                           >
                             {copy.completeLine}
                           </button>
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex)}
-                            className="min-h-0 rounded-lg px-2 py-1 text-xs font-semibold text-ink/70 underline-offset-4 hover:text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+                            className="min-h-10 rounded-lg px-2 py-1 text-xs font-semibold text-ink/70 underline-offset-4 hover:text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
                           >
-                            {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
+                            {currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}
                           </button>
                         </div>
                       </div>
@@ -1348,7 +1395,7 @@ export function AudioDramaPlayer({
                         disabled={isListening}
                         className="mx-auto block min-h-0 rounded-lg px-2 py-1 text-xs font-semibold text-ink/70 underline-offset-4 hover:text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {lineIndex < practiceLines.length - 1 ? copy.skipLine : copy.finishPractice}
+                        {currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}
                       </button>
                     ) : null}
                     </article>
@@ -1446,8 +1493,18 @@ export function AudioDramaPlayer({
                       handleSpeakWord,
                       copy.pronunciationLabel,
                       isCurrentLine ? activeWordIndex : null,
+                      false,
                     )}
                   </p>
+                  {selectedWord?.keyId?.startsWith(`${lineIndex}-`) ? (
+                    <WordMeaningPanel
+                      selectedWord={selectedWord}
+                      onSpeakWord={handleSpeakWord}
+                      onClose={closeWordMeaning}
+                      isBn={isBn}
+                      pronunciationLabel={copy.pronunciationLabel}
+                    />
+                  ) : null}
                 </div>
               </div>
             );

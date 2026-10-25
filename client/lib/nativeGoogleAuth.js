@@ -46,8 +46,17 @@ export async function signInWithGoogleNative(webClientId) {
 
     return idToken;
   } catch (error) {
-    if (error?.message?.includes('cancel') || error?.code === 'canceled' || error?.code === '12501') {
-      throw new Error('Google sign-in was canceled.');
+    const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+    const code = typeof error?.code === 'string' ? error.code.toLowerCase() : '';
+    if (
+      message.includes('cancel')
+      || code === 'user_cancelled'
+      || code === 'user_canceled'
+      || code === 'canceled'
+      || code === 'cancelled'
+      || code === '12501'
+    ) {
+      throw new Error('Google sign-in was canceled.', { cause: error });
     }
     throw error;
   }
