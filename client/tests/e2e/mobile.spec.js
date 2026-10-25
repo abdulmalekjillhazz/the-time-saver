@@ -237,10 +237,10 @@ test.describe('mobile header and home page at 360px', () => {
 
   test('all Android app links point to the latest production APK download', async ({ page }) => {
     const downloadUrl = '/downloads/android';
-    const apkUrl = '/downloads/smart-routine-android-v1.10.apk';
+    const apkUrl = '/downloads/smart-routine-android-v1.11.apk';
     await page.goto('/en');
-    await expect(page.locator('#main').getByRole('link', { name: 'Download Android app (v1.10)' })).toHaveAttribute('href', downloadUrl);
-    await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app (v1.10)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.locator('#main').getByRole('link', { name: 'Download Android app (v1.11)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.getByRole('navigation', { name: 'Resources' }).getByRole('link', { name: 'Download Android app (v1.11)' })).toHaveAttribute('href', downloadUrl);
     const redirectResponse = await page.request.head(new URL(downloadUrl, page.url()).href, { maxRedirects: 0 });
     expect(redirectResponse.status()).toBe(302);
     expect(new URL(redirectResponse.headers().location).pathname).toBe(apkUrl);
@@ -250,11 +250,11 @@ test.describe('mobile header and home page at 360px', () => {
     expect(Number(apkResponse.headers()['content-length'])).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: 'Menu' }).click();
-    const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app (v1.10)' });
+    const navigationLinks = page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Download Android app (v1.11)' });
     await expect(navigationLinks).toHaveAttribute('href', downloadUrl);
 
     await page.goto('/bn');
-    await expect(page.locator('#main').getByRole('link', { name: 'অ্যান্ড্রয়েড অ্যাপ ডাউনলোড (v1.10)' })).toHaveAttribute('href', downloadUrl);
+    await expect(page.locator('#main').getByRole('link', { name: 'অ্যান্ড্রয়েড অ্যাপ ডাউনলোড (v1.11)' })).toHaveAttribute('href', downloadUrl);
   });
 
   test('the home page has no axe violations', async ({ page }) => {

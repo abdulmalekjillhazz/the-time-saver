@@ -66,4 +66,14 @@ describe('native Android Google sign-in', () => {
       'Google sign-in was canceled.',
     );
   });
+
+  it('does not misreport a configuration failure just because its message mentions cancellation', async () => {
+    const error = Object.assign(
+      new Error('Google OAuth configuration failed while resolving the canceled credential flow.'),
+      { code: 'CONFIGURATION_ERROR' },
+    );
+    SocialLogin.login.mockRejectedValue(error);
+
+    await expect(signInWithGoogleNative('web-client-id')).rejects.toBe(error);
+  });
 });

@@ -46,11 +46,9 @@ export async function signInWithGoogleNative(webClientId) {
 
     return idToken;
   } catch (error) {
-    const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
     const code = typeof error?.code === 'string' ? error.code.toLowerCase() : '';
     if (
-      message.includes('cancel')
-      || code === 'user_cancelled'
+      code === 'user_cancelled'
       || code === 'user_canceled'
       || code === 'canceled'
       || code === 'cancelled'
