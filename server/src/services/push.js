@@ -39,3 +39,38 @@ export async function sendToUser(userId, payload, sender = defaultSender, prefer
   }
   return { delivered };
 }
+
+export async function broadcastPushNotification(payload, sender = defaultSender) {
+  const subs = await PushSubscription.find({}).lean();
+  const body = JSON.stringify({
+    title: payload.title || 'Smart Routine',
+    body: payload.body || '',
+    url: payload.url || '/today',
+    tag: `smart-routine-broadcast-${Date.now()}`,
+    type: 'broadcast',
+  });
+
+  let delivered = 0;
+  let failed = 0;
+
+  for (const sub of subs) {
+    try {
+      await sender(
+        { endpoint: sub.endpoint, keys: sub.keys },
+        body,
+        { ttl: 24 * 60 * 60 },
+      );
+      delivered += 1;
+      await PushSubscription.updateOne({ _id: sub._id }, { $set: { lastSuccessAt: new Date(), failureCount: 0 } });
+    } catch (err) {
+      failed += 1;
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        await PushSubscription.deleteOne({ _id: sub._id });
+      } else {
+        await PushSubscription.updateOne({ _id: sub._id }, { $inc: { failureCount: 1 } });
+      }
+    }
+  }
+
+  return { totalSubscriptions: subs.length, delivered, failed };
+}

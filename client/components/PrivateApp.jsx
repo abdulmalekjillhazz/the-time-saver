@@ -634,6 +634,7 @@ export function PrivateApp() {
   const [answers, setAnswers] = useState([]);
   const [quizResult, setQuizResult] = useState(null);
   const [notice, setNotice] = useState('');
+  const [broadcastAnnouncement, setBroadcastAnnouncement] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [passwordAction, setPasswordAction] = useState('');
@@ -705,6 +706,22 @@ export function PrivateApp() {
     }
     setVoiceBriefingAutoPlay(false);
     setVoiceModalOpen(true);
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/announcements/latest', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.announcement?.id) {
+          try {
+            const dismissed = globalThis.localStorage?.getItem(`dismissed_announcement_${data.announcement.id}`);
+            if (!dismissed) setBroadcastAnnouncement(data.announcement);
+          } catch {
+            setBroadcastAnnouncement(data.announcement);
+          }
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const reportError = useCallback((err) => {
@@ -2478,6 +2495,40 @@ export function PrivateApp() {
           >
             ✕
           </button>
+        </div>
+      ) : null}
+      {broadcastAnnouncement ? (
+        <div role="region" aria-label={lang === 'bn' ? 'বিশেষ ঘোষণা' : 'Special Announcement'} className="enter-up flex items-center justify-between gap-3 rounded-2xl border border-gold/50 bg-gradient-to-r from-sapphire/20 via-paper to-gold/15 p-3.5 shadow-md">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <span className="text-xl shrink-0" aria-hidden="true">📢</span>
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-gold-soft truncate">{broadcastAnnouncement.title}</h4>
+              <p className="text-xs font-semibold text-ink leading-snug">{broadcastAnnouncement.body}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {broadcastAnnouncement.url ? (
+              <a
+                href={broadcastAnnouncement.url}
+                className="rounded-lg border border-gold/40 bg-gold/20 px-2.5 py-1 text-xs font-bold text-ink hover:bg-gold/30"
+              >
+                {lang === 'bn' ? 'দেখুন' : 'View'}
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  globalThis.localStorage?.setItem(`dismissed_announcement_${broadcastAnnouncement.id}`, 'true');
+                } catch {}
+                setBroadcastAnnouncement(null);
+              }}
+              aria-label={lang === 'bn' ? 'বিজ্ঞপ্তি বন্ধ করুন' : 'Dismiss announcement'}
+              className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-gold/30 p-1.5 text-xs font-bold text-ink hover:bg-paper"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       ) : null}
       {notice ? (

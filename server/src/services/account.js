@@ -43,6 +43,13 @@ export async function loginUser({ email, password }) {
     await hitCounter(key, FIFTEEN_MIN);
     throw new AppError(401, 'UNAUTHENTICATED', MSG.loginFailed);
   }
+  if (user.isRestricted) {
+    await hitCounter(key, FIFTEEN_MIN);
+    throw new AppError(403, 'FORBIDDEN', {
+      en: 'Your account has been restricted by an administrator.',
+      bn: 'আপনার অ্যাকাউন্টটি অ্যাডমিন কর্তৃক সীমাবদ্ধ করা হয়েছে।',
+    });
+  }
   return user;
 }
 
@@ -63,6 +70,12 @@ export async function loginGoogleUser({ email, googleId, displayName, avatarUrl 
   if (user) {
     if (user.deletedAt || (user.googleId && user.googleId !== googleId)) {
       throw new AppError(401, 'UNAUTHENTICATED', MSG.loginFailed);
+    }
+    if (user.isRestricted) {
+      throw new AppError(403, 'FORBIDDEN', {
+        en: 'Your account has been restricted by an administrator.',
+        bn: 'আপনার অ্যাকাউন্টটি অ্যাডমিন কর্তৃক সীমাবদ্ধ করা হয়েছে।',
+      });
     }
     if (!user.googleId) {
       user.googleId = googleId;

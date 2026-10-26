@@ -19,5 +19,25 @@ describe('admin daily story routes', () => {
       path: '/daily-lessons/:id/narration',
       methods: expect.objectContaining({ post: true }),
     });
+    expect(routes).toContainEqual({
+      path: '/notifications/broadcast',
+      methods: expect.objectContaining({ get: true }),
+    });
+    expect(routes).toContainEqual({
+      path: '/notifications/broadcast',
+      methods: expect.objectContaining({ post: true }),
+    });
+    expect(routes).toContainEqual({
+      path: '/users',
+      methods: expect.objectContaining({ get: true }),
+    });
+    expect(routes).toContainEqual({
+      path: '/users/:id/restrict',
+      methods: expect.objectContaining({ post: true }),
+    });
+    expect(routes).toContainEqual({
+      path: '/users/:id',
+      methods: expect.objectContaining({ delete: true }),
+    });
   });
 });

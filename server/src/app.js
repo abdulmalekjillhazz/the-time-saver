@@ -33,6 +33,7 @@ import { circlesRouter } from './routes/circles.js';
 import { telegramRouter } from './routes/telegram.js';
 import { configureCloudinary } from './services/cloudinary.js';
 import { speechRouter } from './routes/speech.js';
+import { announcementsRouter } from './routes/announcements.js';
 import { islamicReflectionsRouter } from './routes/islamicReflections.js';
 
 function normalizeWord(raw) {
@@ -240,6 +241,7 @@ export function createApp({ config }) {
   app.use('/api/telegram', telegramRouter(config));
   app.use('/api/speech', speechRouter({ config }));
   app.use('/api/islamic-reflections', islamicReflectionsRouter());
+  app.use('/api/announcements', announcementsRouter());
 
   app.use(notFound);
   app.use(errorHandler);

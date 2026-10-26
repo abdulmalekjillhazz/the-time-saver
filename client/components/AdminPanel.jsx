@@ -72,6 +72,42 @@ const COPY = {
     uploadTooLarge: 'This file exceeds the upload size limit.',
     uploadVerifyError: 'The upload could not be verified or attached to the lesson.',
     uploadComplete: 'Media uploaded and attached to the lesson.',
+    broadcastTab: '📢 Broadcast',
+    broadcastHeading: 'Broadcast Notification to All Users',
+    broadcastHelp: 'Send an instant push notification and in-app announcement to all registered and subscribed users.',
+    broadcastTitle: 'Notification Title',
+    broadcastTitlePlaceholder: 'e.g. Special Update from Smart Routine',
+    broadcastBody: 'Notification Message',
+    broadcastBodyPlaceholder: 'e.g. New daily audio drama and speaking practice is now available!',
+    broadcastUrl: 'Click Target URL (optional)',
+    broadcastSend: '📢 Send to All Users',
+    broadcastSending: 'Sending notification to all users...',
+    broadcastSuccess: (count, total) => `Push notification successfully sent to ${count} of ${total} subscribed devices!`,
+    broadcastHistory: 'Past Broadcasts',
+    noBroadcasts: 'No broadcast notifications sent yet.',
+    usersTab: '👥 Users & Access',
+    usersHeading: 'User Access Control & Management',
+    usersHelp: 'View all registered accounts, change roles, restrict access, or delete users.',
+    searchUsersPlaceholder: 'Search by email or name...',
+    searchUsers: 'Search',
+    allUsersCount: (count) => `Total: ${count} user${count === 1 ? '' : 's'}`,
+    userDisplayName: 'Name',
+    userEmail: 'Email',
+    userRole: 'Role',
+    userJoined: 'Joined',
+    userStatus: 'Status',
+    statusActive: 'Active',
+    statusRestricted: 'Restricted',
+    restrictUser: 'Restrict',
+    unrestrictUser: 'Unrestrict',
+    deleteUser: 'Delete',
+    confirmRestrict: (name) => `Are you sure you want to restrict "${name}"? They will be logged out and blocked from logging in.`,
+    confirmUnrestrict: (name) => `Are you sure you want to unrestrict "${name}"?`,
+    confirmDeleteUser: (name) => `Are you sure you want to permanently delete user "${name}"? This action cannot be undone.`,
+    userUpdated: 'User status updated successfully.',
+    userDeleted: 'User account has been deleted.',
+    cannotModifySelf: 'You cannot restrict or delete your own account.',
+    noUsersFound: 'No users found.',
     languageToggle: 'বাংলা', themeDark: 'Switch to dark mode', themeLight: 'Switch to light mode',
   },
   bn: {
@@ -134,6 +170,42 @@ const COPY = {
     uploadTooLarge: 'ফাইলটি আপলোডের নির্ধারিত আকারের চেয়ে বড়।',
     uploadVerifyError: 'আপলোড যাচাই করা যায়নি অথবা পাঠের সাথে যুক্ত করা যায়নি।',
     uploadComplete: 'মিডিয়া আপলোড করে পাঠের সাথে যুক্ত করা হয়েছে।',
+    broadcastTab: '📢 ব্রডকাস্ট নোটিফিকেশন',
+    broadcastHeading: 'সমস্ত ব্যবহারকারীদের নোটিফিকেশন পাঠান',
+    broadcastHelp: 'সমস্ত সাবস্ক্রাইবড ব্যবহারকারীদের ডিভাইসে ইনস্ট্যান্ট পুশ নোটিফিকেশন ও অ্যাপে ঘোষণা পাঠান।',
+    broadcastTitle: 'নোটিফিকেশনের শিরোনাম',
+    broadcastTitlePlaceholder: 'যেমন: স্মার্ট রুটিনের বিশেষ বার্তা',
+    broadcastBody: 'নোটিফিকেশনের বার্তা',
+    broadcastBodyPlaceholder: 'যেমন: আজকের নতুন ইংরেজি সংলাপ ও অডিও ড্রামা পাঠ যুক্ত হয়েছে!',
+    broadcastUrl: 'ক্লিক করলে যে পেজে যাবে (ঐচ্ছিক)',
+    broadcastSend: '📢 সমস্ত ব্যবহারকারীদের পাঠান',
+    broadcastSending: 'নোটিফিকেশন পাঠানো হচ্ছে…',
+    broadcastSuccess: (count, total) => `সফলভাবে ${total}টি ডিভাইসের মধ্যে ${count}টিতে পুশ নোটিফিকেশন পাঠানো হয়েছে!`,
+    broadcastHistory: 'আগের ব্রডকাস্টের তালিকা',
+    noBroadcasts: 'এখনও কোনো ব্রডকাস্ট নোটিফিকেশন পাঠানো হয়নি।',
+    usersTab: '👥 ব্যবহারকারী নিয়ন্ত্রণ',
+    usersHeading: 'ব্যবহারকারী অ্যাক্সেস ও পরিচালনা',
+    usersHelp: 'নিবন্ধিত ব্যবহারকারীদের দেখুন, ভূমিকা পরিবর্তন করুন, অ্যাক্সেস সীমাবদ্ধ করুন বা ব্যবহারকারী মুছুন।',
+    searchUsersPlaceholder: 'ইমেইল বা নাম দিয়ে খুঁজুন...',
+    searchUsers: 'খুঁজুন',
+    allUsersCount: (count) => `মোট: ${count} জন ব্যবহারকারী`,
+    userDisplayName: 'নাম',
+    userEmail: 'ইমেইল',
+    userRole: 'ভূমিকা',
+    userJoined: 'যোগদান',
+    userStatus: 'অবস্থা',
+    statusActive: 'সক্রিয়',
+    statusRestricted: 'সীমাবদ্ধ',
+    restrictUser: 'সীমাবদ্ধ করুন',
+    unrestrictUser: 'সক্রিয় করুন',
+    deleteUser: 'মুছুন',
+    confirmRestrict: (name) => `আপনি কি "${name}" এর অ্যাক্সেস সীমাবদ্ধ করতে চান? তাদের তাৎক্ষণিক লগআউট করা হবে এবং প্রবেশ বন্ধ থাকবে।`,
+    confirmUnrestrict: (name) => `আপনি কি "${name}" এর অ্যাকাউন্ট পুনরায় সক্রিয় করতে চান?`,
+    confirmDeleteUser: (name) => `আপনি কি নিশ্চিত "${name}" এর অ্যাকাউন্টটি মুছে ফেলতে চান? এই কাজটি আর ফেরানো যাবে না।`,
+    userUpdated: 'ব্যবহারকারীর তথ্য সফলভাবে আপডেট হয়েছে।',
+    userDeleted: 'ব্যবহারকারীর অ্যাকাউন্ট মুছে ফেলা হয়েছে।',
+    cannotModifySelf: 'নিজের অ্যাকাউন্টের সীমাবদ্ধতা বা মোছার কাজ করা যাবে না।',
+    noUsersFound: 'কোনো ব্যবহারকারী পাওয়া যায়নি।',
     languageToggle: 'English', themeDark: 'ডার্ক মোড চালু করুন', themeLight: 'লাইট মোড চালু করুন',
   },
 };
@@ -204,23 +276,23 @@ async function api(path, { method = 'GET', body, query } = {}) {
 
 function Field({ label, ...props }) {
   return (
-    <label className="block space-y-1">
+    <label className="block space-y-1.5 text-xs font-bold text-ink">
       <span>{label}</span>
-      <input {...props} className="block w-full rounded border border-ink/40 bg-paper p-3 text-ink" />
+      <input {...props} className="polished-input block w-full rounded-xl border border-ink/20 bg-paper p-3 text-sm text-ink font-semibold focus:border-gold focus:outline-none" />
     </label>
   );
 }
 
 function LocalizedText({ bnLabel, enLabel, name, multiline = false, required = true, value, onChange }) {
   const Input = multiline ? 'textarea' : 'input';
-  const className = 'block w-full rounded border border-ink/40 bg-paper p-3 text-ink';
+  const className = 'polished-input block w-full rounded-xl border border-ink/20 bg-paper p-3 text-sm text-ink font-semibold focus:border-gold focus:outline-none';
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <label className="block space-y-1">
+      <label className="block space-y-1.5 text-xs font-bold text-ink">
         <span>{bnLabel}</span>
         <Input name={`${name}-bn`} required={required} value={value?.bn} onChange={onChange ? (event) => onChange('bn', event.target.value) : undefined} className={className} lang="bn" dir="auto" rows={multiline ? 5 : undefined} maxLength={multiline ? 5000 : 200} />
       </label>
-      <label className="block space-y-1">
+      <label className="block space-y-1.5 text-xs font-bold text-ink">
         <span>{enLabel}</span>
         <Input name={`${name}-en`} required={required} value={value?.en} onChange={onChange ? (event) => onChange('en', event.target.value) : undefined} className={className} lang="en" dir="auto" rows={multiline ? 5 : undefined} maxLength={multiline ? 5000 : 200} />
       </label>
@@ -239,7 +311,7 @@ function LessonEditorForm({ lesson, copy, busy, onCancel, onSave }) {
 
   return (
     <form
-      className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4"
+      className="space-y-4 rounded-2xl border border-gold/30 bg-paper/95 p-4 sm:p-5 shadow-md"
       onSubmit={(event) => {
         event.preventDefault();
         onSave({ title, body, quiz });
@@ -377,7 +449,7 @@ function DailyStoryEditorForm({ lesson, copy, busy, onCancel, onSave }) {
   }
 
   return (
-    <form className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4" onSubmit={submit}>
+    <form className="space-y-4 rounded-2xl border border-gold/30 bg-paper/95 p-4 sm:p-5 shadow-md" onSubmit={submit}>
       <h3 className="font-bold">{copy.editLesson} · {lesson.locale.toUpperCase()} · {lesson.date}</h3>
       <label className="block space-y-1 text-sm font-medium">
         <span>{copy.dailyTitle}</span>
@@ -447,6 +519,14 @@ export function AdminPanel() {
   const [auditCursor, setAuditCursor] = useState(null);
   const [auditLoaded, setAuditLoaded] = useState(false);
   const [flags, setFlags] = useState({});
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastBody, setBroadcastBody] = useState('');
+  const [broadcastUrl, setBroadcastUrl] = useState('/today');
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [activeTab, setActiveTab] = useState('drafts');
   const [previewDraftSlug, setPreviewDraftSlug] = useState('');
   const [draftContext, setDraftContext] = useState('');
@@ -550,14 +630,35 @@ export function AdminPanel() {
     setAuditLoaded(true);
   }, []);
 
+  const loadBroadcasts = useCallback(async () => {
+    try {
+      const result = await api('/api/admin/notifications/broadcast');
+      setBroadcasts(result?.announcements || []);
+    } catch {
+      setBroadcasts([]);
+    }
+  }, []);
+
+  const loadUsers = useCallback(async (searchQuery = '') => {
+    setLoadingUsers(true);
+    try {
+      const result = await api('/api/admin/users', { query: searchQuery ? { search: searchQuery } : undefined });
+      setUsers(result?.users || []);
+    } catch {
+      setUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
   const loadAdminData = useCallback(async () => {
     if (!adminStatus?.mfaVerified || !STAFF_ROLES.includes(adminStatus.role)) return;
-    const requests = [loadLessons(), loadDailyLessons(), loadLandingQuizzes(), loadAudit()];
-    if (adminStatus.role === 'owner') requests.push(loadFlags());
+    const requests = [loadLessons(), loadDailyLessons(), loadLandingQuizzes(), loadAudit(), loadBroadcasts()];
+    if (adminStatus.role === 'owner') requests.push(loadFlags(), loadUsers());
     const results = await Promise.allSettled(requests);
     const rejected = results.find((result) => result.status === 'rejected');
     if (rejected) showError(rejected.reason);
-  }, [adminStatus, loadAudit, loadDailyLessons, loadFlags, loadLandingQuizzes, loadLessons, showError]);
+  }, [adminStatus, loadAudit, loadBroadcasts, loadDailyLessons, loadFlags, loadLandingQuizzes, loadLessons, loadUsers, showError]);
 
   useEffect(() => {
     if (!uiReady) return undefined;
@@ -857,6 +958,32 @@ export function AdminPanel() {
     if (result) await loadLessons();
   }
 
+  async function sendBroadcastNotification(event) {
+    event.preventDefault();
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) return;
+    setSendingBroadcast(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api('/api/admin/notifications/broadcast', {
+        method: 'POST',
+        body: {
+          title: broadcastTitle.trim(),
+          body: broadcastBody.trim(),
+          url: broadcastUrl.trim() || '/today',
+        },
+      });
+      setNotice(copy.broadcastSuccess(result.push?.delivered ?? 0, result.push?.totalSubscriptions ?? 0));
+      setBroadcastTitle('');
+      setBroadcastBody('');
+      await loadBroadcasts();
+    } catch (err) {
+      showError(err);
+    } finally {
+      setSendingBroadcast(false);
+    }
+  }
+
   async function runCleanup() {
     const result = await perform(() => api('/api/admin/uploads/cleanup', { method: 'POST', body: {} }), '');
     if (result) setNotice(copy.cleanupResult(result));
@@ -912,6 +1039,50 @@ export function AdminPanel() {
     if (result) setFlags((current) => ({ ...current, [key]: result.flag }));
   }
 
+  async function toggleUserRestriction(targetUser) {
+    const isRestricting = !targetUser.isRestricted;
+    const confirmMsg = isRestricting
+      ? copy.confirmRestrict(targetUser.displayName || targetUser.email)
+      : copy.confirmUnrestrict(targetUser.displayName || targetUser.email);
+    if (!globalThis.confirm(confirmMsg)) return;
+
+    const result = await perform(
+      () => api(`/api/admin/users/${targetUser.id}/restrict`, {
+        method: 'POST',
+        body: { restricted: isRestricting },
+      }),
+      copy.userUpdated
+    );
+    if (result) await loadUsers(userSearch);
+  }
+
+  async function deleteUserAccount(targetUser) {
+    const confirmMsg = copy.confirmDeleteUser(targetUser.displayName || targetUser.email);
+    if (!globalThis.confirm(confirmMsg)) return;
+
+    const result = await perform(
+      () => api(`/api/admin/users/${targetUser.id}`, { method: 'DELETE' }),
+      copy.userDeleted
+    );
+    if (result) await loadUsers(userSearch);
+  }
+
+  async function updateUserRoleDirectly(targetUserId, newRole) {
+    const result = await perform(
+      () => api(`/api/admin/users/${targetUserId}/role`, {
+        method: 'POST',
+        body: { role: newRole },
+      }),
+      copy.userUpdated
+    );
+    if (result) await loadUsers(userSearch);
+  }
+
+  function handleSearchUsers(e) {
+    e.preventDefault();
+    void loadUsers(userSearch);
+  }
+
   async function refreshAll() {
     setBusy(true);
     setError('');
@@ -919,8 +1090,8 @@ export function AdminPanel() {
       const status = await refreshStatus();
       setAdminStatus(status);
       if (status.mfaVerified) {
-        const requests = [loadLessons(), loadAudit()];
-        if (status.role === 'owner') requests.push(loadFlags());
+        const requests = [loadLessons(), loadDailyLessons(), loadLandingQuizzes(), loadAudit(), loadBroadcasts()];
+        if (status.role === 'owner') requests.push(loadFlags(), loadUsers(userSearch));
         await Promise.all(requests);
       }
     } catch (err) {
@@ -943,61 +1114,94 @@ export function AdminPanel() {
 
   if (authState === 'loading') {
     return (
-      <main className="mx-auto max-w-5xl space-y-4 py-8">
-        <header className="flex items-center justify-between gap-3">
-          <h1 className="text-3xl font-bold">{copy.title}</h1>
+      <main className="app-shell app-shell-main enter-up mx-auto my-6 max-w-4xl space-y-5 rounded-[2rem] p-5 sm:my-10 sm:p-8">
+        <header className="flex items-center justify-between gap-3 border-b border-gold/20 pb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl" aria-hidden="true">🛡️</span>
+            <h1 className="text-2xl font-black text-ink">{copy.title}</h1>
+          </div>
           {uiReady ? preferences : null}
         </header>
-        <p role="status">{copy.loading}</p>
+        <p role="status" className="py-8 text-center text-sm font-semibold text-ink/70">{copy.loading}</p>
       </main>
     );
   }
   if (authState === 'signed-out') {
     return (
-      <main className="mx-auto max-w-3xl space-y-4 py-8">
-        <header className="flex items-center justify-between gap-3">
-          <h1 className="text-3xl font-bold">{copy.title}</h1>
+      <main className="app-shell app-shell-main enter-up mx-auto my-6 max-w-md space-y-5 rounded-[2rem] p-5 sm:my-10 sm:p-8">
+        <header className="flex items-center justify-between gap-3 border-b border-gold/20 pb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl" aria-hidden="true">🛡️</span>
+            <h1 className="text-2xl font-black text-ink">{copy.title}</h1>
+          </div>
           {preferences}
         </header>
-        {error ? <p role="alert">{error}</p> : null}
-        <Card as="form" className="max-w-lg space-y-4" onSubmit={signIn}>
-          <h2 className="text-xl font-semibold">{copy.signIn}</h2>
+        {error ? <p role="alert" className="rounded-xl bg-rose-500/10 p-3 text-center text-xs font-bold text-rose-600">{error}</p> : null}
+        <Card as="form" className="space-y-4" onSubmit={signIn}>
+          <h2 className="text-lg font-black text-ink">{copy.signIn}</h2>
           <Field label={copy.email} name="email" type="email" autoComplete="username" required />
           <Field label={copy.password} name="password" type="password" autoComplete="current-password" required />
-          <Button type="submit" disabled={busy}>{busy ? copy.loading : copy.signInSubmit}</Button>
+          <Button type="submit" disabled={busy} className="primary-button min-h-[44px] w-full text-sm font-bold shadow-md">
+            {busy ? copy.loading : copy.signInSubmit}
+          </Button>
         </Card>
       </main>
     );
   }
   if (authState === 'error') {
-    return <main className="mx-auto max-w-5xl space-y-4 py-8"><header className="flex items-center justify-between gap-3"><h1 className="text-3xl font-bold">{copy.title}</h1>{preferences}</header><p role="alert">{error || copy.noDatabase}</p></main>;
+    return (
+      <main className="app-shell app-shell-main enter-up mx-auto my-6 max-w-4xl space-y-5 rounded-[2rem] p-5 sm:my-10 sm:p-8">
+        <header className="flex items-center justify-between gap-3 border-b border-gold/20 pb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl" aria-hidden="true">🛡️</span>
+            <h1 className="text-2xl font-black text-ink">{copy.title}</h1>
+          </div>
+          {preferences}
+        </header>
+        <p role="alert" className="rounded-xl bg-rose-500/10 p-4 text-center text-sm font-bold text-rose-600">{error || copy.noDatabase}</p>
+      </main>
+    );
   }
 
   const isStaff = STAFF_ROLES.includes(adminStatus?.role);
   const isOwner = adminStatus?.role === 'owner';
 
   return (
-    <main className="mx-auto max-w-6xl space-y-5 py-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <main lang={lang} className="app-shell app-shell-main enter-up mx-auto my-4 max-w-6xl space-y-6 rounded-[2rem] p-4 sm:my-8 sm:p-7">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-gold/20 pb-4">
         <div>
-          <h1 className="text-3xl font-bold">{copy.title}</h1>
-          <p>{user?.displayName} · {copy.role}: {adminStatus?.role}</p>
+          <div className="flex items-center gap-2.5">
+            <span className="text-3xl" aria-hidden="true">🛡️</span>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">{copy.title}</h1>
+          </div>
+          <p className="mt-1 text-xs sm:text-sm font-semibold text-ink/70">
+            {user?.displayName} · <span className="rounded-full bg-gold/15 px-2.5 py-0.5 text-xs font-black text-gold-soft border border-gold/30">{adminStatus?.role?.toUpperCase()}</span>
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          {adminStatus?.mfaVerified ? <StatusChip lang={lang} status="done" /> : null}
+          {adminStatus?.mfaVerified ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1 text-xs font-black text-emerald-600">
+              <span>✓</span>
+              <span>MFA {lang === 'bn' ? 'সক্রিয়' : 'Verified'}</span>
+            </span>
+          ) : null}
           {preferences}
         </div>
       </header>
 
       {error ? (
-        <Card role="alert" className="border-gold">
+        <Card role="alert" className="border-rose-500/40 bg-rose-500/10 text-rose-700">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p>{error}</p>
-            <Button variant="secondary" onClick={() => setError('')}>{copy.dismiss}</Button>
+            <p className="text-sm font-bold">{error}</p>
+            <Button variant="secondary" onClick={() => setError('')} className="min-h-[36px] text-xs font-bold">{copy.dismiss}</Button>
           </div>
         </Card>
       ) : null}
-      {notice ? <Card role="status">{notice}</Card> : null}
+      {notice ? (
+        <Card role="status" className="border-emerald-500/40 bg-emerald-500/10 text-emerald-800">
+          <p className="text-sm font-bold">{notice}</p>
+        </Card>
+      ) : null}
 
       {adminStatus?.role === 'user' ? (
         <Card className="space-y-3">
@@ -1066,18 +1270,19 @@ export function AdminPanel() {
       {isStaff && adminStatus.mfaVerified ? (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p role="status">{copy.alreadyVerified} · {copy.role}: {adminStatus.role}</p>
-            <Button variant="secondary" disabled={busy} onClick={refreshAll}>{copy.reload}</Button>
+            <p role="status" className="text-xs sm:text-sm font-bold text-ink/80">{copy.alreadyVerified} · {copy.role}: {adminStatus.role}</p>
+            <Button variant="secondary" disabled={busy} onClick={refreshAll} className="min-h-[38px] text-xs font-bold">{copy.reload}</Button>
           </div>
 
-          <nav aria-label={copy.tabs} role="tablist" className="flex flex-wrap gap-2 border-b border-sapphire/20 pb-2">
+          <nav aria-label={copy.tabs} role="tablist" className="flex flex-wrap gap-2 border-b border-gold/20 pb-3">
             {[
               ...(isOwner ? [['drafts', copy.draftsTab]] : []),
               ['daily-stories', copy.dailyStoriesTab],
               ['landing-quizzes', copy.landingQuizzesTab],
               ['lessons', copy.lessonsTab],
+              ['broadcast', copy.broadcastTab],
+              ...(isOwner ? [['users', copy.usersTab]] : []),
               ['audit', copy.auditTab],
-              ['roles', copy.rolesTab],
               ['maintenance', copy.maintenance],
             ].map(([tab, label]) => (
               <button
@@ -1088,7 +1293,11 @@ export function AdminPanel() {
                 aria-selected={activeTab === tab}
                 aria-controls={`admin-panel-${tab}`}
                 onClick={() => setActiveTab(tab)}
-                className={`min-h-11 rounded-md px-4 py-2 font-semibold ${activeTab === tab ? 'bg-sapphire text-on-sapphire' : 'border border-sapphire/30'}`}
+                className={`tab-button min-h-11 rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-200 ${
+                  activeTab === tab
+                    ? 'bg-gradient-to-r from-sapphire to-sapphire-deep text-on-sapphire shadow-lg shadow-sapphire/25 ring-2 ring-gold/40'
+                    : 'border border-gold/25 bg-paper/80 text-ink/75 hover:bg-gold/10 hover:text-ink'
+                }`}
               >
                 {label}
               </button>
@@ -1097,7 +1306,7 @@ export function AdminPanel() {
 
           {activeTab === 'drafts' && isOwner ? (
             <section id="admin-panel-drafts" role="tabpanel" aria-label={copy.draftsHeading} className="space-y-4">
-              <Card className="space-y-3 border-indigo-200 bg-indigo-50/60">
+              <Card className="space-y-3 border-gold/40 bg-paper/95 shadow-lg">
                 <h2 className="text-2xl font-semibold">{copy.draftsHeading}</h2>
                 <p>{copy.dailyAiDrafts}</p>
                 <label className="block space-y-1 text-sm font-medium">
@@ -1443,9 +1652,9 @@ export function AdminPanel() {
             )}
 
             {lessons.length ? (
-              <div className="overflow-x-auto rounded-md border border-sapphire/20">
+              <div className="overflow-x-auto rounded-2xl border border-gold/25 bg-paper/90 shadow-md">
                 <table className="w-full min-w-[900px] border-collapse text-left">
-                  <thead><tr className="bg-sapphire/10">
+                  <thead><tr className="border-b border-gold/20 bg-sapphire/15 text-[11px] font-black uppercase tracking-wider text-gold-soft">
                     <th className="p-3">{copy.slug}</th><th className="p-3">{copy.status}</th>
                     <th className="p-3">{copy.author}</th><th className="p-3">{copy.created}</th><th className="p-3">{copy.media}</th><th className="p-3">{copy.actions}</th>
                   </tr></thead>
@@ -1529,9 +1738,9 @@ export function AdminPanel() {
           {activeTab === 'audit' ? <section id="admin-panel-audit" role="tabpanel" aria-labelledby="admin-tab-audit" className="space-y-3">
             <h2 className="text-2xl font-semibold">{copy.auditTitle}</h2>
             {audit.length ? (
-              <div className="overflow-x-auto rounded-md border border-sapphire/20">
+              <div className="overflow-x-auto rounded-2xl border border-gold/25 bg-paper/90 shadow-md">
                 <table className="w-full min-w-[720px] border-collapse text-left">
-                  <thead><tr className="bg-sapphire/10">
+                  <thead><tr className="border-b border-gold/20 bg-sapphire/15 text-[11px] font-black uppercase tracking-wider text-gold-soft">
                     <th className="p-3">{copy.action}</th><th className="p-3">{copy.actor}</th>
                     <th className="p-3">{copy.timestamp}</th><th className="p-3">{copy.summary}</th>
                   </tr></thead>
@@ -1552,23 +1761,242 @@ export function AdminPanel() {
           </section>
           : null}
 
-          {activeTab === 'roles' ? (
-            <section id="admin-panel-roles" role="tabpanel" aria-labelledby="admin-tab-roles" className="space-y-3">
-            {isOwner ? (
-              <Card className="space-y-3">
-                <h2 className="text-xl font-semibold">{copy.roleManagement}</h2>
-                <form className="space-y-3" onSubmit={changeRole}>
-                  <Field label={copy.userId} name="userId" required pattern="[a-fA-F0-9]{24}" maxLength="24" />
-                  <label className="block space-y-1">
-                    <span>{copy.newRole}</span>
-                    <select name="role" defaultValue="user" className="block w-full rounded border border-ink/40 bg-paper p-3 text-ink">
-                      {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
-                    </select>
+          {activeTab === 'users' ? (
+            <section id="admin-panel-users" role="tabpanel" aria-labelledby="admin-tab-users" className="space-y-4">
+              {isOwner ? (
+                <>
+                  <Card className="space-y-4 border border-gold/40 bg-paper/95 p-5 shadow-lg">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl" aria-hidden="true">👥</span>
+                        <div>
+                          <h2 className="text-xl font-bold text-ink">{copy.usersHeading}</h2>
+                          <p className="text-xs text-ink/70">{copy.usersHelp}</p>
+                        </div>
+                      </div>
+                      <span className="rounded-full border border-gold/40 bg-gold/15 px-3 py-1 text-xs font-black text-gold-soft">
+                        {copy.allUsersCount(users.length)}
+                      </span>
+                    </div>
+
+                    <form onSubmit={handleSearchUsers} className="flex flex-wrap items-center gap-2 pt-1">
+                      <input
+                        type="search"
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                        placeholder={copy.searchUsersPlaceholder}
+                        className="polished-input min-w-[240px] flex-1 rounded-xl border border-ink/20 bg-paper p-2.5 text-sm font-semibold text-ink focus:border-gold focus:outline-none"
+                      />
+                      <Button type="submit" disabled={busy || loadingUsers} className="primary-button min-h-[42px] px-4 text-xs font-bold">
+                        {loadingUsers ? '...' : `🔍 ${copy.searchUsers}`}
+                      </Button>
+                      {userSearch ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() => {
+                            setUserSearch('');
+                            void loadUsers('');
+                          }}
+                          className="min-h-[42px] px-3 text-xs font-bold"
+                        >
+                          ✕
+                        </Button>
+                      ) : null}
+                    </form>
+                  </Card>
+
+                  {users.length ? (
+                    <div className="overflow-x-auto rounded-2xl border border-gold/25 bg-paper/90 shadow-md">
+                      <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
+                        <thead>
+                          <tr className="border-b border-gold/20 bg-sapphire/15 text-[11px] font-black uppercase tracking-wider text-gold-soft">
+                            <th className="p-3.5">{copy.userDisplayName}</th>
+                            <th className="p-3.5">{copy.userEmail}</th>
+                            <th className="p-3.5">{copy.userRole}</th>
+                            <th className="p-3.5">{copy.userStatus}</th>
+                            <th className="p-3.5">{copy.userJoined}</th>
+                            <th className="p-3.5 text-right">{copy.actions}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {users.map((u) => {
+                            const isSelf = String(u.id) === String(user?.id);
+                            return (
+                              <tr key={u.id} className="border-t border-ink/10 transition-colors hover:bg-gold/5">
+                                <td className="p-3.5 font-bold text-ink">
+                                  <div className="flex items-center gap-2">
+                                    <span className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/30 bg-gold/15 text-xs font-black text-gold-soft">
+                                      {u.displayName?.charAt(0)?.toUpperCase() || '👤'}
+                                    </span>
+                                    <span className="truncate max-w-[130px] sm:max-w-xs">{u.displayName}</span>
+                                  </div>
+                                </td>
+                                <td className="p-3.5 text-ink/80 font-mono text-xs">{u.email}</td>
+                                <td className="p-3.5">
+                                  {isSelf ? (
+                                    <span className="rounded-lg border border-gold/40 bg-gold/15 px-2.5 py-1 text-xs font-black text-gold-soft">
+                                      {u.role.toUpperCase()}
+                                    </span>
+                                  ) : (
+                                    <select
+                                      value={u.role}
+                                      disabled={busy}
+                                      onChange={(e) => void updateUserRoleDirectly(u.id, e.target.value)}
+                                      className="rounded-lg border border-ink/20 bg-paper px-2 py-1 text-xs font-bold text-ink focus:border-gold focus:outline-none"
+                                    >
+                                      {ROLES.map((r) => (
+                                        <option key={r} value={r}>{r}</option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </td>
+                                <td className="p-3.5">
+                                  {u.isRestricted ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/40 bg-rose-500/15 px-2.5 py-0.5 text-xs font-black text-rose-600">
+                                      <span>●</span> {copy.statusRestricted}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-xs font-black text-emerald-600">
+                                      <span>●</span> {copy.statusActive}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-3.5 text-xs text-ink/60">
+                                  {new Date(u.createdAt).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en')}
+                                </td>
+                                <td className="p-3.5 text-right">
+                                  {isSelf ? (
+                                    <span className="text-[11px] font-bold text-ink/40">({copy.cannotModifySelf})</span>
+                                  ) : (
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="secondary"
+                                        disabled={busy}
+                                        onClick={() => void toggleUserRestriction(u)}
+                                        className={`min-h-[34px] px-2.5 py-1 text-xs font-black transition-all ${
+                                          u.isRestricted
+                                            ? 'border-emerald-500/50 text-emerald-600 hover:bg-emerald-500/10'
+                                            : 'border-amber-500/50 text-amber-600 hover:bg-amber-500/10'
+                                        }`}
+                                      >
+                                        {u.isRestricted ? `✅ ${copy.unrestrictUser}` : `🚫 ${copy.restrictUser}`}
+                                      </Button>
+                                      <Button
+                                        variant="secondary"
+                                        disabled={busy}
+                                        onClick={() => void deleteUserAccount(u)}
+                                        className="min-h-[34px] border-rose-500/40 px-2.5 py-1 text-xs font-black text-rose-600 hover:bg-rose-500/10 transition-all"
+                                      >
+                                        🗑️ {copy.deleteUser}
+                                      </Button>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <Card className="text-center py-6">
+                      <p className="text-sm font-semibold text-ink/60">{copy.noUsersFound}</p>
+                    </Card>
+                  )}
+                </>
+              ) : <Card>{copy.accessRestricted}</Card>}
+            </section>
+          ) : null}
+
+          {activeTab === 'broadcast' ? (
+            <section id="admin-panel-broadcast" role="tabpanel" aria-labelledby="admin-tab-broadcast" className="space-y-5">
+              <Card className="space-y-4 border border-gold/40 bg-paper/95 p-5 shadow-lg">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-2xl" aria-hidden="true">📢</span>
+                  <div>
+                    <h2 className="text-xl font-bold text-ink">{copy.broadcastHeading}</h2>
+                    <p className="text-xs text-ink/70">{copy.broadcastHelp}</p>
+                  </div>
+                </div>
+
+                <form onSubmit={sendBroadcastNotification} className="space-y-4">
+                  <label className="block space-y-1.5 text-xs font-bold text-ink">
+                    <span>{copy.broadcastTitle}</span>
+                    <input
+                      type="text"
+                      required
+                      value={broadcastTitle}
+                      onChange={(e) => setBroadcastTitle(e.target.value)}
+                      maxLength={100}
+                      placeholder={copy.broadcastTitlePlaceholder}
+                      className="polished-input block w-full rounded-xl border border-ink/20 bg-paper p-3 text-sm text-ink font-semibold focus:border-gold focus:outline-none"
+                    />
                   </label>
-                  <Button type="submit" disabled={busy}>{copy.updateRole}</Button>
+
+                  <label className="block space-y-1.5 text-xs font-bold text-ink">
+                    <span>{copy.broadcastBody}</span>
+                    <textarea
+                      required
+                      rows={4}
+                      value={broadcastBody}
+                      onChange={(e) => setBroadcastBody(e.target.value)}
+                      maxLength={500}
+                      placeholder={copy.broadcastBodyPlaceholder}
+                      className="polished-input block w-full rounded-xl border border-ink/20 bg-paper p-3 text-sm text-ink font-semibold focus:border-gold focus:outline-none"
+                    />
+                  </label>
+
+                  <label className="block space-y-1.5 text-xs font-bold text-ink">
+                    <span>{copy.broadcastUrl}</span>
+                    <input
+                      type="text"
+                      value={broadcastUrl}
+                      onChange={(e) => setBroadcastUrl(e.target.value)}
+                      maxLength={500}
+                      placeholder="/today"
+                      className="polished-input block w-full rounded-xl border border-ink/20 bg-paper p-3 text-sm text-ink font-semibold focus:border-gold focus:outline-none"
+                    />
+                  </label>
+
+                  <Button
+                    type="submit"
+                    disabled={sendingBroadcast || busy}
+                    className="primary-button min-h-[46px] w-full sm:w-auto px-6 py-2.5 text-sm font-bold shadow-md"
+                  >
+                    {sendingBroadcast ? copy.broadcastSending : copy.broadcastSend}
+                  </Button>
                 </form>
               </Card>
-            ) : <Card>{copy.accessRestricted}</Card>}
+
+              <Card className="space-y-3 p-5">
+                <h3 className="text-base font-bold text-ink flex items-center gap-2">
+                  <span aria-hidden="true">📋</span> {copy.broadcastHistory}
+                </h3>
+                {broadcasts.length ? (
+                  <div className="space-y-3">
+                    {broadcasts.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-ink/10 bg-paper/60 p-3.5 space-y-1.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h4 className="text-sm font-bold text-gold-soft">{item.title}</h4>
+                          <span className="text-[11px] text-ink/60 font-medium">
+                            {new Date(item.createdAt).toLocaleString(lang === 'bn' ? 'bn-BD' : 'en')}
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-ink leading-relaxed">{item.body}</p>
+                        <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] font-semibold text-ink/60">
+                          <span>🎯 {item.url}</span>
+                          <span>📱 {lang === 'bn' ? `ডেলিভারি: ${item.deliveredCount}টি ডিভাইস` : `Delivered: ${item.deliveredCount} devices`}</span>
+                          {item.creator ? <span>👤 {item.creator}</span> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-ink/60">{copy.noBroadcasts}</p>
+                )}
+              </Card>
             </section>
           ) : null}
 

@@ -3682,12 +3682,15 @@ body,
 }
 
 .speech-practice-layout {
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  height: 100dvh;
   min-height: 100dvh;
+  max-height: 100dvh;
   gap: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: max(2rem, env(safe-area-inset-bottom, 24px));
+  overflow: hidden;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 8px));
 }
 
 .speech-practice-exit {
@@ -3717,24 +3720,28 @@ body,
 .speech-practice-layout > .speech-practice-panel {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   min-height: 0;
-  justify-content: flex-start;
+  height: 100%;
+  justify-content: space-between;
   gap: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: 0.75rem 1rem max(2rem, env(safe-area-inset-bottom, 24px));
+  padding: 0.5rem 1rem max(0.75rem, env(safe-area-inset-bottom, 12px));
   box-shadow: none;
 }
 
 .speech-practice-step {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  gap: 1rem;
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
+  justify-content: space-between;
+  gap: 0.75rem;
   width: min(100%, 38rem);
   margin-inline: auto;
 }
@@ -3774,11 +3781,15 @@ body,
 .speech-practice-card {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
+  justify-content: space-between;
   gap: clamp(0.75rem, 2.5vw, 1.25rem);
   border-color: rgb(var(--c-ink) / 0.1);
-  border-radius: 1.25rem;
+  border-radius: 1.5rem;
   background: rgb(var(--c-paper));
-  padding: clamp(0.85rem, 3.5vw, 1.35rem);
+  padding: clamp(0.9rem, 3.5vw, 1.35rem);
   box-shadow: 0 12px 32px -28px rgb(0 0 0 / 0.55);
   animation: none;
   transform: none;
@@ -3791,9 +3802,9 @@ body,
 }
 
 .speech-practice-sentence {
-  font-size: clamp(1.1rem, 4vw, 1.55rem);
+  font-size: clamp(1.15rem, 4vw, 1.6rem);
   font-weight: 750;
-  line-height: 1.45;
+  line-height: 1.5;
   text-align: left;
 }
 
@@ -3861,23 +3872,29 @@ body,
 }
 
 .speech-practice-speak {
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 4.5rem;
+  height: 4.5rem;
   border-radius: 50%;
   background: rgb(var(--c-sapphire));
   color: rgb(var(--c-paper));
-  box-shadow: none;
+  box-shadow: 0 8px 24px -4px rgb(var(--c-sapphire) / 0.45);
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.speech-practice-speak:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 12px 30px -4px rgb(var(--c-sapphire) / 0.55);
 }
 
 .speech-practice-speak.is-listening {
   background: rgb(var(--c-gold));
   color: rgb(var(--c-paper));
-  box-shadow: none;
+  box-shadow: 0 0 0 8px rgb(var(--c-gold) / 0.25), 0 0 28px rgb(var(--c-gold) / 0.65);
 }
 
 .speech-practice-stop-mark {
-  width: 0.75rem;
-  height: 0.75rem;
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .speech-practice-result {

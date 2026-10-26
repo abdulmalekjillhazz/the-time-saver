@@ -9,14 +9,17 @@ import {
   uploadSignatureSchema,
   attachMediaSchema,
   auditQuerySchema,
+  broadcastNotificationSchema,
 } from '@smart-routine/shared';
+import { Announcement } from '../models/Announcement.js';
+import { broadcastPushNotification } from '../services/push.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { requireStaff, requireAdmin, requireRole, requireCloudinary } from '../middleware/roles.js';
 import { writeAudit, listAudit } from '../services/audit.js';
 import * as mfa from '../services/mfa.js';
-import { setRole } from '../services/roles.js';
+import { setRole, listUsers, restrictUser, deleteUser } from '../services/roles.js';
 import { createDraft, updateLesson, submitForReview, publishLesson, approveAiDraft, archiveLesson, listAllLessons } from '../services/lessons.js';
 import { createSignature, attachMedia, detachMedia, cleanupUploads } from '../services/uploads.js';
 import { effectiveFlags, setFlag } from '../services/flags.js';
@@ -130,11 +133,55 @@ export function adminRouter(config) {
     }
   });
 
+  r.get('/users', requireRole('owner'), async (req, res, next) => {
+    try {
+      const users = await listUsers({ search: req.query.search });
+      res.json({ users });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   r.post('/users/:id/role', requireRole('owner'), validate({ body: roleChangeSchema }), async (req, res, next) => {
     try {
       const target = await setRole(req.user, req.params.id, req.body.role);
       await writeAudit({ actor: req.user, action: 'role.change', targetType: 'user', targetId: req.params.id, summary: `role=${req.body.role}`, requestId: req.id });
       res.json({ user: { id: String(target._id), role: target.role } });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  r.post('/users/:id/restrict', requireRole('owner'), async (req, res, next) => {
+    try {
+      const restricted = req.body?.restricted !== false;
+      const target = await restrictUser(req.user, req.params.id, restricted);
+      await writeAudit({
+        actor: req.user,
+        action: restricted ? 'user.restrict' : 'user.unrestrict',
+        targetType: 'user',
+        targetId: req.params.id,
+        summary: `restricted=${restricted}`,
+        requestId: req.id,
+      });
+      res.json({ user: { id: String(target._id), email: target.email, role: target.role, isRestricted: target.isRestricted } });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  r.delete('/users/:id', requireRole('owner'), async (req, res, next) => {
+    try {
+      const target = await deleteUser(req.user, req.params.id);
+      await writeAudit({
+        actor: req.user,
+        action: 'user.delete',
+        targetType: 'user',
+        targetId: req.params.id,
+        summary: `deleted email=${target.email}`,
+        requestId: req.id,
+      });
+      res.json({ ok: true, id: String(target._id) });
     } catch (err) {
       next(err);
     }
@@ -434,6 +481,77 @@ export function adminRouter(config) {
       next(err);
     }
   });
+
+  r.get('/notifications/broadcast', requireRole('editor', 'owner'), async (_req, res, next) => {
+    try {
+      const announcements = await Announcement.find({})
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .populate('createdBy', 'displayName email')
+        .lean();
+      res.json({
+        announcements: announcements.map((a) => ({
+          id: String(a._id),
+          title: a.title,
+          body: a.body,
+          url: a.url,
+          deliveredCount: a.deliveredCount,
+          totalSubscribers: a.totalSubscribers,
+          createdAt: a.createdAt,
+          creator: a.createdBy?.displayName || a.createdBy?.email || 'Admin',
+        })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  r.post(
+    '/notifications/broadcast',
+    requireRole('editor', 'owner'),
+    rateLimit({ name: 'admin-broadcast-push', limit: 10, windowMs: HOUR, by: 'user' }),
+    validate({ body: broadcastNotificationSchema }),
+    async (req, res, next) => {
+      try {
+        const { title, body, url } = req.body;
+        const pushResult = await broadcastPushNotification({ title, body, url: url || '/today' });
+
+        const announcement = await Announcement.create({
+          title,
+          body,
+          url: url || '/today',
+          createdBy: req.user._id,
+          deliveredCount: pushResult.delivered,
+          totalSubscribers: pushResult.totalSubscriptions,
+        });
+
+        await writeAudit({
+          actor: req.user,
+          action: 'notification.broadcast',
+          targetType: 'announcement',
+          targetId: announcement._id,
+          summary: `title=${title}; delivered=${pushResult.delivered}/${pushResult.totalSubscriptions}`,
+          requestId: req.id,
+        });
+
+        res.status(201).json({
+          ok: true,
+          announcement: {
+            id: String(announcement._id),
+            title: announcement.title,
+            body: announcement.body,
+            url: announcement.url,
+            deliveredCount: announcement.deliveredCount,
+            totalSubscribers: announcement.totalSubscribers,
+            createdAt: announcement.createdAt,
+          },
+          push: pushResult,
+        });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
 
   return r;
 }

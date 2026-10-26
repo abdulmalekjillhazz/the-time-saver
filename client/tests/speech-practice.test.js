@@ -14,14 +14,14 @@ import {
 } from '../lib/speechPractice.js';
 
 describe('story speech practice matching', () => {
-  it('uses clear pronunciation feedback tiers and only saves scores above 35%', () => {
-    expect(getPronunciationFeedbackTier(34)).toBe('retry');
-    expect(getPronunciationFeedbackTier(35)).toBe('good');
-    expect(getPronunciationFeedbackTier(69)).toBe('good');
-    expect(getPronunciationFeedbackTier(70)).toBe('great');
-    expect(MIN_PRONUNCIATION_SCORE_TO_SAVE).toBe(35);
-    expect(shouldSubmitPronunciationScore(34)).toBe(false);
-    expect(shouldSubmitPronunciationScore(35)).toBe(true);
+  it('uses clear pronunciation feedback tiers and only saves scores above 40%', () => {
+    expect(getPronunciationFeedbackTier(39)).toBe('retry');
+    expect(getPronunciationFeedbackTier(40)).toBe('good');
+    expect(getPronunciationFeedbackTier(59)).toBe('good');
+    expect(getPronunciationFeedbackTier(60)).toBe('great');
+    expect(MIN_PRONUNCIATION_SCORE_TO_SAVE).toBe(40);
+    expect(shouldSubmitPronunciationScore(39)).toBe(false);
+    expect(shouldSubmitPronunciationScore(40)).toBe(true);
   });
 
   it('allows at most three attempts for each story line', () => {

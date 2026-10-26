@@ -31,3 +31,11 @@ export const auditQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(50),
   })
   .strict();
+
+export const broadcastNotificationSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Title is required').max(100, 'Title is too long'),
+    body: z.string().trim().min(1, 'Message is required').max(500, 'Message is too long'),
+    url: z.string().trim().max(500).optional().default('/today'),
+  })
+  .strict();

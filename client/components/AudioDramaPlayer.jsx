@@ -1175,7 +1175,7 @@ export function AudioDramaPlayer({
   };
 
   const advancePracticeLine = (lineIndex, completed = false) => {
-    const pronunciationSucceeded = completed && (speechPractice.comparison?.accuracy ?? 0) >= 35;
+    const pronunciationSucceeded = completed && (speechPractice.comparison?.accuracy ?? 0) >= 40;
     const currentComparison = speechPractice.lineIndex === lineIndex
       ? speechPractice.comparison
       : null;
@@ -1249,7 +1249,7 @@ export function AudioDramaPlayer({
   };
 
   useEffect(() => {
-    if (speechPractice.status !== 'result' || (speechPractice.comparison?.accuracy ?? 0) < 35) {
+    if (speechPractice.status !== 'result' || (speechPractice.comparison?.accuracy ?? 0) < 40) {
       setPracticeSuccessLineIndex(null);
       return undefined;
     }
@@ -1499,7 +1499,7 @@ export function AudioDramaPlayer({
                 const attemptsExhausted = !canAttemptSpeechPractice(attempts);
                 const hasResult = isCurrentPractice && speechPractice.status === 'result';
                 const showSuccessMark = hasResult
-                  && comparison?.accuracy >= 35
+                  && comparison?.accuracy >= 40
                   && practiceSuccessLineIndex === lineIndex;
                 const currentStep = completedPracticeLineIndexes.length + 1;
                 const progress = Math.round((completedPracticeLineIndexes.length / practiceLines.length) * 100);
@@ -1534,10 +1534,10 @@ export function AudioDramaPlayer({
                           : 'border-ink/10 bg-paper/70'
                     }`}
                   >
-                    <div className="speech-practice-body space-y-3">
-                      <div className="mb-1 flex items-center gap-2">
+                    <div className="speech-practice-body my-auto flex flex-1 flex-col justify-center space-y-3.5">
+                      <div className="mb-1 flex items-center gap-2.5">
                         <span
-                          className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-gold/40 bg-gold/10 text-xl shadow-inner"
+                          className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-gold/40 bg-gold/10 text-2xl shadow-inner"
                           role="img"
                           aria-label={isBn ? 'চরিত্রের অভিব্যক্তি' : 'Character expression'}
                         >
@@ -1546,7 +1546,7 @@ export function AudioDramaPlayer({
                         <span className="min-w-0 truncate text-xs sm:text-sm font-extrabold text-gold-soft">{line.character}</span>
                       </div>
                       <div className="flex items-start">
-                        <p className="speech-practice-sentence min-w-0 max-w-[46ch] flex-1 text-base font-bold leading-snug text-ink sm:text-xl sm:leading-normal">
+                        <p className="speech-practice-sentence min-w-0 max-w-[46ch] flex-1 text-base font-bold leading-relaxed text-ink sm:text-xl sm:leading-normal">
                           {spokenTextParts(
                             line.text,
                             0,
@@ -1561,6 +1561,33 @@ export function AudioDramaPlayer({
                           )}
                         </p>
                       </div>
+                      {microsoftVoices.length ? (
+                        <div className="flex items-center pt-0.5">
+                          <details className="speech-practice-voice-settings">
+                            <summary aria-label={copy.voiceChoice} title={copy.voiceChoice}>
+                              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.2a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.4 15a1.7 1.7 0 0 0-1.56-1.03H6v-2.4h.84A1.7 1.7 0 0 0 8.4 10a1.7 1.7 0 0 0-.34-1.88L8 8.06l1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 12.67 5.2V5h2.4v.2a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.34 10a1.7 1.7 0 0 0 1.56 1.03h.1v2.4h-.1A1.7 1.7 0 0 0 19.4 15Z" />
+                              </svg>
+                            </summary>
+                            <label>
+                              <span className="sr-only">{copy.voiceChoice}</span>
+                              <select
+                                aria-label={copy.voiceChoice}
+                                value={selectedVoiceURI}
+                                onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                              >
+                                <option value="">{copy.defaultVoice}</option>
+                                {microsoftVoices.map((voice) => (
+                                  <option key={speechVoiceKey(voice)} value={speechVoiceKey(voice)}>
+                                    {voice.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </details>
+                        </div>
+                      ) : null}
                       {selectedWord?.keyId?.startsWith(`practice-${lineIndex}-`) ? (
                         <WordMeaningPanel
                           selectedWord={selectedWord}
@@ -1571,40 +1598,18 @@ export function AudioDramaPlayer({
                           floating
                         />
                       ) : null}
-                      {microsoftVoices.length ? (
-                        <details className="speech-practice-voice-settings">
-                          <summary aria-label={copy.voiceChoice} title={copy.voiceChoice}>
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-                              <circle cx="12" cy="12" r="3" />
-                              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.2a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.4 15a1.7 1.7 0 0 0-1.56-1.03H6v-2.4h.84A1.7 1.7 0 0 0 8.4 10a1.7 1.7 0 0 0-.34-1.88L8 8.06l1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 12.67 5.2V5h2.4v.2a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.34 10a1.7 1.7 0 0 0 1.56 1.03h.1v2.4h-.1A1.7 1.7 0 0 0 19.4 15Z" />
-                            </svg>
-                          </summary>
-                          <label>
-                            <span className="sr-only">{copy.voiceChoice}</span>
-                            <select
-                              aria-label={copy.voiceChoice}
-                              value={selectedVoiceURI}
-                              onChange={(event) => setSelectedVoiceURI(event.target.value)}
-                            >
-                              <option value="">{copy.defaultVoice}</option>
-                              {microsoftVoices.map((voice) => (
-                                <option key={speechVoiceKey(voice)} value={speechVoiceKey(voice)}>
-                                  {voice.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </details>
-                      ) : null}
+                    </div>
+
+                    <div className="speech-practice-bottom mt-auto flex flex-col items-center space-y-2.5 pt-3">
                       {showSuccessMark ? (
-                        <div role="status" aria-live="assertive" className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-emerald-500/10 py-2.5 text-emerald-700">
+                        <div role="status" aria-live="assertive" className="flex w-full min-h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-emerald-500/10 py-2.5 text-emerald-700">
                           <span aria-hidden="true" className="grid size-12 place-items-center rounded-full border-4 border-emerald-500 bg-emerald-500/15 text-3xl font-black leading-none">✓</span>
                           <span className="text-xs font-extrabold">{isBn ? 'সঠিক হয়েছে' : 'Correct'}</span>
                           <span className="text-[10px] font-medium text-emerald-800/80">{isBn ? 'পরের বাক্য আসছে...' : 'Next sentence coming...'}</span>
                         </div>
                       ) : null}
                       {isCurrentPractice && speechPractice.status === 'result' && comparison && !showSuccessMark ? (
-                        <div role="status" aria-live="polite" className="speech-practice-result space-y-1.5 text-xs text-ink">
+                        <div role="status" aria-live="polite" className="speech-practice-result w-full space-y-1.5 text-xs text-ink">
                           <p className={`flex items-center justify-center gap-1.5 rounded-xl px-2.5 py-1 font-extrabold ${
                             getPronunciationFeedbackTier(comparison.accuracy) === 'great'
                               ? 'bg-emerald-500/15 text-emerald-800'
@@ -1643,26 +1648,10 @@ export function AudioDramaPlayer({
                           </p>
                         </div>
                       ) : null}
-                      {isCurrentPractice && speechPractice.status === 'error' ? (
-                        <span role="alert" className="sr-only">{speechPractice.message}</span>
-                      ) : null}
-                    </div>
 
-                    <div className="speech-practice-bottom mt-auto space-y-2 pt-3">
+                      {/* Helper button: ONLY when 3 attempts exhausted, positioned right above mic */}
                       {isCurrentPractice && attemptsExhausted && !showSuccessMark ? (
-                        <div className="text-center">
-                          <button
-                            type="button"
-                            onClick={() => advancePracticeLine(lineIndex, true)}
-                            className="primary-button mx-auto inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black shadow-md hover:brightness-110 active:scale-95"
-                          >
-                            <span>✅</span>
-                            <span>{copy.completeLine}</span>
-                          </button>
-                        </div>
-                      ) : null}
-                      {isCurrentPractice && speechPractice.status === 'error' ? (
-                        <div className="text-center">
+                        <div className="w-full text-center">
                           <button
                             type="button"
                             onClick={() => listenAndCompletePracticeLine(lineIndex)}
@@ -1673,6 +1662,14 @@ export function AudioDramaPlayer({
                           </button>
                         </div>
                       ) : null}
+
+                      {/* Compact non-intrusive alert when mic error occurs before 3 attempts */}
+                      {isCurrentPractice && speechPractice.status === 'error' && !attemptsExhausted ? (
+                        <p role="alert" className="mx-auto max-w-xs rounded-xl bg-rose-500/10 px-3 py-1.5 text-center text-xs font-semibold text-rose-600">
+                          {speechPractice.message || copy.microphonePermissionFailed}
+                        </p>
+                      ) : null}
+
                       <div className="speech-practice-action-dock" role="group" aria-label={copy.practiceActions}>
                         <button
                           type="button"
@@ -1691,7 +1688,7 @@ export function AudioDramaPlayer({
                           {isListening ? (
                             <span aria-hidden="true" className="speech-practice-stop-mark" />
                           ) : (
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-7 stroke-current stroke-2">
                               <rect x="9" y="3" width="6" height="12" rx="3" />
                               <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8" />
                             </svg>
@@ -1701,12 +1698,12 @@ export function AudioDramaPlayer({
                       {isListening ? (
                         <p role="status" className="text-center text-xs font-semibold text-ink/70">{copy.listening}</p>
                       ) : null}
-                      <div className="text-center">
+                      <div className="text-center pt-0.5">
                         <button
                           type="button"
                           onClick={() => advancePracticeLine(lineIndex)}
                           disabled={isListening}
-                          className="mx-auto inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-ink/60 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                          className="mx-auto inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-ink/60 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
                         >
                           <span>⏭️</span>
                           <span>{currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}</span>

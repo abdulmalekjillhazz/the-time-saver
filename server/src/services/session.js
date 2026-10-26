@@ -72,6 +72,6 @@ export async function rotateSession(session) {
 
 export async function loadUserForSession(session) {
   const user = await User.findById(session.userId).lean();
-  if (!user || user.deletedAt) throw unauthenticated();
+  if (!user || user.deletedAt || user.isRestricted) throw unauthenticated();
   return user;
 }
