@@ -33,6 +33,8 @@
     "vite": "^8.3.4"
   },
   "overrides": {
+    "body-parser": "^1.20.9",
+    "zod": "^4.6.7",
     "braces": "3.0.3",
     "micromatch": "4.0.8",
     "postcss": "^8.4.49",
