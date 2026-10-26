@@ -290,6 +290,20 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     playCongratulationsSound();
     if (!exercise.storyBacked) {
       setResult('correct');
+      setCompletedSentenceCount((current) => {
+        const nextCount = current + 1;
+        if (nextCount > 0 && nextCount % 10 === 0) {
+          setMilestoneNotice(isBn
+            ? `🎉 চমৎকার! ${nextCount}টি বাক্য সম্পন্ন করে ১৫ পয়েন্ট পেয়েছ!`
+            : `🎉 Great! You completed ${nextCount} sentences and earned 15 points!`);
+          announceLearningActivity(15, { soundAlreadyPlayed: true });
+        }
+        return nextCount;
+      });
+      setCompletedLevels((current) => ({
+        ...current,
+        [level]: (current[level] || 0) + 1,
+      }));
       return;
     }
     setCompletionBusy(true);
@@ -329,6 +343,17 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     setMilestoneNotice('');
     setCompletionError('');
   };
+
+  const nextExerciseRef = useRef(nextExercise);
+  nextExerciseRef.current = nextExercise;
+
+  useEffect(() => {
+    if (result !== 'correct') return undefined;
+    const timer = window.setTimeout(() => {
+      nextExerciseRef.current?.();
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [result]);
 
   const restartExercises = () => {
     setShuffleRound((current) => current + 1);
@@ -680,7 +705,7 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
                   >
                     <p>
                       {result === 'correct'
-                        ? (isBn ? '✓ দারুণ! গল্পের বাক্যটি ঠিকভাবে সাজিয়েছ।' : '✓ Excellent! You rebuilt the story sentence correctly.')
+                        ? (isBn ? '✓ দারুণ! বাক্যটি ঠিকভাবে সাজিয়েছ · পরের বাক্য আসছে...' : '✓ Excellent! Sentence arranged correctly · Next coming...')
                         : (isBn ? 'আরেকবার চেষ্টা করো—কর্তা দিয়ে শুরু করে ক্রিয়াটি খুঁজে দেখো।' : 'Try again. Look for the subject first, then find the verb.')}
                     </p>
                     {milestoneNotice ? <p className="font-extrabold text-gold-soft">{milestoneNotice}</p> : null}

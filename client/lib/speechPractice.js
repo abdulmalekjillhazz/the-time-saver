@@ -1,14 +1,14 @@
 export const MAX_SPEECH_PRACTICE_ATTEMPTS = 3;
-export const MIN_PRONUNCIATION_SCORE_TO_SAVE = 75;
+export const MIN_PRONUNCIATION_SCORE_TO_SAVE = 35;
 
 export function getPronunciationFeedbackTier(accuracy) {
-  if (accuracy >= 80) return 'great';
-  if (accuracy >= 50) return 'good';
+  if (accuracy >= 70) return 'great';
+  if (accuracy >= 35) return 'good';
   return 'retry';
 }
 
 export function shouldSubmitPronunciationScore(accuracy) {
-  return accuracy > MIN_PRONUNCIATION_SCORE_TO_SAVE;
+  return accuracy >= MIN_PRONUNCIATION_SCORE_TO_SAVE;
 }
 
 export function canAttemptSpeechPractice(attemptCount) {

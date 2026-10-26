@@ -6,7 +6,7 @@ import { AudioDramaPlayer } from './AudioDramaPlayer.jsx';
 import { ContextSpeakingPractice } from './ContextSpeakingPractice.jsx';
 import { Card } from './ui/Card.jsx';
 
-export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryComplete }) {
+export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryComplete, initialMode = 'dialogue' }) {
   const isBn = lang === 'bn';
   const situations = useMemo(() => {
     const dailyDialogue = typeof dailyLesson?.body === 'string'
@@ -42,14 +42,23 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
       ? situations[situations.length - 1].id
       : SPEAKING_SITUATIONS[0].id
   ));
-  const [speakingMode, setSpeakingMode] = useState('dialogue');
+  const [speakingMode, setSpeakingMode] = useState(initialMode);
   const [autoPlaySignal, setAutoPlaySignal] = useState(0);
   const [isMobileView, setIsMobileView] = useState(false);
-  const [mobilePlayerVisible, setMobilePlayerVisible] = useState(false);
+  const [mobilePlayerVisible, setMobilePlayerVisible] = useState(() => initialMode === 'free-speech');
   const practiceRef = useRef(null);
   const hasSelectedSituation = useRef(false);
   const selectedSituation = situations.find((item) => item.id === selectedSituationId)
     || situations[0];
+
+  useEffect(() => {
+    if (initialMode) {
+      setSpeakingMode(initialMode);
+      if (initialMode === 'free-speech') {
+        setMobilePlayerVisible(true);
+      }
+    }
+  }, [initialMode]);
 
   useEffect(() => {
     const query = window.matchMedia('(max-width: 639px)');
@@ -76,102 +85,54 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
 
   return (
     <section className="speaking-situations-section space-y-4" aria-labelledby="speaking-situations-heading">
-      <Card className={`surface-card space-y-4 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/30 via-paper to-gold/10 p-3 shadow-xl sm:space-y-5 sm:p-7 ${
+      <Card className={`surface-card space-y-4 overflow-hidden rounded-3xl border border-gold/25 bg-gradient-to-br from-sapphire-deep/30 via-paper to-gold/10 p-3.5 shadow-xl sm:space-y-5 sm:p-6 ${
         isMobileView && mobilePlayerVisible ? 'mobile-speaking-practice-open' : ''
       }`}>
-        <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gold/15 pb-3">
           <div className="flex items-center gap-3">
-            <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gold/15 text-3xl shadow-inner">🗣️</span>
-            <h2 id="speaking-situations-heading" className="section-heading">
+            <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gold/15 text-2xl shadow-inner">
+              🗣️
+            </span>
+            <h2 id="speaking-situations-heading" className="section-heading text-base sm:text-lg font-extrabold text-ink">
               {isBn ? 'পরিস্থিতি অনুযায়ী ইংরেজিতে কথা বলুন' : 'Speak English in real-life situations'}
             </h2>
           </div>
-          <p className="max-w-3xl text-sm leading-relaxed text-ink/75 sm:text-base">
-            {isBn
-              ? 'দৈনন্দিন জীবনের একটি পরিস্থিতি বেছে নিন। কথোপকথন শুনুন, শব্দে ট্যাপ করে ধীরে উচ্চারণ শিখুন, অথবা ৫ মিনিট মুক্ত কথন দিয়ে ১০০ নম্বরে নিজের কথা যাচাই করুন।'
-              : 'Choose an everyday situation. Listen to the conversation, tap any word to hear a slow pronunciation in context, or practise 5-minute free speech evaluated out of 100.'}
-          </p>
-        </div>
-
-        {/* Practice Mode Tabs */}
-        <div className="flex rounded-2xl border-2 border-sapphire/25 bg-paper/70 p-1 gap-1" role="tablist" aria-label={isBn ? 'কথন অনুশীলন মোড' : 'Speaking mode'}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={speakingMode === 'dialogue'}
-            onClick={() => setSpeakingMode('dialogue')}
-            className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-black transition ${
-              speakingMode === 'dialogue'
-                ? 'border-2 border-sapphire/40 bg-sapphire text-on-sapphire shadow-sm'
-                : 'text-ink/75 hover:bg-gold/15'
-            }`}
-          >
-            🗣️ {isBn ? 'সংলাপ ও উচ্চারণ পাঠ' : 'Dialogue & Lines'}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={speakingMode === 'free-speech'}
-            onClick={() => {
-              setSpeakingMode('free-speech');
-              if (isMobileView) setMobilePlayerVisible(true);
-            }}
-            className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-black transition ${
-              speakingMode === 'free-speech'
-                ? 'border-2 border-sapphire/40 bg-sapphire text-on-sapphire shadow-sm'
-                : 'text-ink/75 hover:bg-gold/15'
-            }`}
-          >
-            ⏱️ {isBn ? '৫ মিনিট মুক্ত কথন (স্কোর / ১০০)' : '5-Min Free Speech (/100)'}
-          </button>
+          <span className="rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-xs font-bold text-ink/75">
+            {isBn ? `${situations.length}টি পরিস্থিতি` : `${situations.length} situations`}
+          </span>
         </div>
 
         <div className="space-y-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-sm font-extrabold uppercase tracking-wide text-ink/75">
-              {isBn ? 'আপনি কোন পরিস্থিতিতে অনুশীলন করতে চান?' : 'Choose a situation to practise'}
-            </h3>
-            <span className="text-xs font-semibold text-ink/60">
-              {isBn ? `${situations.length}টি পরিস্থিতি` : `${situations.length} situations`}
-            </span>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3" role="group" aria-label={isBn ? 'অনুশীলনের পরিস্থিতি' : 'Speaking practice situations'}>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3.5 md:grid-cols-4" role="group" aria-label={isBn ? 'অনুশীলনের পরিস্থিতি' : 'Speaking practice situations'}>
             {situations.map((situation) => {
               const selected = selectedSituationId === situation.id;
               return (
                 <div
                   key={situation.id}
-                  className={`rounded-xl border-2 transition-colors duration-200 sm:rounded-2xl ${
-                    selected && isMobileView && mobilePlayerVisible ? 'overflow-visible' : 'overflow-hidden'
-                  } ${
+                  className={`rounded-2xl border-2 transition-all duration-200 ${
                     selected
-                      ? 'border-gold bg-gold/15 shadow-md'
-                      : 'border-sapphire/15 bg-paper/75'
+                      ? 'border-gold bg-gold/20 shadow-md ring-2 ring-gold/40'
+                      : 'border-sapphire/15 bg-paper/75 hover:border-gold/30 hover:bg-gold/5'
                   }`}
                 >
                   <button
                     type="button"
                     aria-pressed={selected}
+                    title={situation.description[lang] || situation.description.en}
                     onClick={() => {
                       setSelectedSituationId(situation.id);
-                      setMobilePlayerVisible(false);
+                      setMobilePlayerVisible(true);
+                      setAutoPlaySignal((signal) => signal + 1);
                     }}
-                    className="group flex min-h-0 w-full items-start gap-2 p-2 text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-gold/40 sm:min-h-28 sm:gap-4 sm:p-4"
+                    className="flex w-full flex-col items-center justify-center p-3 text-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-gold/40 sm:p-4"
                   >
-                    <span aria-hidden="true" className="grid size-[4.5rem] shrink-0 place-items-center rounded-2xl bg-sapphire/10 text-5xl sm:size-16 sm:text-4xl">
+                    <span aria-hidden="true" className="grid size-12 place-items-center rounded-2xl bg-sapphire/10 text-3xl shadow-inner sm:size-14 sm:text-4xl">
                       {situation.icon}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[0.68rem] font-bold uppercase tracking-wider text-ink/60">
-                        {situation.category[lang] || situation.category.en}
-                      </span>
-                      <span className="mt-1 block text-base font-extrabold leading-snug text-ink">
-                        {situation.title[lang] || situation.title.en}
-                      </span>
-                      <span className="mt-1 line-clamp-1 block text-sm leading-snug text-ink/75 sm:mt-1.5 sm:line-clamp-none sm:leading-relaxed">
-                        {situation.description[lang] || situation.description.en}
-                      </span>
+                    <span className="mt-2 block text-xs font-black leading-snug text-ink line-clamp-2 sm:text-sm">
+                      {situation.title[lang] || situation.title.en}
                     </span>
+                    <span className="sr-only">{situation.description[lang] || situation.description.en}</span>
                   </button>
                   {selected ? (
                     <button
@@ -180,37 +141,29 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
                         setMobilePlayerVisible(true);
                         setAutoPlaySignal((signal) => signal + 1);
                       }}
-                      className="mx-3 mb-3 inline-flex min-h-11 items-center gap-2 rounded-lg bg-sapphire px-4 py-2 text-sm font-bold text-on-sapphire focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold/40 sm:hidden"
+                      className="mx-2 mb-2 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-sapphire px-3 py-1.5 text-xs font-bold text-on-sapphire sm:hidden"
                     >
                       <span aria-hidden="true">▶</span>
                       {isBn ? 'শুরু' : 'Start'}
                     </button>
                   ) : null}
                   {selected && isMobileView && mobilePlayerVisible ? (
-                    <div className="px-3 pb-3">
-                      {speakingMode === 'free-speech' ? (
-                        <ContextSpeakingPractice
-                          key={`context-speaking-${selectedSituation.id}`}
-                          situation={selectedSituation}
-                          lang={lang}
-                        />
-                      ) : (
-                        <AudioDramaPlayer
-                          key={`speaking-situation-${selectedSituation.id}`}
-                          title={selectedSituation.title.en}
-                          slug={selectedSituation.slug || ''}
-                          content={selectedSituation.dialogue}
-                          practiceContent={selectedSituation.dialogue}
-                          audioUrl={selectedSituation.audioUrl || ''}
-                          lang={lang}
-                          autoPlaySignal={autoPlaySignal}
-                          startInPracticeMode
-                          initialChunkMode={false}
-                          onComplete={selectedSituation.completionId && onStoryComplete
-                            ? () => onStoryComplete(selectedSituation.completionId)
-                            : undefined}
-                        />
-                      )}
+                    <div className="px-2 pb-2 sm:px-3 sm:pb-3">
+                      <AudioDramaPlayer
+                        key={`speaking-situation-${selectedSituation.id}`}
+                        title={selectedSituation.title.en}
+                        slug={selectedSituation.slug || ''}
+                        content={selectedSituation.dialogue}
+                        practiceContent={selectedSituation.dialogue}
+                        audioUrl={selectedSituation.audioUrl || ''}
+                        lang={lang}
+                        autoPlaySignal={autoPlaySignal}
+                        startInPracticeMode
+                        initialChunkMode={false}
+                        onComplete={selectedSituation.completionId && onStoryComplete
+                          ? () => onStoryComplete(selectedSituation.completionId)
+                          : undefined}
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -236,28 +189,20 @@ export function SpeakingSituations({ lang = 'bn', dailyLesson = null, onStoryCom
               </p>
             </div>
           </div>
-          {speakingMode === 'free-speech' ? (
-            <ContextSpeakingPractice
-              key={`context-speaking-${selectedSituation.id}`}
-              situation={selectedSituation}
-              lang={lang}
-            />
-          ) : (
-            <AudioDramaPlayer
-              key={`speaking-situation-${selectedSituation.id}`}
-              title={selectedSituation.title.en}
-              slug={selectedSituation.slug || ''}
-              content={selectedSituation.dialogue}
-              practiceContent={selectedSituation.dialogue}
-              audioUrl={selectedSituation.audioUrl || ''}
-              lang={lang}
-              autoPlaySignal={autoPlaySignal}
-              initialChunkMode={false}
-              onComplete={selectedSituation.completionId && onStoryComplete
-                ? () => onStoryComplete(selectedSituation.completionId)
-                : undefined}
-            />
-          )}
+          <AudioDramaPlayer
+            key={`speaking-situation-${selectedSituation.id}`}
+            title={selectedSituation.title.en}
+            slug={selectedSituation.slug || ''}
+            content={selectedSituation.dialogue}
+            practiceContent={selectedSituation.dialogue}
+            audioUrl={selectedSituation.audioUrl || ''}
+            lang={lang}
+            autoPlaySignal={autoPlaySignal}
+            initialChunkMode={false}
+            onComplete={selectedSituation.completionId && onStoryComplete
+              ? () => onStoryComplete(selectedSituation.completionId)
+              : undefined}
+          />
         </div>
       </Card>
     </section>

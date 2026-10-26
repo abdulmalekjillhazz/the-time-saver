@@ -32,6 +32,7 @@ import { base64UrlToBytes, bengaliCalendarMonthRange, buildCalendarDays } from '
 import { getRoutineMood } from '../lib/routineMood.js';
 import { buildAlarmAnnouncement, getNextRoutineTitle, speakWithGoogleTts, speakWithVoice, buildMissedAnnouncement } from '../lib/voiceBriefing.js';
 import { SpeakingSituations } from './SpeakingSituations.jsx';
+import { FreeSpeechStudio } from './FreeSpeechStudio.jsx';
 import { syncAlarmCreate, syncAlarmDelete, syncAlarmUpdate, reportAlarmFired, fetchServerAlarms, fetchMissedAlarms, acknowledgeAlarm } from '../lib/alarmsSync.js';
 import { ensureAlarmPushSubscription } from '../lib/pushClient.js';
 import { ALARM_SOUNDS, getAlarmSoundDataUri, playAlarmSound, stopAlarmSound } from '../lib/notificationSound.js';
@@ -576,6 +577,13 @@ export function PrivateApp() {
   const [uiReady, setUiReady] = useState(false);
   const tab = useAppStore((state) => state.activeTab);
   const setTab = useAppStore((state) => state.setActiveTab);
+  const [todayView, setTodayView] = useState(() => (tab === 'plan' ? 'plan' : 'today'));
+
+  useEffect(() => {
+    if (tab === 'plan') {
+      setTodayView('plan');
+    }
+  }, [tab]);
   const [routines, setRoutines] = useState([]);
   const [routineStartTime, setRoutineStartTime] = useState('');
   const [routineEndTime, setRoutineEndTime] = useState('');
@@ -2499,20 +2507,39 @@ export function PrivateApp() {
       ) : null}
       <nav className="app-tabs" aria-label={copy.title}>
         {[
-          ['today', '🌤️', copy.today, lang === 'bn' ? 'আজ' : 'Today'],
-          ['plan', '🗓️', lang === 'bn' ? 'পরিকল্পনা' : 'Plan', lang === 'bn' ? 'পরিকল্পনা' : 'Plan'],
+          ['today', '🌤️', lang === 'bn' ? 'আজ ও পরিকল্পনা' : 'Today & Plan', lang === 'bn' ? 'আজ' : 'Today'],
+          ['free-speech', '🕊️', lang === 'bn' ? 'মুক্ত কথন ও আত্মপ্রকাশ (Free Speech)' : 'Free Speech & Expression', lang === 'bn' ? 'মুক্ত কথন' : 'Free Speech'],
           ['lessons', '📚', copy.lessons, lang === 'bn' ? 'পাঠ' : 'Learn'],
-          ['speaking', '🎙️', lang === 'bn' ? 'কথা বলা শিখুন' : 'Learn to speak', lang === 'bn' ? 'কথা' : 'Speak'],
+          ['speaking', '🎙️', lang === 'bn' ? 'পরিস্থিতি সংলাপ' : 'Dialogue & Situations', lang === 'bn' ? 'সংলাপ' : 'Dialogue'],
           ['grammar', '🧩', lang === 'bn' ? 'Building · ইংরেজি বাক্য অনুশীলন' : 'Building · English practice', 'Building'],
-        ].map(([key, icon, label, shortLabel], index) => (
-          <Button key={key} variant={tab === key ? 'primary' : 'secondary'} style={{ '--enter-delay': `${index * 60}ms` }} className={`tab-button enter-up ${tab === key ? 'tab-button-active' : ''}`} aria-label={label} title={label} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>
-            <span className={`tab-icon tab-icon-${key}`} aria-hidden="true">
-              {icon}
-            </span>
-            <span className="tab-label-desktop">{shortLabel}</span>
-            <span className="tab-label-mobile" aria-hidden="true">{shortLabel}</span>
-          </Button>
-        ))}
+        ].map(([key, icon, label, shortLabel], index) => {
+          const isActive = tab === key || (key === 'today' && tab === 'plan');
+          return (
+            <Button
+              key={key}
+              variant={isActive ? 'primary' : 'secondary'}
+              style={{ '--enter-delay': `${index * 60}ms` }}
+              className={`tab-button enter-up ${isActive ? 'tab-button-active' : ''}`}
+              aria-label={label}
+              title={label}
+              aria-current={isActive ? 'page' : undefined}
+              onClick={() => {
+                if (key === 'today' && tab === 'plan') {
+                  setTab('today');
+                  setTodayView('today');
+                } else {
+                  setTab(key);
+                }
+              }}
+            >
+              <span className={`tab-icon tab-icon-${key}`} aria-hidden="true">
+                {icon}
+              </span>
+              <span className="tab-label-desktop">{shortLabel}</span>
+              <span className="tab-label-mobile" aria-hidden="true">{shortLabel}</span>
+            </Button>
+          );
+        })}
         <div className="app-tabs-utilities" aria-label={lang === 'bn' ? 'অতিরিক্ত নিয়ন্ত্রণ' : 'More controls'}>
           {renderAppHeaderControls()}
         </div>
@@ -2572,6 +2599,12 @@ export function PrivateApp() {
 
       {tab === 'leaderboard' ? <div className="tab-enter"><LeaderboardPanel lang={lang} /></div> : null}
 
+      {tab === 'free-speech' ? (
+        <div className="tab-enter">
+          <FreeSpeechStudio lang={lang} />
+        </div>
+      ) : null}
+
       {tab === 'speaking' ? (
         <div className="tab-enter">
           <SpeakingSituations
@@ -2595,15 +2628,52 @@ export function PrivateApp() {
 
       {tab === 'grammar' ? <div className="tab-enter"><GrammarLessons lang={lang} stories={grammarStorySources} /></div> : null}
 
-      {tab === 'today' ? (
+      {tab === 'today' || tab === 'plan' ? (
         <section className="tab-enter today-screen space-y-4">
-          <TodayProgressCard
-            lang={lang}
-            userId={user.id}
-            routines={routines}
-            onScrollToAddRoutine={() => setTab('plan')}
-            onScrollToAlarms={() => setTab('focus')}
-          />
+          {/* Today & Plan Combined View Switcher */}
+          <div className="flex rounded-2xl border-2 border-gold/30 bg-paper/90 p-1 gap-1 shadow-sm" role="tablist" aria-label={lang === 'bn' ? 'রুটিন ও পরিকল্পনা ভিউ' : 'Routine and Plan view'}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={todayView === 'today'}
+              onClick={() => {
+                setTodayView('today');
+                if (tab === 'plan') setTab('today');
+              }}
+              className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-extrabold transition-all duration-200 ${
+                todayView === 'today'
+                  ? 'border-2 border-gold/50 bg-gold text-on-gold shadow-sm'
+                  : 'text-ink/75 hover:bg-gold/15'
+              }`}
+            >
+              🌤️ {lang === 'bn' ? 'আজকের কাজ ও রুটিন' : "Today's Routine"}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={todayView === 'plan'}
+              onClick={() => {
+                setTodayView('plan');
+              }}
+              className={`flex-1 rounded-xl py-2 px-3 text-xs sm:text-sm font-extrabold transition-all duration-200 ${
+                todayView === 'plan'
+                  ? 'border-2 border-gold/50 bg-gold text-on-gold shadow-sm'
+                  : 'text-ink/75 hover:bg-gold/15'
+              }`}
+            >
+              🗓️ {lang === 'bn' ? 'নতুন রুটিন ও ক্যালেন্ডার' : 'Plan & Calendar'}
+            </button>
+          </div>
+
+          {todayView === 'today' ? (
+            <>
+              <TodayProgressCard
+                lang={lang}
+                userId={user.id}
+                routines={routines}
+                onScrollToAddRoutine={() => setTodayView('plan')}
+                onScrollToAlarms={() => setTab('focus')}
+              />
 
           <Card className="surface-card glass-panel glow-border flex flex-wrap items-center justify-between gap-3 p-4">
             <div>
@@ -2659,7 +2729,7 @@ export function PrivateApp() {
                   <Button
                     variant="primary"
                     className="min-h-[44px] px-5 py-2.5 text-sm font-bold shadow-md"
-                    onClick={() => setTab('plan')}
+                    onClick={() => setTodayView('plan')}
                   >
                     <span aria-hidden="true" className="mr-1.5">➕</span>
                     <span>{lang === 'bn' ? 'প্রথম রুটিন যোগ করুন' : 'Add First Routine'}</span>
@@ -2739,12 +2809,9 @@ export function PrivateApp() {
               </ul>
             )}
           </Card>
-
-        </section>
-      ) : null}
-
-      {tab === 'plan' ? (
-        <section className="tab-enter space-y-4">
+        </>
+      ) : (
+        <div className="space-y-4">
           <div className="space-y-2">
             <p className="eyebrow">{lang === 'bn' ? 'ধাপ ১ · রুটিন তৈরি' : 'STEP 1 · CREATE A ROUTINE'}</p>
             <AddRoutineBuilderCard
@@ -2845,8 +2912,10 @@ export function PrivateApp() {
               <TemplatePicker lang={lang} userId={user.id} onRoutineAdded={() => loadRoutines(user).catch(reportError)} />
             </div>
           </Card>
-        </section>
-      ) : null}
+        </div>
+      )}
+    </section>
+  ) : null}
 
       {tab === 'focus' ? (
         <section className="tab-enter space-y-4">
