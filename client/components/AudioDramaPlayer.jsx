@@ -1479,7 +1479,7 @@ export function AudioDramaPlayer({
                       <span>{copy.progressPercent(progress)}</span>
                     </div>
                     <article
-                    className={`speech-practice-card duo-card space-y-3 rounded-2xl border p-4 transition-colors duration-300 sm:p-6 ${
+                    className={`speech-practice-card duo-card rounded-2xl border p-3.5 transition-colors duration-300 sm:p-5 ${
                       isListening
                         ? 'border-sapphire/60 bg-sapphire/10 shadow-lg shadow-sapphire/10'
                         : hasResult
@@ -1487,18 +1487,18 @@ export function AudioDramaPlayer({
                           : 'border-ink/10 bg-paper/70'
                     }`}
                   >
-                    <div className="mb-2 flex items-center gap-3">
+                    <div className="mb-1 flex items-center gap-2">
                       <span
-                        className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-gold/40 bg-gold/10 text-3xl shadow-inner"
+                        className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-gold/40 bg-gold/10 text-xl shadow-inner"
                         role="img"
                         aria-label={isBn ? 'চরিত্রের অভিব্যক্তি' : 'Character expression'}
                       >
                         {characterIcon(line.role, line.text)}
                       </span>
-                      <span className="min-w-0 truncate text-sm font-extrabold text-gold-soft">{line.character}</span>
+                      <span className="min-w-0 truncate text-xs sm:text-sm font-extrabold text-gold-soft">{line.character}</span>
                     </div>
                     <div className="flex items-start">
-                      <p className="speech-practice-sentence min-w-0 max-w-[46ch] flex-1 text-lg font-bold leading-relaxed text-ink sm:text-2xl sm:leading-[1.85]">
+                      <p className="speech-practice-sentence min-w-0 max-w-[46ch] flex-1 text-base font-bold leading-snug text-ink sm:text-xl sm:leading-normal">
                         {spokenTextParts(
                           line.text,
                           0,
@@ -1574,27 +1574,27 @@ export function AudioDramaPlayer({
                       </button>
                     </div>
                     {isListening ? (
-                      <p role="status" className="text-center text-sm font-semibold text-ink/70">{copy.listening}</p>
+                      <p role="status" className="text-center text-xs font-semibold text-ink/70">{copy.listening}</p>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'error' ? (
-                      <p role="alert" className="rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-3 text-sm font-semibold leading-relaxed text-ink">{speechPractice.message}</p>
+                      <p role="alert" className="rounded-xl border border-rose-500/35 bg-rose-500/10 px-3 py-2 text-xs font-semibold leading-normal text-ink">{speechPractice.message}</p>
                     ) : null}
                     {showSuccessMark ? (
-                      <div role="status" aria-live="assertive" className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-2xl bg-emerald-500/10 py-4 text-emerald-700">
-                        <span aria-hidden="true" className="grid size-20 place-items-center rounded-full border-4 border-emerald-500 bg-emerald-500/15 text-6xl font-black leading-none">✓</span>
-                        <span className="text-sm font-extrabold">{isBn ? 'সঠিক হয়েছে' : 'Correct'}</span>
+                      <div role="status" aria-live="assertive" className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-2xl bg-emerald-500/10 py-3 text-emerald-700">
+                        <span aria-hidden="true" className="grid size-14 place-items-center rounded-full border-4 border-emerald-500 bg-emerald-500/15 text-4xl font-black leading-none">✓</span>
+                        <span className="text-xs font-extrabold">{isBn ? 'সঠিক হয়েছে' : 'Correct'}</span>
                       </div>
                     ) : null}
                     {isCurrentPractice && speechPractice.status === 'result' && comparison && !showSuccessMark ? (
-                      <div role="status" aria-live="polite" className="speech-practice-result space-y-3 text-sm text-ink">
-                        <p className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-extrabold ${
+                      <div role="status" aria-live="polite" className="speech-practice-result space-y-2 text-xs text-ink">
+                        <p className={`flex items-center justify-center gap-1.5 rounded-xl px-2.5 py-1.5 font-extrabold ${
                           getPronunciationFeedbackTier(comparison.accuracy) === 'great'
                             ? 'bg-emerald-500/15 text-emerald-800'
                             : getPronunciationFeedbackTier(comparison.accuracy) === 'good'
                               ? 'bg-amber-400/20 text-amber-800'
                               : 'bg-rose-500/10 text-rose-700'
                         }`}>
-                          <span aria-hidden="true" className="text-2xl">
+                          <span aria-hidden="true" className="text-lg">
                             {getPronunciationFeedbackTier(comparison.accuracy) === 'retry' ? '×' : '✓'}
                           </span>
                           {getPronunciationFeedbackTier(comparison.accuracy) === 'great'
@@ -1604,14 +1604,14 @@ export function AudioDramaPlayer({
                               : (isBn ? 'আরেকবার চেষ্টা করুন।' : 'Try that sentence again.')}
                         </p>
                         <p className="text-center font-bold">{copy.wordMatch}: {comparison.accuracy}%</p>
-                        <p className="text-center text-ink/70">{speechPractice.transcript}</p>
+                        <p className="text-center text-ink/70 italic text-[11px]">{speechPractice.transcript}</p>
                         <p className="flex flex-wrap justify-center gap-1" aria-label={`${copy.wordMatch}: ${comparison.accuracy}%`}>
                           {comparison.targetWords.map((word, wordIndex) => (
                             <span
                               key={`${word}-${wordIndex}`}
                               aria-label={comparison.matchedWords[wordIndex] ? copy.matchedWord : copy.missedWord}
                               style={{ '--enter-delay': `${Math.min(wordIndex, 20) * 35}ms` }}
-                              className={`enter-up rounded-md px-2 py-1 font-semibold text-ink ${
+                              className={`enter-up rounded-md px-1.5 py-0.5 text-xs font-semibold text-ink ${
                                 comparison.matchedWords[wordIndex]
                                   ? 'border border-emerald-500/30 bg-emerald-500/20'
                                   : 'border border-rose-500/30 bg-rose-500/20'
@@ -1621,18 +1621,18 @@ export function AudioDramaPlayer({
                             </span>
                           ))}
                         </p>
-                        <div className="flex flex-col items-center gap-2.5 pt-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5 w-full">
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex, true)}
-                            className="primary-button min-h-12 w-full rounded-xl px-4 py-2.5 text-sm font-black shadow-md"
+                            className="primary-button min-h-[42px] w-full rounded-xl px-3 py-2 text-xs font-black shadow-md"
                           >
                             ✅ {copy.completeLine}
                           </button>
                           <button
                             type="button"
                             onClick={() => advancePracticeLine(lineIndex)}
-                            className="secondary-button min-h-10 w-full rounded-xl border border-gold/40 px-3 py-2 text-xs font-bold text-ink shadow-sm hover:bg-gold/15"
+                            className="secondary-button min-h-[42px] w-full rounded-xl border border-gold/40 px-3 py-2 text-xs font-bold text-ink shadow-sm hover:bg-gold/15"
                           >
                             ⏭️ {currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}
                           </button>
@@ -1640,12 +1640,12 @@ export function AudioDramaPlayer({
                       </div>
                     ) : null}
                     {speechPractice.status !== 'result' ? (
-                      <div className="pt-2 text-center">
+                      <div className="pt-1.5 text-center">
                         <button
                           type="button"
                           onClick={() => advancePracticeLine(lineIndex)}
                           disabled={isListening}
-                          className="secondary-button mx-auto inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-sapphire/25 px-4 py-2 text-xs font-bold text-ink shadow-sm hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50"
+                          className="secondary-button mx-auto inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-sapphire/25 px-4 py-2 text-xs font-bold text-ink shadow-sm hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span>⏭️</span>
                           <span>{currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}</span>

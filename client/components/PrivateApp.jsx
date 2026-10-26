@@ -1875,6 +1875,15 @@ export function PrivateApp() {
     };
     if (!routine.title) return;
 
+    if (routine.startTime && routine.endTime) {
+      const [sh, sm] = routine.startTime.split(':').map(Number);
+      const [eh, em] = routine.endTime.split(':').map(Number);
+      if (((eh || 0) * 60 + (em || 0)) <= ((sh || 0) * 60 + (sm || 0))) {
+        setError(lang === 'bn' ? 'রুটিনের শেষ সময় অবশ্যই শুরুর সময়ের চেয়ে বেশি হতে হবে।' : 'Routine end time must be after start time.');
+        return;
+      }
+    }
+
     // 0ms Optimistic UI update: immediately insert into state and reset form without freezing!
     const optimisticItem = {
       id: clientId,

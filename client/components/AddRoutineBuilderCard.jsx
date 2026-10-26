@@ -109,8 +109,28 @@ export function AddRoutineBuilderCard({ lang = 'bn', copy, busy = false, onSubmi
   const [priority, setPriority] = useState('medium');
   const [isFrog, setIsFrog] = useState(false);
 
+  const toMinutes = (time) => {
+    if (!time || typeof time !== 'string') return 0;
+    const [h, m] = time.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  const isTimeOrderValid = (st, et) => {
+    if (!st || !et) return false;
+    return toMinutes(et) > toMinutes(st);
+  };
+
+  const handleStartTimeChange = (newStart) => {
+    setStartTime(newStart);
+    if (newStart && endTime) {
+      if (toMinutes(endTime) <= toMinutes(newStart)) {
+        setEndTime(addMinutesToTime(newStart, 30));
+      }
+    }
+  };
+
   const routineMood = getRoutineMood(startTime, endTime);
-  const timeInvalid = Boolean(startTime && endTime && routineMood.durationMinutes === 0);
+  const timeInvalid = Boolean(startTime && endTime && !isTimeOrderValid(startTime, endTime));
 
   const applyPreset = (preset) => {
     setTitle(isBn ? preset.bn : preset.en);
@@ -129,7 +149,7 @@ export function AddRoutineBuilderCard({ lang = 'bn', copy, busy = false, onSubmi
 
   const handleFormSubmit = async (event) => {
     event.preventDefault();
-    if (timeInvalid) return;
+    if (timeInvalid || !isTimeOrderValid(startTime, endTime)) return;
     await onSubmitRoutine(event, () => {
       setTitle('');
       setAnchorHabit('');
@@ -238,7 +258,7 @@ export function AddRoutineBuilderCard({ lang = 'bn', copy, busy = false, onSubmi
               type="time"
               required
               value={startTime}
-              onChange={(event) => setStartTime(event.target.value)}
+              onChange={(event) => handleStartTimeChange(event.target.value)}
               className="polished-input mt-1.5 block w-full p-3"
             />
           </label>
@@ -248,6 +268,7 @@ export function AddRoutineBuilderCard({ lang = 'bn', copy, busy = false, onSubmi
               name="endTime"
               type="time"
               required
+              min={startTime}
               value={endTime}
               onChange={(event) => setEndTime(event.target.value)}
               className="polished-input mt-1.5 block w-full p-3"
@@ -288,8 +309,10 @@ export function AddRoutineBuilderCard({ lang = 'bn', copy, busy = false, onSubmi
         </div>
 
         {timeInvalid ? (
-          <p role="alert" className="rounded-xl border border-rose-400 bg-rose-500/15 px-3 py-2 text-xs font-bold text-rose-300">
-            ❌ {copy.timeInvalid}
+          <p role="alert" className="rounded-xl border border-rose-400 bg-rose-500/15 px-3.5 py-2 text-xs font-bold text-rose-300">
+            ❌ {isBn
+              ? `ভুল সময় নির্বাচন: শেষ সময় (${formatNaturalTime(endTime, lang)}) অবশ্যই শুরুর সময়ের (${formatNaturalTime(startTime, lang)}) পরে হতে হবে!`
+              : `Invalid time: End time (${formatNaturalTime(endTime, lang)}) must be after start time (${formatNaturalTime(startTime, lang)})!`}
           </p>
         ) : null}
       </div>
