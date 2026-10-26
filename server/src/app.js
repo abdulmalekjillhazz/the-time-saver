@@ -35,6 +35,7 @@ import { configureCloudinary } from './services/cloudinary.js';
 import { speechRouter } from './routes/speech.js';
 import { announcementsRouter } from './routes/announcements.js';
 import { islamicReflectionsRouter } from './routes/islamicReflections.js';
+import { appVersionRouter } from './routes/appVersion.js';
 
 function normalizeWord(raw) {
   return String(raw || '')
@@ -81,6 +82,7 @@ export function createApp({ config }) {
 
   // Health and readiness go before CSRF and the database guard, so monitors can always reach them.
   app.use('/api', healthRouter(config));
+  app.use('/api/app', appVersionRouter());
 
   // Public word lookup proxy so mobile browsers are never blocked by CSP or CORS.
   const serverWordCache = new Map();

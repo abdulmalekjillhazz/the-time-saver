@@ -71,6 +71,7 @@ const TemplatePicker = dynamic(() => import('./TemplatePicker.jsx').then((m) => 
 const AudioDramaPlayer = dynamic(() => import('./AudioDramaPlayer.jsx').then((m) => m.AudioDramaPlayer), { ssr: false });
 const DailyLessonCard = dynamic(() => import('./DailyLessonCard.jsx').then((m) => m.DailyLessonCard), { ssr: false });
 const GrammarLessons = dynamic(() => import('./GrammarLessons.jsx').then((m) => m.GrammarLessons), { ssr: false });
+const AppUpdateModal = dynamic(() => import('./AppUpdateModal.jsx').then((m) => m.AppUpdateModal), { ssr: false });
 import { ProfileAvatar, ProfileAvatarPicker } from './ProfileAvatar.jsx';
 import { TodayProgressCard } from './TodayProgressCard.jsx';
 import { StoryReader } from './StoryReader.jsx';
@@ -3386,6 +3387,7 @@ export function PrivateApp() {
         />
       )}
       <PointsAwardToast lang={lang} />
+      <AppUpdateModal lang={lang} />
       {reflectionModalOpen && (
         <EveningReflectionModal
           lang={lang}

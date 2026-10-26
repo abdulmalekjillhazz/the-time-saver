@@ -1306,27 +1306,47 @@ export function AudioDramaPlayer({
       aria-label={copy.title}
       className={
         practiceFullscreen
-          ? 'audio-drama-player speech-practice-fullscreen fixed inset-0 z-[120] overflow-y-auto overscroll-y-contain bg-paper'
+          ? 'audio-drama-player speech-practice-fullscreen fixed inset-0 z-[120] flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden bg-paper'
           : isFullscreen
           ? 'audio-drama-player fixed inset-0 z-[120] overflow-y-auto overscroll-y-contain bg-paper p-4 sm:p-8'
           : 'audio-drama-player w-full'
       }
     >
-      <div className={`audio-drama-player-content ${practiceFullscreen ? 'speech-practice-layout mx-auto flex min-h-[100dvh] max-w-4xl flex-col gap-2 p-0 sm:gap-4 sm:p-6' : isFullscreen ? 'mx-auto max-w-4xl space-y-4 p-4 sm:p-8' : 'space-y-3.5'}`}>
+      <div className={`audio-drama-player-content ${practiceFullscreen ? 'speech-practice-layout mx-auto flex h-full max-h-full w-full max-w-2xl flex-1 flex-col justify-between p-0' : isFullscreen ? 'mx-auto max-w-4xl space-y-4 p-4 sm:p-8' : 'space-y-3.5'}`}>
         {practiceFullscreen ? (
-          <div className="speech-practice-exit sticky z-40 flex justify-end bg-paper/95 px-3 py-2 pt-[calc(0.5rem+env(safe-area-inset-top))] sm:px-6" style={{ top: 0 }}>
-            <button
-              type="button"
-              aria-label={isBn ? 'অনুশীলন থেকে বের হন' : 'Exit practice'}
-              onClick={async () => {
-                if (!await cancelSpeechPractice()) return;
-                setSpeechPracticeOpen(false);
-              }}
-              className="speech-practice-exit-button secondary-button min-h-[44px] px-4 py-2 text-sm font-bold"
-            >
-              ⛷️
-            </button>
-          </div>
+          <header className="speech-practice-header flex items-center justify-between gap-3 w-full shrink-0 px-4 pt-[calc(0.65rem+env(safe-area-inset-top))] pb-2 border-b border-gold/15">
+            <div className="speech-practice-exit shrink-0">
+              <button
+                type="button"
+                aria-label={isBn ? 'অনুশীলন থেকে বের হন' : 'Exit practice'}
+                onClick={async () => {
+                  if (!await cancelSpeechPractice()) return;
+                  setSpeechPracticeOpen(false);
+                }}
+                className="speech-practice-exit-button secondary-button min-h-[38px] px-3 py-1.5 text-xs font-bold"
+              >
+                ⛷️
+              </button>
+            </div>
+            {speechPractice.status !== 'complete' ? (
+              <div className="speech-practice-progress-row flex-1" aria-label={copy.practiceProgressLabel}>
+                <span>{completedPracticeLineIndexes.length + 1} / {practiceLines.length}</span>
+                <div
+                  role="progressbar"
+                  aria-label={copy.practiceProgressLabel}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round((completedPracticeLineIndexes.length / practiceLines.length) * 100)}
+                  className="speech-practice-constellation"
+                >
+                  <span aria-hidden="true" style={{ width: `${Math.round((completedPracticeLineIndexes.length / practiceLines.length) * 100)}%` }} />
+                </div>
+                <span>{copy.progressPercent(Math.round((completedPracticeLineIndexes.length / practiceLines.length) * 100))}</span>
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+          </header>
         ) : null}
         {!practiceFullscreen ? (
         <div className="audio-drama-toolbar duo-card grid grid-cols-2 items-center gap-2.5 rounded-2xl border-2 border-gold/40 bg-paper/95 p-3 shadow-lg sm:flex sm:flex-wrap">
@@ -1489,232 +1509,213 @@ export function AudioDramaPlayer({
                 ) : null}
               </div>
             ) : null}
-            {speechPractice.status !== 'complete' ? <div className="speech-practice-step flex-1 flex flex-col justify-between space-y-3 sm:space-y-4">
-              {practiceLines.slice(activePracticeLineIndex, activePracticeLineIndex + 1).map((line, visiblePracticeIndex) => {
-                const lineIndex = activePracticeLineIndex + visiblePracticeIndex;
-                const isCurrentPractice = speechPractice.lineIndex === lineIndex;
-                const isListening = isCurrentPractice && speechPractice.status === 'listening';
-                const comparison = isCurrentPractice ? speechPractice.comparison : null;
-                const attempts = attemptsByLine[lineIndex] || 0;
-                const attemptsExhausted = !canAttemptSpeechPractice(attempts);
-                const hasResult = isCurrentPractice && speechPractice.status === 'result';
-                const showSuccessMark = hasResult
-                  && comparison?.accuracy >= 40
-                  && practiceSuccessLineIndex === lineIndex;
-                const currentStep = completedPracticeLineIndexes.length + 1;
-                const progress = Math.round((completedPracticeLineIndexes.length / practiceLines.length) * 100);
-                return (
-                  <div key={`practice-step-${lineIndex}-${line.character}`} className="speech-practice-step flex-1 flex flex-col justify-between">
-                    <div className="speech-practice-progress-row" aria-label={copy.practiceProgressLabel}>
-                      <span>{currentStep} / {practiceLines.length}</span>
-                      <div
-                        role="progressbar"
-                        aria-label={copy.practiceProgressLabel}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={progress}
-                        className="speech-practice-constellation"
-                      >
-                        <span aria-hidden="true" style={{ width: `${progress}%` }} />
-                      </div>
-                      <span>{copy.progressPercent(progress)}</span>
-                    </div>
-                    {milestoneNotice ? (
-                      <div role="status" className="enter-up flex items-center justify-center gap-2 rounded-xl border border-gold/50 bg-gold/15 px-3 py-2 text-center text-xs font-black text-gold">
-                        <span>🏆</span>
-                        <span>{milestoneNotice}</span>
-                      </div>
-                    ) : null}
+            {speechPractice.status !== 'complete' ? (
+              <div className="speech-practice-step flex-1 flex flex-col justify-between">
+                {practiceLines.slice(activePracticeLineIndex, activePracticeLineIndex + 1).map((line, visiblePracticeIndex) => {
+                  const lineIndex = activePracticeLineIndex + visiblePracticeIndex;
+                  const isCurrentPractice = speechPractice.lineIndex === lineIndex;
+                  const isListening = isCurrentPractice && speechPractice.status === 'listening';
+                  const comparison = isCurrentPractice ? speechPractice.comparison : null;
+                  const attempts = attemptsByLine[lineIndex] || 0;
+                  const attemptsExhausted = !canAttemptSpeechPractice(attempts);
+                  const hasResult = isCurrentPractice && speechPractice.status === 'result';
+                  const showSuccessMark = hasResult
+                    && comparison?.accuracy >= 40
+                    && practiceSuccessLineIndex === lineIndex;
+                  const currentStep = completedPracticeLineIndexes.length + 1;
+                  return (
                     <article
-                    className={`speech-practice-card duo-card flex-1 flex flex-col justify-between rounded-2xl border p-3.5 transition-colors duration-300 sm:p-5 ${
-                      isListening
-                        ? 'border-sapphire/60 bg-sapphire/10 shadow-lg shadow-sapphire/10'
-                        : hasResult
-                          ? 'border-emerald-500/35 bg-emerald-500/5'
-                          : 'border-ink/10 bg-paper/70'
-                    }`}
-                  >
-                    <div className="speech-practice-body my-auto flex flex-1 flex-col justify-center space-y-3.5">
-                      <div className="mb-1 flex items-center gap-2.5">
-                        <span
-                          className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-gold/40 bg-gold/10 text-2xl shadow-inner"
-                          role="img"
-                          aria-label={isBn ? 'চরিত্রের অভিব্যক্তি' : 'Character expression'}
-                        >
-                          {characterIcon(line.role, line.text)}
-                        </span>
-                        <span className="min-w-0 truncate text-xs sm:text-sm font-extrabold text-gold-soft">{line.character}</span>
-                      </div>
-                      <div className="flex items-start">
-                        <p className="speech-practice-sentence min-w-0 max-w-[46ch] flex-1 text-base font-bold leading-relaxed text-ink sm:text-xl sm:leading-normal">
-                          {spokenTextParts(
-                            line.text,
-                            0,
-                            false,
-                            (word, keyId) => handleWordLookup(word, keyId, line.text),
-                            selectedWord,
-                            `practice-${lineIndex}`,
-                            handleSpeakWord,
-                            copy.pronunciationLabel,
-                            null,
-                            false,
-                          )}
-                        </p>
-                      </div>
-                      {microsoftVoices.length ? (
-                        <div className="flex items-center pt-0.5">
-                          <details className="speech-practice-voice-settings">
-                            <summary aria-label={copy.voiceChoice} title={copy.voiceChoice}>
-                              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.2a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.4 15a1.7 1.7 0 0 0-1.56-1.03H6v-2.4h.84A1.7 1.7 0 0 0 8.4 10a1.7 1.7 0 0 0-.34-1.88L8 8.06l1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 12.67 5.2V5h2.4v.2a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.34 10a1.7 1.7 0 0 0 1.56 1.03h.1v2.4h-.1A1.7 1.7 0 0 0 19.4 15Z" />
-                              </svg>
-                            </summary>
-                            <label>
-                              <span className="sr-only">{copy.voiceChoice}</span>
-                              <select
-                                aria-label={copy.voiceChoice}
-                                value={selectedVoiceURI}
-                                onChange={(event) => setSelectedVoiceURI(event.target.value)}
-                              >
-                                <option value="">{copy.defaultVoice}</option>
-                                {microsoftVoices.map((voice) => (
-                                  <option key={speechVoiceKey(voice)} value={speechVoiceKey(voice)}>
-                                    {voice.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </details>
+                      key={`practice-step-${lineIndex}-${line.character}`}
+                      className="speech-practice-card flex-1 flex flex-col justify-between"
+                    >
+                      {milestoneNotice ? (
+                        <div role="status" className="enter-up my-1 flex items-center justify-center gap-2 rounded-xl border border-gold/50 bg-gold/15 px-3 py-1.5 text-center text-xs font-black text-gold">
+                          <span>🏆</span>
+                          <span>{milestoneNotice}</span>
                         </div>
                       ) : null}
-                      {selectedWord?.keyId?.startsWith(`practice-${lineIndex}-`) ? (
-                        <WordMeaningPanel
-                          selectedWord={selectedWord}
-                          onSpeakWord={handleSpeakWord}
-                          onClose={closeWordMeaning}
-                          isBn={isBn}
-                          pronunciationLabel={copy.pronunciationLabel}
-                          floating
-                        />
-                      ) : null}
-                    </div>
 
-                    <div className="speech-practice-bottom mt-auto flex flex-col items-center space-y-2.5 pt-3">
-                      {showSuccessMark ? (
-                        <div role="status" aria-live="assertive" className="flex w-full min-h-16 flex-col items-center justify-center gap-1 rounded-2xl bg-emerald-500/10 py-2.5 text-emerald-700">
-                          <span aria-hidden="true" className="grid size-12 place-items-center rounded-full border-4 border-emerald-500 bg-emerald-500/15 text-3xl font-black leading-none">✓</span>
-                          <span className="text-xs font-extrabold">{isBn ? 'সঠিক হয়েছে' : 'Correct'}</span>
-                          <span className="text-[10px] font-medium text-emerald-800/80">{isBn ? 'পরের বাক্য আসছে...' : 'Next sentence coming...'}</span>
+                      <div className="speech-practice-body my-auto flex flex-1 flex-col justify-center items-center text-center space-y-4 px-3">
+                        <div className="flex items-center justify-center gap-2.5">
+                          <span
+                            className="grid size-12 shrink-0 place-items-center rounded-2xl border-2 border-gold/40 bg-gold/10 text-2xl shadow-inner"
+                            role="img"
+                            aria-label={isBn ? 'চরিত্রের অভিব্যক্তি' : 'Character expression'}
+                          >
+                            {characterIcon(line.role, line.text)}
+                          </span>
+                          <span className="min-w-0 truncate text-sm font-extrabold text-gold-soft">{line.character}</span>
                         </div>
-                      ) : null}
-                      {isCurrentPractice && speechPractice.status === 'result' && comparison && !showSuccessMark ? (
-                        <div role="status" aria-live="polite" className="speech-practice-result w-full space-y-1.5 text-xs text-ink">
-                          <p className={`flex items-center justify-center gap-1.5 rounded-xl px-2.5 py-1 font-extrabold ${
-                            getPronunciationFeedbackTier(comparison.accuracy) === 'great'
-                              ? 'bg-emerald-500/15 text-emerald-800'
-                              : getPronunciationFeedbackTier(comparison.accuracy) === 'good'
-                                ? 'bg-amber-400/20 text-amber-800'
-                                : 'bg-rose-500/10 text-rose-700'
-                          }`}>
-                            <span aria-hidden="true" className="text-base">
-                              {getPronunciationFeedbackTier(comparison.accuracy) === 'retry' ? '×' : '✓'}
-                            </span>
-                            {getPronunciationFeedbackTier(comparison.accuracy) === 'great'
-                              ? (isBn ? 'দারুণ উচ্চারণ!' : 'Great pronunciation!')
-                              : getPronunciationFeedbackTier(comparison.accuracy) === 'good'
-                                ? (isBn ? 'ভালো চেষ্টা—আরেকটু অনুশীলন করুন।' : 'Good try—keep practicing.')
-                                : (isBn ? 'আরেকবার চেষ্টা করুন।' : 'Try that sentence again.')}
+                        <div className="flex items-center justify-center w-full">
+                          <p className="speech-practice-sentence max-w-[40ch] text-xl sm:text-2xl font-black leading-relaxed text-ink selection:bg-gold/30">
+                            {spokenTextParts(
+                              line.text,
+                              0,
+                              false,
+                              (word, keyId) => handleWordLookup(word, keyId, line.text),
+                              selectedWord,
+                              `practice-${lineIndex}`,
+                              handleSpeakWord,
+                              copy.pronunciationLabel,
+                              null,
+                              false,
+                            )}
                           </p>
-                          <p className="text-center font-bold">{copy.wordMatch}: {comparison.accuracy}%</p>
-                          {speechPractice.transcript ? (
-                            <p className="text-center text-ink/70 italic text-[11px]">{speechPractice.transcript}</p>
-                          ) : null}
-                          <p className="flex flex-wrap justify-center gap-1" aria-label={`${copy.wordMatch}: ${comparison.accuracy}%`}>
-                            {comparison.targetWords.map((word, wordIndex) => (
-                              <span
-                                key={`${word}-${wordIndex}`}
-                                aria-label={comparison.matchedWords[wordIndex] ? copy.matchedWord : copy.missedWord}
-                                style={{ '--enter-delay': `${Math.min(wordIndex, 20) * 35}ms` }}
-                                className={`enter-up rounded-md px-1.5 py-0.5 text-xs font-semibold text-ink ${
-                                  comparison.matchedWords[wordIndex]
-                                    ? 'border border-emerald-500/30 bg-emerald-500/20'
-                                    : 'border border-rose-500/30 bg-rose-500/20'
-                                }`}
-                              >
-                                {word}
+                        </div>
+                        {microsoftVoices.length ? (
+                          <div className="flex items-center justify-center pt-0.5">
+                            <details className="speech-practice-voice-settings">
+                              <summary aria-label={copy.voiceChoice} title={copy.voiceChoice}>
+                                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="3" />
+                                  <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20h-2.4v-.2a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.4 15a1.7 1.7 0 0 0-1.56-1.03H6v-2.4h.84A1.7 1.7 0 0 0 8.4 10a1.7 1.7 0 0 0-.34-1.88L8 8.06l1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 12.67 5.2V5h2.4v.2a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.34 10a1.7 1.7 0 0 0 1.56 1.03h.1v2.4h-.1A1.7 1.7 0 0 0 19.4 15Z" />
+                                </svg>
+                              </summary>
+                              <label>
+                                <span className="sr-only">{copy.voiceChoice}</span>
+                                <select
+                                  aria-label={copy.voiceChoice}
+                                  value={selectedVoiceURI}
+                                  onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                                >
+                                  <option value="">{copy.defaultVoice}</option>
+                                  {microsoftVoices.map((voice) => (
+                                    <option key={speechVoiceKey(voice)} value={speechVoiceKey(voice)}>
+                                      {voice.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </details>
+                          </div>
+                        ) : null}
+                        {selectedWord?.keyId?.startsWith(`practice-${lineIndex}-`) ? (
+                          <WordMeaningPanel
+                            selectedWord={selectedWord}
+                            onSpeakWord={handleSpeakWord}
+                            onClose={closeWordMeaning}
+                            isBn={isBn}
+                            pronunciationLabel={copy.pronunciationLabel}
+                            floating
+                          />
+                        ) : null}
+                      </div>
+
+                      <div className="speech-practice-bottom mt-auto flex shrink-0 flex-col items-center space-y-2.5 pt-2 pb-2">
+                        {showSuccessMark ? (
+                          <div role="status" aria-live="assertive" className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 px-5 py-2 text-emerald-600 font-extrabold text-xs sm:text-sm">
+                            <span aria-hidden="true" className="text-base font-black">✓</span>
+                            <span>{isBn ? 'সঠিক হয়েছে! পরের বাক্য আসছে...' : 'Correct! Next sentence coming...'}</span>
+                          </div>
+                        ) : null}
+
+                        {isCurrentPractice && speechPractice.status === 'result' && comparison && !showSuccessMark ? (
+                          <div role="status" aria-live="polite" className="speech-practice-result w-full max-w-sm space-y-1 text-xs text-ink text-center">
+                            <p className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-1 font-extrabold ${
+                              getPronunciationFeedbackTier(comparison.accuracy) === 'great'
+                                ? 'bg-emerald-500/15 text-emerald-800'
+                                : getPronunciationFeedbackTier(comparison.accuracy) === 'good'
+                                  ? 'bg-amber-400/20 text-amber-800'
+                                  : 'bg-rose-500/10 text-rose-700'
+                            }`}>
+                              <span aria-hidden="true" className="text-base">
+                                {getPronunciationFeedbackTier(comparison.accuracy) === 'retry' ? '×' : '✓'}
                               </span>
-                            ))}
-                          </p>
-                        </div>
-                      ) : null}
+                              {getPronunciationFeedbackTier(comparison.accuracy) === 'great'
+                                ? (isBn ? 'দারুণ উচ্চারণ!' : 'Great pronunciation!')
+                                : getPronunciationFeedbackTier(comparison.accuracy) === 'good'
+                                  ? (isBn ? 'ভালো চেষ্টা—আরেকটু অনুশীলন করুন।' : 'Good try—keep practicing.')
+                                  : (isBn ? 'আরেকবার চেষ্টা করুন।' : 'Try that sentence again.')}
+                            </p>
+                            <p className="font-bold">{copy.wordMatch}: {comparison.accuracy}%</p>
+                            {speechPractice.transcript ? (
+                              <p className="text-ink/70 italic text-[11px] truncate max-w-xs mx-auto">{speechPractice.transcript}</p>
+                            ) : null}
+                            <div className="flex flex-wrap justify-center gap-1" aria-label={`${copy.wordMatch}: ${comparison.accuracy}%`}>
+                              {comparison.targetWords.map((word, wordIndex) => (
+                                <span
+                                  key={`${word}-${wordIndex}`}
+                                  aria-label={comparison.matchedWords[wordIndex] ? copy.matchedWord : copy.missedWord}
+                                  style={{ '--enter-delay': `${Math.min(wordIndex, 20) * 35}ms` }}
+                                  className={`enter-up rounded-md px-1.5 py-0.5 text-xs font-semibold text-ink ${
+                                    comparison.matchedWords[wordIndex]
+                                      ? 'border border-emerald-500/30 bg-emerald-500/20'
+                                      : 'border border-rose-500/30 bg-rose-500/20'
+                                  }`}
+                                >
+                                  {word}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
 
-                      {/* Helper button: ONLY when 3 attempts exhausted, positioned right above mic */}
-                      {isCurrentPractice && attemptsExhausted && !showSuccessMark ? (
-                        <div className="w-full text-center">
+                        {/* Helper button: ONLY when 3 attempts exhausted, positioned right above mic */}
+                        {isCurrentPractice && attemptsExhausted && !showSuccessMark ? (
+                          <div className="w-full text-center">
+                            <button
+                              type="button"
+                              onClick={() => listenAndCompletePracticeLine(lineIndex)}
+                              className="mx-auto inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl border-2 border-gold/50 bg-gradient-to-r from-gold/25 via-gold/15 to-gold/25 px-5 py-2 text-xs sm:text-sm font-black text-ink shadow-md hover:bg-gold/30 active:scale-95 transition-all"
+                            >
+                              <span>🎧</span>
+                              <span>{isBn ? 'শুনে বাক্যটি সম্পন্ন করুন (+পয়েন্ট)' : 'Listen & complete (+points)'}</span>
+                            </button>
+                          </div>
+                        ) : null}
+
+                        {/* Compact non-intrusive alert when mic error occurs before 3 attempts */}
+                        {isCurrentPractice && speechPractice.status === 'error' && !attemptsExhausted ? (
+                          <p role="alert" className="mx-auto max-w-xs rounded-xl bg-rose-500/10 px-3 py-1.5 text-center text-xs font-semibold text-rose-600">
+                            {speechPractice.message || copy.microphonePermissionFailed}
+                          </p>
+                        ) : null}
+
+                        <div className="speech-practice-action-dock" role="group" aria-label={copy.practiceActions}>
                           <button
                             type="button"
-                            onClick={() => listenAndCompletePracticeLine(lineIndex)}
-                            className="mx-auto inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl border border-gold/40 bg-gold/15 px-4 py-2 text-xs font-black text-ink shadow-sm hover:bg-gold/25 active:scale-95"
+                            onClick={() => { void practiceLine(lineIndex); }}
+                            aria-label={
+                              isListening
+                                ? copy.stopSpeaking
+                                : isCurrentPractice && speechPractice.status === 'result'
+                                  ? attemptsExhausted ? copy.attemptsLimit : copy.retrySpeaking
+                                  : attemptsExhausted ? copy.attemptsLimit : copy.speakLine
+                            }
+                            aria-pressed={isListening}
+                            disabled={(attemptsExhausted && !isListening) || pronunciationPlaying}
+                            className={`speech-practice-action speech-practice-speak${isListening ? ' is-listening' : ''}`}
                           >
-                            <span>🎧</span>
-                            <span>{isBn ? 'শুনে বাক্যটি সম্পন্ন করুন (+পয়েন্ট)' : 'Listen & complete (+points)'}</span>
+                            {isListening ? (
+                              <span aria-hidden="true" className="speech-practice-stop-mark" />
+                            ) : (
+                              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-8 stroke-current stroke-[2.2]">
+                                <rect x="9" y="3" width="6" height="12" rx="3" />
+                                <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8" />
+                              </svg>
+                            )}
                           </button>
                         </div>
-                      ) : null}
-
-                      {/* Compact non-intrusive alert when mic error occurs before 3 attempts */}
-                      {isCurrentPractice && speechPractice.status === 'error' && !attemptsExhausted ? (
-                        <p role="alert" className="mx-auto max-w-xs rounded-xl bg-rose-500/10 px-3 py-1.5 text-center text-xs font-semibold text-rose-600">
-                          {speechPractice.message || copy.microphonePermissionFailed}
-                        </p>
-                      ) : null}
-
-                      <div className="speech-practice-action-dock" role="group" aria-label={copy.practiceActions}>
-                        <button
-                          type="button"
-                          onClick={() => { void practiceLine(lineIndex); }}
-                          aria-label={
-                            isListening
-                              ? copy.stopSpeaking
-                              : isCurrentPractice && speechPractice.status === 'result'
-                                ? attemptsExhausted ? copy.attemptsLimit : copy.retrySpeaking
-                                : attemptsExhausted ? copy.attemptsLimit : copy.speakLine
-                          }
-                          aria-pressed={isListening}
-                          disabled={(attemptsExhausted && !isListening) || pronunciationPlaying}
-                          className={`speech-practice-action speech-practice-speak${isListening ? ' is-listening' : ''}`}
-                        >
-                          {isListening ? (
-                            <span aria-hidden="true" className="speech-practice-stop-mark" />
-                          ) : (
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="size-7 stroke-current stroke-2">
-                              <rect x="9" y="3" width="6" height="12" rx="3" />
-                              <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8" />
-                            </svg>
-                          )}
-                        </button>
+                        {isListening ? (
+                          <p role="status" className="text-center text-xs font-semibold text-ink/70">{copy.listening}</p>
+                        ) : null}
+                        <div className="text-center pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => advancePracticeLine(lineIndex)}
+                            disabled={isListening}
+                            className="mx-auto inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1 text-xs font-semibold text-ink/60 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                          >
+                            <span>⏭️</span>
+                            <span>{currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}</span>
+                          </button>
+                        </div>
                       </div>
-                      {isListening ? (
-                        <p role="status" className="text-center text-xs font-semibold text-ink/70">{copy.listening}</p>
-                      ) : null}
-                      <div className="text-center pt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => advancePracticeLine(lineIndex)}
-                          disabled={isListening}
-                          className="mx-auto inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-ink/60 hover:text-ink hover:underline disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
-                        >
-                          <span>⏭️</span>
-                          <span>{currentStep < practiceLines.length ? copy.skipLine : copy.finishPractice}</span>
-                        </button>
-                      </div>
-                    </div>
                     </article>
-                  </div>
-                );
-              })}
-            </div> : null}
+                  );
+                })}
+              </div>
+            ) : null}
             {microphoneConsentLine !== null ? (
               <div className="fixed inset-0 z-[130] grid place-items-center bg-black/65 p-4" role="presentation">
                 <div role="dialog" aria-modal="true" aria-labelledby="microphone-permission-title" className="w-full max-w-md space-y-4 rounded-2xl border border-gold/40 bg-paper p-5 text-ink shadow-2xl">
