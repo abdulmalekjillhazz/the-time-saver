@@ -58,7 +58,8 @@ export async function getGrammarSentenceProgress(userId) {
 }
 
 export async function recordGrammarSentenceCompletion({ userId, sourceSlug, sentence, timezone }) {
-  if (!(await isPublishedGrammarSentence(sourceSlug, sentence))) {
+  const isEverydayPractice = sourceSlug === 'everyday-sentence-practice' || sourceSlug === 'core' || sourceSlug.startsWith('everyday-') || sourceSlug.startsWith('core-');
+  if (!isEverydayPractice && !(await isPublishedGrammarSentence(sourceSlug, sentence))) {
     throw new AppError(404, 'NOT_FOUND', {
       en: 'That sentence is not available in a published English story.',
       bn: 'প্রকাশিত ইংরেজি গল্পে এই বাক্যটি পাওয়া যায়নি।',
@@ -410,14 +411,6 @@ export async function recordLearningActivity({ userId, activityType, contentId, 
 }
 
 export async function recordPronunciationPractice({ userId, slug, accuracy, timezone }) {
-  const [publishedStory, dailyStory] = await Promise.all([
-    Lesson.exists({ slug, status: 'published' }),
-    DailyLesson.exists({ slug }),
-  ]);
-  if (!publishedStory && !dailyStory) {
-    throw new AppError(404, 'NOT_FOUND', MSG.notFound);
-  }
-
   const activeDate = todayInZone(timezone || 'Asia/Dhaka');
   const contentId = `story:${slug}`;
   const points = getPronunciationPracticePoints(accuracy);

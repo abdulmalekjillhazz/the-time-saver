@@ -215,3 +215,57 @@ export function evaluateContextSpeech({
     feedback: { en: feedbackEn, bn: feedbackBn },
   };
 }
+
+export async function evaluateContextSpeechWithServerAI({
+  transcript = '',
+  situation,
+  durationSeconds = 0,
+  lang = 'bn',
+}) {
+  const localFallback = evaluateContextSpeech({
+    transcript,
+    situation,
+    durationSeconds,
+  });
+
+  if (!transcript || transcript.trim().length < 5) {
+    return localFallback;
+  }
+
+  try {
+    const res = await fetch('/api/speech/evaluate-context', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transcript,
+        situation: situation ? {
+          id: situation.id,
+          title: situation.title,
+          description: situation.description,
+          expectedKeywords: extractContextKeywords(situation),
+        } : undefined,
+        durationSeconds,
+        lang,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.evaluation && typeof data.evaluation.score === 'number') {
+        return {
+          ...localFallback,
+          ...data.evaluation,
+          wordCount: localFallback.wordCount,
+          durationSeconds: localFallback.durationSeconds,
+          wpm: localFallback.wpm,
+          matchedKeywords: localFallback.matchedKeywords,
+          aiEvaluated: true,
+        };
+      }
+    }
+  } catch {
+    // network or server error, fallback to local heuristic
+  }
+
+  return localFallback;
+}

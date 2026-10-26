@@ -50,15 +50,27 @@ export function LeaderboardPanel({ lang = 'bn' }) {
 
   useEffect(() => {
     let active = true;
-    apiRequest('/api/gamification/leaderboard', { locale: lang })
-      .then(({ members: result }) => {
-        if (active) setMembers(result);
-      })
-      .catch(() => {
-        if (active) setError(copy.error);
-      });
+    const fetchLeaderboard = () => {
+      apiRequest('/api/gamification/leaderboard', { locale: lang })
+        .then(({ members: result }) => {
+          if (active) setMembers(result);
+        })
+        .catch(() => {
+          if (active) setError(copy.error);
+        });
+    };
+    fetchLeaderboard();
+    const handleUpdate = () => fetchLeaderboard();
+    window.addEventListener('smart-routine:learning-activity', handleUpdate);
+    window.addEventListener('smart-routine:points-awarded', handleUpdate);
+    window.addEventListener('smart-routine:sync', handleUpdate);
+    window.addEventListener('focus', fetchLeaderboard);
     return () => {
       active = false;
+      window.removeEventListener('smart-routine:learning-activity', handleUpdate);
+      window.removeEventListener('smart-routine:points-awarded', handleUpdate);
+      window.removeEventListener('smart-routine:sync', handleUpdate);
+      window.removeEventListener('focus', fetchLeaderboard);
     };
   }, [copy.error, lang]);
 

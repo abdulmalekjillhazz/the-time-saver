@@ -183,16 +183,16 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     audio = new globalThis.Audio();
     audio.preload = 'auto';
     audio.volume = currentVolume;
-    audio.onloadedmetadata = () => {
+    const handleMetadata = () => {
       if (id !== runId || !audio) return;
-      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      if (desiredStartIndex > 0 && Number.isFinite(audio.duration) && audio.duration > 0) {
         audio.currentTime = audio.duration * getStoryAudioProgressFromPosition(
           Math.min(desiredStartIndex, lines.length - 1),
           lineWeights,
         );
       }
-      if (!isPaused) void startAudio(id);
     };
+    audio.onloadedmetadata = handleMetadata;
     audio.onplaying = () => {
       if (!syncProgress || id !== runId || !audio || audio.paused) return;
       const progress = Number.isFinite(audio.duration) && audio.duration > 0
@@ -218,6 +218,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     };
     audio.src = src;
     audio.load();
+    if (!isPaused) void startAudio(id);
   };
 
   const configureTimedSegment = (id, segmentIndex, startAtSeconds = 0, audioOverride = null) => {
@@ -235,10 +236,9 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     audio.volume = currentVolume;
     audio.onloadedmetadata = () => {
       if (id !== runId || !audio) return;
-      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      if (startAtSeconds > 0 && Number.isFinite(audio.duration) && audio.duration > 0) {
         audio.currentTime = Math.min(Math.max(0, startAtSeconds), audio.duration);
       }
-      if (!isPaused) void startAudio(id);
     };
     audio.onplaying = () => {
       if (id !== runId || !audio || audio.paused) return;
@@ -284,6 +284,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     audio.src = segment.url || globalThis.URL.createObjectURL(segment.audio);
     if (!segment.url) audioObjectUrl = audio.src;
     audio.load();
+    if (!isPaused) void startAudio(id);
     const nextSegmentIndex = segmentIndex + 1;
     const nextSegment = timedSegments[nextSegmentIndex];
     if (nextSegment?.url) {
@@ -339,6 +340,10 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     } catch (error) {
       if (id !== runId) return;
       if (audioSource === 'cloudinary' && error.name !== 'NotAllowedError' && playOfflineAudio(id)) return;
+      if (error.name === 'NotAllowedError') {
+        onNotice(lang === 'bn' ? 'অডিও শুনতে প্লে বোতামে ট্যাপ করুন' : 'Tap play to listen to audio');
+        return;
+      }
       fail(error.message);
     }
   };
@@ -387,6 +392,11 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
       if (playOfflineAudio(id)) return;
+      if (audioUrl && typeof audioUrl === 'string' && audioUrl.startsWith('http')) {
+        onNotice(lang === 'bn' ? 'গল্পের অডিও চালানো হচ্ছে…' : 'Playing story audio…');
+        configureAudio(id, audioUrl, 'cloudinary', true);
+        return;
+      }
       try {
         const audioData = await apiRequestAudio('/api/speech/audio-drama/free', {
           body: { content, lang },

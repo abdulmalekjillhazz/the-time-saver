@@ -15,6 +15,7 @@ import { CloudinaryApiError, isCloudinaryConfigured } from '../services/cloudina
 import { generateGoogleTtsAudio, GoogleTtsApiError } from '../services/googleTts.js';
 import { logger } from '../lib/logger.js';
 import { parseStoryNarration } from '@smart-routine/shared';
+import { evaluateContextSpeechWithAI } from '../services/contextEvaluation.js';
 
 const MINUTE = 60 * 1000;
 const audioDramaRequest = z.object({
@@ -32,6 +33,17 @@ const pronounceRequest = z.object({
   text: z.string().trim().min(1).max(800),
   lang: z.enum(['bn', 'en']).default('en'),
   speaker: z.string().trim().max(40).optional(),
+}).strict();
+const evaluateContextRequest = z.object({
+  transcript: z.string().trim().min(1).max(10000),
+  situation: z.object({
+    id: z.string().optional(),
+    title: z.union([z.string(), z.record(z.string())]).optional(),
+    description: z.union([z.string(), z.record(z.string())]).optional(),
+    expectedKeywords: z.array(z.string()).optional(),
+  }).passthrough().optional(),
+  durationSeconds: z.number().nonnegative().optional(),
+  lang: z.enum(['bn', 'en']).default('bn'),
 }).strict();
 
 export const googleTtsError = (error) => {
@@ -89,7 +101,7 @@ export const audioDramaError = elevenLabsError;
 
 export function speechRouter({ config = {} } = {}) {
   const router = Router();
-  const effectiveConfig = config.ELEVENLABS_API_KEY ? withDefaultNarrationVoices(config) : config;
+  const effectiveConfig = withDefaultNarrationVoices(config);
   router.use(rateLimit({ name: 'speech-api', limit: 60, windowMs: MINUTE }));
 
   router.get('/config', (_req, res) => {
@@ -198,10 +210,10 @@ export function speechRouter({ config = {} } = {}) {
             bn: 'ElevenLabs-এ সংরক্ষিত গল্পের অডিও শুধু ইংরেজি ভাষার জন্য উপলভ্য।',
           });
         }
-        if (!hasCompleteNarrationVoiceConfig(effectiveConfig) || !isCloudinaryConfigured()) {
+        if (!isCloudinaryConfigured()) {
           throw new AppError(503, 'UNAVAILABLE', {
-            en: 'Configure all four narration voices and Cloudinary to look up saved story audio.',
-            bn: 'সংরক্ষিত গল্পের অডিও খুঁজতে চারটি narration voice ও Cloudinary কনফিগার করুন।',
+            en: 'Configure Cloudinary to look up saved story audio.',
+            bn: 'সংরক্ষিত গল্পের অডিও খুঁজতে Cloudinary কনফিগার করুন।',
           });
         }
         const result = await generateAndUploadAudioDrama({
@@ -260,6 +272,30 @@ export function speechRouter({ config = {} } = {}) {
           logger.warn({ errName: err.name }, 'Offline story audio download failed');
         }
         next(err instanceof AppError ? err : audioDramaError(err));
+      }
+    }
+  );
+
+  router.post(
+    '/evaluate-context',
+    rateLimit({ name: 'speech-evaluate-context', limit: 20, windowMs: 15 * MINUTE }),
+    validate({ body: evaluateContextRequest }),
+    async (req, res, next) => {
+      try {
+        const { transcript, situation = {}, durationSeconds = 0, lang = 'bn' } = req.body;
+        const evaluation = await evaluateContextSpeechWithAI({
+          transcript,
+          situation,
+          durationSeconds,
+          lang,
+          config: effectiveConfig,
+        });
+        return res.json({
+          success: true,
+          evaluation,
+        });
+      } catch (err) {
+        next(err);
       }
     }
   );

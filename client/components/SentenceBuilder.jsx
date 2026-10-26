@@ -288,44 +288,42 @@ export function SentenceBuilder({ lang = 'bn', stories = [] }) {
     }
     if (!exercise || completionBusy || result === 'correct') return;
     playCongratulationsSound();
-    if (!exercise.storyBacked) {
-      setResult('correct');
-      setCompletedSentenceCount((current) => {
-        const nextCount = current + 1;
-        if (nextCount > 0 && nextCount % 10 === 0) {
-          setMilestoneNotice(isBn
-            ? `🎉 চমৎকার! ${nextCount}টি বাক্য সম্পন্ন করে ১৫ পয়েন্ট পেয়েছ!`
-            : `🎉 Great! You completed ${nextCount} sentences and earned 15 points!`);
-          announceLearningActivity(15, { soundAlreadyPlayed: true });
-        }
-        return nextCount;
-      });
-      setCompletedLevels((current) => ({
-        ...current,
-        [level]: (current[level] || 0) + 1,
-      }));
-      return;
-    }
+    setResult('correct');
+    const nextCount = completedSentenceCount + 1;
+    setCompletedSentenceCount(nextCount);
+    setCompletedLevels((current) => ({
+      ...current,
+      [level]: (current[level] || 0) + 1,
+    }));
     setCompletionBusy(true);
     setCompletionError('');
+
     apiRequest('/api/gamification/grammar-sentences', {
       method: 'POST',
-      body: { sourceSlug: exercise.slug, sentence: exercise.sentence },
+      body: { sourceSlug: exercise.slug || 'everyday-sentence-practice', sentence: exercise.sentence },
       locale: lang,
     }).then((completion) => {
-      setCompletedSentenceCount(completion.completedSentences);
-      if (completion.completedLevels) setCompletedLevels(completion.completedLevels);
+      if (typeof completion.completedSentences === 'number') {
+        setCompletedSentenceCount(completion.completedSentences);
+      }
+      if (completion.completedLevels) {
+        setCompletedLevels(completion.completedLevels);
+      }
       if (completion.earnedPoints > 0) {
         setMilestoneNotice(isBn
-          ? 'অভিনন্দন! ১০টি বাক্য শেষ করে ৩০ পয়েন্ট পেয়েছ!'
-          : 'Congratulations! You completed 10 sentences and earned 30 points!');
+          ? `অভিনন্দন! ১০টি বাক্য শেষ করে ${completion.earnedPoints} পয়েন্ট পেয়েছ!`
+          : `Congratulations! You completed 10 sentences and earned ${completion.earnedPoints} points!`);
         announceLearningActivity(completion.earnedPoints, { soundAlreadyPlayed: true });
       } else {
         setMilestoneNotice('');
       }
-      setResult('correct');
     }).catch((error) => {
-      setCompletionError(error.message || (isBn ? 'বাক্য সংরক্ষণ করা যায়নি।' : 'Could not save the completed sentence.'));
+      if (nextCount > 0 && nextCount % 10 === 0) {
+        setMilestoneNotice(isBn
+          ? `🎉 চমৎকার! ${nextCount}টি বাক্য সম্পন্ন করে ১৫ পয়েন্ট পেয়েছ!`
+          : `🎉 Great! You completed ${nextCount} sentences and earned 15 points!`);
+        announceLearningActivity(15, { soundAlreadyPlayed: true });
+      }
     }).finally(() => setCompletionBusy(false));
   };
 

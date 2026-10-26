@@ -17,12 +17,9 @@ import {
 import { apiRequest } from '../lib/apiClient.js';
 import { isAndroidNativeApp, recognizeEnglishSpeech, stopEnglishSpeechRecognition } from '../lib/nativeSpeech.js';
 import { lookupStoryWordMeaning, normalizeWord } from './StoryReader.jsx';
-import {
-  getOfflineStoryAudio,
-  saveOfflineMeanings,
-  saveOfflineStoryAudio,
-} from '../lib/offlineStoryCache.js';
+import { getOfflineStoryAudio, saveOfflineMeanings, saveOfflineStoryAudio } from '../lib/offlineStoryCache.js';
 import { getMicrosoftEnglishVoices, speakNaturalSpeech, speakWithGoogleTts } from '../lib/voiceBriefing.js';
+import { stopActiveAudioPlayback } from '../lib/audioPlayback.js';
 
 const STORY_AUDIO_CACHE_VERSION = 'story-audio-v3-sentence-alignment';
 
@@ -485,6 +482,7 @@ export function AudioDramaPlayer({
         const playback = speakWithGoogleTts(text, {
           lang: 'en',
           locale: lang,
+          endpoint: '/api/speech/pronounce',
           onEnd: finishPronunciation,
           onError: () => {
             if (pronunciationRef.current?.playbackId !== playbackId) return;
@@ -728,6 +726,7 @@ export function AudioDramaPlayer({
 
   useEffect(() => {
     if (!speechPracticeOpen) return;
+    stopActiveAudioPlayback();
     controllerRef.current?.stop?.();
     controllerRef.current?.close?.();
     controllerRef.current?.pause?.();
@@ -736,6 +735,15 @@ export function AudioDramaPlayer({
     pausedRef.current = false;
     setIsPlaying(false);
     setIsPaused(false);
+    stopPronunciation();
+    if (typeof document !== 'undefined') {
+      document.querySelectorAll('audio').forEach((el) => {
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {}
+      });
+    }
     if (typeof globalThis.window !== 'undefined' && globalThis.window?.speechSynthesis) {
       try {
         globalThis.window.speechSynthesis.cancel();
@@ -743,7 +751,7 @@ export function AudioDramaPlayer({
         // Ignore
       }
     }
-  }, [speechPracticeOpen]);
+  }, [speechPracticeOpen, stopPronunciation]);
 
   useEffect(() => {
     const changed = playbackSettingsRef.current.lines !== lines
@@ -954,12 +962,28 @@ export function AudioDramaPlayer({
       [lineIndex]: (previous[lineIndex] || 0) + 1,
     }));
 
-    if (isPlaying || isPaused) {
-      controllerRef.current?.pause();
-      isPlayingRef.current = false;
-      pausedRef.current = false;
-      setIsPlaying(false);
-      setIsPaused(false);
+    stopActiveAudioPlayback();
+    controllerRef.current?.stop?.();
+    controllerRef.current?.close?.();
+    controllerRef.current?.pause?.();
+    controllerRef.current = null;
+    isPlayingRef.current = false;
+    pausedRef.current = false;
+    setIsPlaying(false);
+    setIsPaused(false);
+    stopPronunciation();
+    if (typeof document !== 'undefined') {
+      document.querySelectorAll('audio').forEach((el) => {
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {}
+      });
+    }
+    if (typeof globalThis.window !== 'undefined' && globalThis.window?.speechSynthesis) {
+      try {
+        globalThis.window.speechSynthesis.cancel();
+      } catch {}
     }
 
     if (nativeSpeech) {
@@ -1124,15 +1148,12 @@ export function AudioDramaPlayer({
   };
 
   const submitPracticeScore = async (accuracy) => {
-    if (!slug) {
-      setPracticeScore((score) => ({ ...score, status: 'error' }));
-      return;
-    }
+    const effectiveSlug = slug || title?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'speaking-practice';
     setPracticeScore((score) => ({ ...score, status: 'saving' }));
     try {
       const result = await apiRequest('/api/gamification/pronunciation', {
         method: 'POST',
-        body: { slug, accuracy },
+        body: { slug: effectiveSlug, accuracy },
         locale: lang,
       });
       setPracticeScore((score) => ({
@@ -1141,6 +1162,9 @@ export function AudioDramaPlayer({
         bestAccuracy: result.bestAccuracy,
         earnedPoints: result.earnedPoints,
       }));
+      if (result.earnedPoints > 0) {
+        announceLearningActivity(result.earnedPoints);
+      }
     } catch {
       setPracticeScore((score) => ({ ...score, status: 'error' }));
     }

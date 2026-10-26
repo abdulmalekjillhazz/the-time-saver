@@ -243,7 +243,7 @@ export function speakNaturalSpeech(
   return speakWithVoice(text, { lang, rate, voice, onEnd, onStop, onError, errorMessage });
 }
 
-export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, onError } = {}) {
+export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, onError, endpoint = '/api/speech/briefing' } = {}) {
   const AudioContextConstructor = globalThis.window?.AudioContext
     || globalThis.window?.webkitAudioContext;
   if (typeof AudioContextConstructor !== 'function') throw new Error('This browser cannot play audio.');
@@ -318,7 +318,7 @@ export function speakWithGoogleTts(text, { lang = 'en', locale = 'en', onEnd, on
   // Resume the audio context synchronously from the click gesture, before the network request.
   void audioContext.resume().catch(fail);
 
-  void apiRequestAudio('/api/speech/briefing', {
+  void apiRequestAudio(endpoint, {
     body: { text, lang },
     locale,
     signal: requestController.signal,

@@ -303,6 +303,7 @@ export function GrammarLessons({ lang = 'bn', stories = [] }) {
         {
           lang: 'en',
           locale: 'en',
+          endpoint: '/api/speech/pronounce',
           onEnd: () => {
             speechRef.current = null;
             setVoiceStatus('');

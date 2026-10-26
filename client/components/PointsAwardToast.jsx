@@ -13,10 +13,12 @@ export function PointsAwardToast({ lang = 'bn' }) {
       const awardedPoints = event.detail?.points;
       if (!Number.isSafeInteger(awardedPoints) || awardedPoints <= 0) return;
       if (!event.detail?.soundAlreadyPlayed) playCongratulationsSound();
-      setAward((current) => ({
-        points: current.points + awardedPoints,
-        celebration: current.celebration + 1,
-      }));
+      queueMicrotask(() => {
+        setAward((current) => ({
+          points: current.points + awardedPoints,
+          celebration: current.celebration + 1,
+        }));
+      });
       window.clearTimeout(dismissTimer);
       dismissTimer = window.setTimeout(() => setAward({ points: 0, celebration: 0 }), 3600);
     };

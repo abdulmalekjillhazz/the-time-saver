@@ -473,11 +473,12 @@ async function createAudioDramaAsset({ content, config, signal }) {
   if (isBengaliStoryContent(content)) {
     throw new ElevenLabsApiError(503, 'english_only_policy');
   }
-  if (!hasCompleteNarrationVoiceConfig(config) || !config?.CLOUDINARY_CLOUD_NAME || !config?.CLOUDINARY_API_KEY || !config?.CLOUDINARY_API_SECRET) {
-    throw new Error('All four narration voices and Cloudinary must be configured to save audio dramas.');
+  const effectiveConfig = withDefaultNarrationVoices(config);
+  if (!config?.CLOUDINARY_CLOUD_NAME || !config?.CLOUDINARY_API_KEY || !config?.CLOUDINARY_API_SECRET) {
+    throw new Error('Cloudinary must be configured to check or save audio dramas.');
   }
 
-  const voiceConfigVersion = getNarrationVoiceConfigVersion(config);
+  const voiceConfigVersion = getNarrationVoiceConfigVersion(effectiveConfig);
   const contentHash = crypto.createHash('sha256').update(`${voiceConfigVersion}\n${content}`).digest('hex').slice(0, 24);
   const folder = 'smart-routine/audio-dramas';
   const publicId = `drama-${contentHash}`;
@@ -492,7 +493,7 @@ async function createAudioDramaAsset({ content, config, signal }) {
     }
   }
 
-  if (!config.ELEVENLABS_API_KEY) {
+  if (!effectiveConfig.ELEVENLABS_API_KEY || !hasCompleteNarrationVoiceConfig(effectiveConfig)) {
     throw new ElevenLabsApiError(503, 'api_key_not_configured');
   }
 
