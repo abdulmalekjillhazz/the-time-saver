@@ -62,7 +62,7 @@ describe('alarm server mirror (offline-first)', () => {
   });
 
   it('fetches and acknowledges missed alarms', async () => {
-    stubFetch(async (url, options = {}) => {
+    stubFetch(async (url) => {
       if (url.endsWith('/api/auth/csrf')) return { ok: true, json: async () => ({ csrfToken: 'csrf-1' }) };
       if (url.includes('missed=1')) {
         return {

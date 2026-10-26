@@ -209,7 +209,7 @@ export function completionsRouter() {
       const routine = await Routine.findOne({ _id: routineId, userId: req.userId }).select('fallbackDuration').lean();
       if (!routine) throw new AppError(404, 'NOT_FOUND', MSG.notFound);
       if (fallbackUsed) {
-        if (status !== 'done' || routine.fallbackDuration == null) {
+        if (status !== 'done' || routine.fallbackDuration === null || routine.fallbackDuration === undefined) {
           throw new AppError(400, 'VALIDATION_FAILED', {
             en: 'A short routine version can only be used to complete a routine that has one configured.',
             bn: 'শুধু নির্ধারিত ছোট সংস্করণ থাকা রুটিন সম্পন্ন করতেই এটি ব্যবহার করা যাবে।',

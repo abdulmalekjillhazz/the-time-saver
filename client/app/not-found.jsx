@@ -5,5 +5,11 @@ import './globals.css';
 import { NotFoundScreen } from '../components/StatusViews.jsx';
 
 export default function NotFound() {
-  return <NotFoundScreen fullPage />;
+  return (
+    <html lang="bn">
+      <body>
+        <NotFoundScreen fullPage />
+      </body>
+    </html>
+  );
 }

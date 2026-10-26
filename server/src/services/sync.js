@@ -84,7 +84,7 @@ async function execute(user, op) {
 
 async function createRoutine(user, op) {
   const d = op.data;
-  if (d.fallbackDuration != null && !(await isEnabledFor('routines.microfallbacks', user._id))) {
+  if (d.fallbackDuration !== null && d.fallbackDuration !== undefined && !(await isEnabledFor('routines.microfallbacks', user._id))) {
     throw new AppError(403, 'FEATURE_DISABLED', {
       en: 'Short routine versions are not available for you yet.',
       bn: 'এখন আপনার জন্য ছোট রুটিনের সংস্করণ চালু হয়নি।',
@@ -114,7 +114,7 @@ async function createRoutine(user, op) {
 }
 
 async function updateRoutine(user, op) {
-  if (op.data.fallbackDuration != null && !(await isEnabledFor('routines.microfallbacks', user._id))) {
+  if (op.data.fallbackDuration !== null && op.data.fallbackDuration !== undefined && !(await isEnabledFor('routines.microfallbacks', user._id))) {
     throw new AppError(403, 'FEATURE_DISABLED', {
       en: 'Short routine versions are not available for you yet.',
       bn: 'এখন আপনার জন্য ছোট রুটিনের সংস্করণ চালু হয়নি।',
@@ -159,7 +159,7 @@ async function setCompletion(user, op) {
   const routine = await Routine.findOne({ _id: routineId, userId: user._id }).select('fallbackDuration').lean();
   if (!routine) return { opId: op.opId, status: 'not_found' };
   if (fallbackUsed) {
-    if (status !== 'done' || routine.fallbackDuration == null) {
+    if (status !== 'done' || routine.fallbackDuration === null || routine.fallbackDuration === undefined) {
       throw new AppError(400, 'VALIDATION_FAILED', {
         en: 'A short routine version can only be used to complete a routine that has one configured.',
         bn: 'শুধু নির্ধারিত ছোট সংস্করণ থাকা রুটিন সম্পন্ন করতেই এটি ব্যবহার করা যাবে।',

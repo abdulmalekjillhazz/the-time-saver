@@ -146,7 +146,7 @@ export async function runTelegramNotificationTick({ now = new Date(), token } = 
   return stats;
 }
 
-export async function handleTelegramWebhookUpdate({ update, token, config }) {
+export async function handleTelegramWebhookUpdate({ update, token, config: _config }) {
   if (!update) return { ok: true };
 
   // Handle inline buttons (User clicked: "Done" or "5m")

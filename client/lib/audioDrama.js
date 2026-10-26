@@ -116,7 +116,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   const lineWeights = getStoryLineWeights(lines);
   let releasePlayback = () => {};
   let speechSynthActive = false;
-  let speechSynthLineIndex = 0;
+  let _speechSynthLineIndex = 0;
   const content = storyContent || lines.map(({ character, text }) => `[${character}]: ${text}`).join('\n');
 
   const emitProgress = (position) => {
@@ -334,7 +334,7 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
         finishPlayback(id);
         return;
       }
-      speechSynthLineIndex = lineIdx;
+      _speechSynthLineIndex = lineIdx;
       index = lineIdx;
       const currentLine = lines[lineIdx];
       emitProgress({ index: lineIdx, fraction: 0, wordIndex: 0 });

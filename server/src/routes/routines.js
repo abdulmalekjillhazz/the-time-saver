@@ -50,7 +50,7 @@ export function routinesRouter() {
 
   r.post('/', validate({ body: routineCreateSchema }), async (req, res, next) => {
     try {
-      if (req.body.fallbackDuration != null && !(await isEnabledFor('routines.microfallbacks', req.userId))) {
+      if (req.body.fallbackDuration !== null && req.body.fallbackDuration !== undefined && !(await isEnabledFor('routines.microfallbacks', req.userId))) {
         throw new AppError(403, 'FEATURE_DISABLED', {
           en: 'Short routine versions are not available for you yet.',
           bn: 'এখন আপনার জন্য ছোট রুটিনের সংস্করণ চালু হয়নি।',
@@ -74,7 +74,7 @@ export function routinesRouter() {
       if (!current) throw notFound();
 
       const { expectedVersion, ...changes } = req.body;
-      if (changes.fallbackDuration != null && !(await isEnabledFor('routines.microfallbacks', req.userId))) {
+      if (changes.fallbackDuration !== null && changes.fallbackDuration !== undefined && !(await isEnabledFor('routines.microfallbacks', req.userId))) {
         throw new AppError(403, 'FEATURE_DISABLED', {
           en: 'Short routine versions are not available for you yet.',
           bn: 'এখন আপনার জন্য ছোট রুটিনের সংস্করণ চালু হয়নি।',

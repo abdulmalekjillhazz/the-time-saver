@@ -1,9 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import { createRequire } from 'node:module';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const clientRoot = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 
 export default defineConfig({

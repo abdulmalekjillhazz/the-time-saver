@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { AppError, MSG } from '../lib/AppError.js';
+import { AppError } from '../lib/AppError.js';
 import { isEnabledFor } from '../services/flags.js';
 import { generateSummary } from '../services/weeklySummary.js';
 import { WeeklySummary } from '../models/WeeklySummary.js';

@@ -128,7 +128,7 @@ export function evaluateContextSpeech({
 
   // 1. Strict Relevance Score (out of 40)
   // Requires multiple rich context keywords to score high
-  let relevanceScore = 0;
+  let relevanceScore;
   const matchCount = matchedKeywords.length;
   if (matchCount >= 7) relevanceScore = 40;
   else if (matchCount === 6) relevanceScore = 36;
@@ -145,7 +145,7 @@ export function evaluateContextSpeech({
   const effectiveSeconds = Math.max(8, Math.min(300, durationSeconds));
   const wpm = Math.round((wordCount / effectiveSeconds) * 60);
 
-  let lengthScore = 0;
+  let lengthScore;
   if (wordCount >= 100) lengthScore = 22;
   else if (wordCount >= 70) lengthScore = 18;
   else if (wordCount >= 45) lengthScore = 14;
@@ -153,7 +153,7 @@ export function evaluateContextSpeech({
   else if (wordCount >= 12) lengthScore = 5;
   else lengthScore = 2;
 
-  let paceScore = 0;
+  let paceScore;
   if (wpm >= 65 && wpm <= 135) paceScore = 13;
   else if (wpm >= 40 && wpm <= 155) paceScore = 9;
   else if (wpm >= 20 && wpm <= 175) paceScore = 5;
@@ -165,7 +165,7 @@ export function evaluateContextSpeech({
   const uniqueWords = new Set(words);
   const uniqueCount = uniqueWords.size;
 
-  let vocabPoints = 0;
+  let vocabPoints;
   if (uniqueCount >= 50) vocabPoints = 17;
   else if (uniqueCount >= 35) vocabPoints = 13;
   else if (uniqueCount >= 20) vocabPoints = 9;
@@ -186,8 +186,8 @@ export function evaluateContextSpeech({
   // Total Score (Strict, realistically scaled out of 100)
   const totalScore = Math.min(100, relevanceScore + fluencyScore + vocabularyScore);
 
-  let feedbackEn = '';
-  let feedbackBn = '';
+  let feedbackEn;
+  let feedbackBn;
 
   if (totalScore >= 80) {
     feedbackEn = 'Excellent mastery! You maintained natural fluency, spoke at length, and used rich situational vocabulary.';

@@ -18,7 +18,6 @@ import {
 } from '../services/dailyLesson.js';
 import { recordDailyLessonRead } from '../services/gamification.js';
 import { isEnabledFor } from '../services/flags.js';
-import { SESSION_COOKIE } from '../lib/cookies.js';
 import { loadSession, loadUserForSession } from '../services/session.js';
 import { listPublicLandingQuizzes, submitLandingQuizAnswer } from '../services/landingQuizzes.js';
 

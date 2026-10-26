@@ -4,13 +4,12 @@ import { AppError } from '../lib/AppError.js';
 import { askAI } from './aiProvider.js';
 import { todayInZone } from '@smart-routine/shared';
 
-export async function generateAdaptiveReplan({ routineId, userId, lang = 'bn', timezone = 'Asia/Dhaka', config }) {
+export async function generateAdaptiveReplan({ routineId, userId, lang = 'bn', timezone: _timezone = 'Asia/Dhaka', config }) {
   const routine = await Routine.findOne({ _id: routineId, userId }).lean();
   if (!routine) {
     throw new AppError(404, 'NOT_FOUND', { en: 'Routine not found.', bn: 'রুটিন পাওয়া যায়নি।' });
   }
 
-  const today = todayInZone(timezone);
   const recentCompletions = await Completion.find({
     userId,
     routineId,

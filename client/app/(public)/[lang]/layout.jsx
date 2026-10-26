@@ -13,7 +13,10 @@ export const metadata = {
   applicationName: BRAND,
   manifest: '/manifest.webmanifest',
   icons: {
-    icon: [{ url: '/brand-logo.png', type: 'image/png', sizes: '512x512' }],
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/brand-logo.png', type: 'image/png', sizes: '512x512' },
+    ],
     shortcut: '/brand-logo.png',
     apple: [{ url: '/brand-logo.png', sizes: '512x512', type: 'image/png' }],
   },

@@ -406,7 +406,7 @@ describe('Daily lesson narration', () => {
   it('generates timestamped sentence clips and a reusable Cloudinary manifest', async () => {
     configureCloudinary(config);
     const assets = new Map();
-    const uploadBuffer = vi.fn(async ({ buffer, publicId, folder, resourceType, format }) => {
+    const uploadBuffer = vi.fn(async ({ buffer, publicId, folder, resourceType: _resourceType, format }) => {
       const asset = {
         secure_url: `https://media.example/${publicId}.${format}`,
         bytes: buffer.length,

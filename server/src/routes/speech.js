@@ -7,7 +7,6 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import {
   ElevenLabsApiError,
   generateAndUploadAudioDrama,
-  hasCompleteNarrationVoiceConfig,
   isBengaliStoryContent,
   withDefaultNarrationVoices,
 } from '../services/elevenLabs.js';

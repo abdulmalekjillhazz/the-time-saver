@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { AppError } from '../lib/AppError.js';
 import { User } from '../models/User.js';
 import { sendTelegramMessage, handleTelegramWebhookUpdate } from '../services/telegramBot.js';
 

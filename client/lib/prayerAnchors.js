@@ -33,7 +33,7 @@ export function formatNaturalTime(timeStr, lang = 'bn') {
     const period = h >= 12 ? 'PM' : 'AM';
     return `${h % 12 || 12}:${minutePadded} ${period}`;
   }
-  let periodBn = 'সকাল';
+  let periodBn;
   if (h >= 4 && h < 6) periodBn = 'ভোর';
   else if (h >= 6 && h < 12) periodBn = 'সকাল';
   else if (h >= 12 && h < 15) periodBn = 'দুপুর';

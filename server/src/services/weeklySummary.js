@@ -46,7 +46,7 @@ async function getWeekCompletions(userId, weekEndDate) {
 
 // Builds context about the week's habits for the AI prompt.
 function buildWeekContext(weekData, routines) {
-  const { completions, byDay, startDate, weekEndDate } = weekData;
+  const { completions, byDay } = weekData;
   let context = '';
 
   // Summary of completions per day
