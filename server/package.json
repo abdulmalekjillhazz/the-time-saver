@@ -25,6 +25,7 @@
     "@node-rs/argon2": "^2.2.2",
     "@sentry/node": "^11.7.0",
     "@smart-routine/shared": "*",
+    "body-parser": "^1.20.9",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "date-holidays": "^3.37.0",
