@@ -1,13 +1,14 @@
 {
   "ci": {
     "collect": {
-      "url": ["http://localhost:3000/", "http://localhost:3000/lessons"],
+      "url": ["http://localhost:3000/bn", "http://localhost:3000/bn/lessons"],
       "startServerCommand": "npm run start -w client",
-      "startServerReadyPattern": "started server",
+      "startServerReadyPattern": "Ready in|Local:|ready",
       "numberOfRuns": 3,
       "settings": {
         "emulatedFormFactor": "mobile",
         "throttlingMethod": "simulate",
+        "chromeFlags": "--no-sandbox --headless --disable-gpu",
         "onlyCategories": ["performance", "accessibility", "best-practices", "seo"]
       }
     },
