@@ -422,7 +422,9 @@ export function AudioDramaPlayer({
     const clean = normalizeWord(rawWord);
     if (!clean) return;
 
-    handleSpeakWord(clean);
+    if (!speechPracticeOpen) {
+      handleSpeakWord(clean);
+    }
     const requestId = ++wordLookupRequestRef.current;
     setSelectedWord((prev) => (prev?.keyId === keyId && prev?.meaning ? prev : {
       keyId,
@@ -521,11 +523,13 @@ export function AudioDramaPlayer({
     pronunciationPlaybackIdRef.current += 1;
     const activePlayback = pronunciationRef.current;
     pronunciationRef.current = null;
-    if (activePlayback) {
-      activePlayback.playback?.stop?.();
-    } else {
-      globalThis.window?.speechSynthesis?.cancel();
-    }
+    try {
+      activePlayback?.playback?.stop?.();
+    } catch {}
+    try {
+      globalThis.window?.speechSynthesis?.cancel?.();
+    } catch {}
+    stopActiveAudioPlayback();
     setPronunciationPlaying(false);
   };
 
