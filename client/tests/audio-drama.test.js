@@ -564,4 +564,97 @@ describe('Cloudinary audio drama', () => {
     expect(onNotice).toHaveBeenCalledWith('Playing audio saved on this device.');
     player.close();
   });
+
+  it('plays the direct Cloudinary audioUrl when segmented drama is not available', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = FakeAudio;
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: { message: 'not configured' } }) });
+    const onNotice = vi.fn();
+    const player = playDrama(
+      parseStoryScript('[Storyteller]: The story begins.'),
+      vi.fn(),
+      vi.fn(),
+      { audioUrl: 'https://res.cloudinary.com/test/direct-story.mp3', onNotice },
+    );
+
+    player.play();
+    await vi.waitFor(() => expect(FakeAudio.instances[0]?.play).toHaveBeenCalledOnce());
+
+    expect(FakeAudio.instances[0].src).toBe('https://res.cloudinary.com/test/direct-story.mp3');
+    expect(onNotice).toHaveBeenCalledWith('গল্পের অডিও চালানো হচ্ছে…');
+    player.close();
+  });
+
+  it('falls back to free TTS when Cloudinary audioUrl encounters an error', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = FakeAudio;
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:fallback-free-audio'),
+      revokeObjectURL: vi.fn(),
+    });
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: { message: 'not configured' } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer });
+
+    const player = playDrama(
+      parseStoryScript('[Storyteller]: The story begins.'),
+      vi.fn(),
+      vi.fn(),
+      { audioUrl: 'https://res.cloudinary.com/test/corrupted-audio.mp3' },
+    );
+
+    player.play();
+    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(1));
+    expect(FakeAudio.instances[0].src).toBe('https://res.cloudinary.com/test/corrupted-audio.mp3');
+
+    // Simulate Cloudinary audio failing to load
+    FakeAudio.instances[0].onerror?.();
+
+    await vi.waitFor(() => expect(FakeAudio.instances).toHaveLength(2));
+    expect(FakeAudio.instances[1].src).toBe('blob:fallback-free-audio');
+    player.close();
+  });
+
+  it('falls back to device SpeechSynthesis when both Cloudinary and free Google TTS fail', async () => {
+    FakeAudio.instances = [];
+    globalThis.Audio = FakeAudio;
+    const speakMock = vi.fn();
+    const cancelMock = vi.fn();
+    globalThis.speechSynthesis = {
+      speak: speakMock,
+      cancel: cancelMock,
+      pause: vi.fn(),
+      resume: vi.fn(),
+      getVoices: () => [{ name: 'English Voice', lang: 'en-US' }],
+    };
+    globalThis.SpeechSynthesisUtterance = class {
+      constructor(text) { this.text = text; }
+    };
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: { message: 'not configured' } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ csrfToken: 'test-token' }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: { message: 'rate limited' } }) });
+
+    const onNotice = vi.fn();
+    const player = playDrama(
+      parseStoryScript('[Storyteller]: The story begins.'),
+      vi.fn(),
+      vi.fn(),
+      { onNotice },
+    );
+
+    player.play();
+    await vi.waitFor(() => expect(speakMock).toHaveBeenCalledOnce());
+
+    expect(speakMock.mock.calls[0][0].text).toBe('The story begins.');
+    expect(onNotice).toHaveBeenCalledWith('স্বাভাবিক কণ্ঠে গল্প শোনা হচ্ছে…');
+    player.close();
+    delete globalThis.speechSynthesis;
+    delete globalThis.SpeechSynthesisUtterance;
+  });
 });

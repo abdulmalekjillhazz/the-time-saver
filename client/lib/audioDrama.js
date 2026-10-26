@@ -115,6 +115,8 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   let desiredStartIndex = 0;
   const lineWeights = getStoryLineWeights(lines);
   let releasePlayback = () => {};
+  let speechSynthActive = false;
+  let speechSynthLineIndex = 0;
   const content = storyContent || lines.map(({ character, text }) => `[${character}]: ${text}`).join('\n');
 
   const emitProgress = (position) => {
@@ -143,6 +145,12 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
   const cleanupAudio = () => {
     requestAbortController?.abort();
     requestAbortController = null;
+    if (speechSynthActive) {
+      speechSynthActive = false;
+      try {
+        globalThis.speechSynthesis?.cancel?.();
+      } catch {}
+    }
     if (audio) {
       audio.pause();
       audio.onloadedmetadata = null;
@@ -207,7 +215,14 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     audio.onended = () => finishPlayback(id);
     audio.onerror = () => {
       if (id !== runId) return;
-      if (source === 'cloudinary' && playOfflineAudio(id)) return;
+      if (source === 'cloudinary') {
+        if (playOfflineAudio(id)) return;
+        void fallbackToFreeTts(id);
+        return;
+      }
+      if (source === 'offline') {
+        if (playWithSpeechSynthesis(id)) return;
+      }
       fail(lang === 'bn'
         ? source === 'offline'
           ? 'এই ডিভাইসে রাখা গল্পের অডিও চালানো যায়নি। আবার ডাউনলোড করুন।'
@@ -277,6 +292,8 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     };
     audio.onerror = () => {
       if (id !== runId) return;
+      if (playOfflineAudio(id)) return;
+      if (playWithSpeechSynthesis(id, segmentIndex)) return;
       fail(lang === 'bn'
         ? `গল্পের ${segmentIndex + 1} নম্বর বাক্যের অডিও চালানো যায়নি। আবার চেষ্টা করুন।`
         : `Story sentence ${segmentIndex + 1} could not be played. Please try again.`);
@@ -294,6 +311,68 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       preloadedSegmentIndex = nextSegmentIndex;
       preloadedAudio.load();
     }
+  };
+
+  const playWithSpeechSynthesis = (id, startIndex = desiredStartIndex) => {
+    if (
+      typeof globalThis.speechSynthesis === 'undefined'
+      || typeof globalThis.SpeechSynthesisUtterance === 'undefined'
+      || !lines.length
+    ) {
+      return false;
+    }
+    cleanupAudio();
+    audioSource = 'browser-speech';
+    speechSynthActive = true;
+    audioProgressSynchronized = true;
+    onNotice(lang === 'bn' ? 'স্বাভাবিক কণ্ঠে গল্প শোনা হচ্ছে…' : 'Playing story audio…');
+
+    const speakLine = (lineIdx) => {
+      if (id !== runId || !isPlaying || !speechSynthActive) return;
+      if (lineIdx >= lines.length) {
+        speechSynthActive = false;
+        finishPlayback(id);
+        return;
+      }
+      speechSynthLineIndex = lineIdx;
+      index = lineIdx;
+      const currentLine = lines[lineIdx];
+      emitProgress({ index: lineIdx, fraction: 0, wordIndex: 0 });
+
+      const utterance = new globalThis.SpeechSynthesisUtterance(currentLine.text);
+      utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+      utterance.rate = currentLine.rate || 0.9;
+      utterance.pitch = currentLine.pitch || 1.0;
+
+      try {
+        const voices = globalThis.speechSynthesis.getVoices?.() || [];
+        const matchedVoice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en')) || null;
+        if (matchedVoice) utterance.voice = matchedVoice;
+      } catch {}
+
+      utterance.onend = () => {
+        if (id !== runId || !isPlaying || !speechSynthActive) return;
+        emitProgress({ index: lineIdx, fraction: 1, wordIndex: -1 });
+        speakLine(lineIdx + 1);
+      };
+
+      utterance.onerror = (event) => {
+        if (id !== runId || !speechSynthActive) return;
+        if (event?.error === 'canceled' || event?.error === 'interrupted') return;
+        speakLine(lineIdx + 1);
+      };
+
+      if (!isPaused) {
+        try {
+          globalThis.speechSynthesis.speak(utterance);
+        } catch {
+          speakLine(lineIdx + 1);
+        }
+      }
+    };
+
+    speakLine(Math.min(Math.max(0, Math.floor(startIndex)), lines.length - 1));
+    return true;
   };
 
   const playOfflineAudio = (id) => {
@@ -339,12 +418,48 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
       await audio.play();
     } catch (error) {
       if (id !== runId) return;
-      if (audioSource === 'cloudinary' && error.name !== 'NotAllowedError' && playOfflineAudio(id)) return;
+      if (audioSource === 'cloudinary' && error.name !== 'NotAllowedError') {
+        if (playOfflineAudio(id)) return;
+        void fallbackToFreeTts(id);
+        return;
+      }
       if (error.name === 'NotAllowedError') {
         onNotice(lang === 'bn' ? 'অডিও শুনতে প্লে বোতামে ট্যাপ করুন' : 'Tap play to listen to audio');
         return;
       }
+      if (playWithSpeechSynthesis(id)) return;
       fail(error.message);
+    }
+  };
+
+  const fallbackToFreeTts = async (id) => {
+    if (id !== runId || !isPlaying) return;
+    const abortController = new AbortController();
+    requestAbortController = abortController;
+    try {
+      const audioData = await apiRequestAudio('/api/speech/audio-drama/free', {
+        body: { content, lang },
+        locale: lang,
+        signal: abortController.signal,
+      });
+      if (id !== runId || !isPlaying) return;
+      const fallbackAudio = new Blob([audioData], { type: 'audio/mpeg' });
+      if (slug && typeof globalThis.indexedDB !== 'undefined') {
+        void saveOfflineStoryAudio(slug, offlineAudioKey || content, fallbackAudio).catch(() => {});
+      }
+      if (typeof globalThis.URL?.createObjectURL !== 'function') {
+        throw new Error('Audio playback is unavailable on this device.');
+      }
+      cleanupAudio();
+      audioObjectUrl = globalThis.URL.createObjectURL(fallbackAudio);
+      onNotice(lang === 'bn' ? 'স্বাভাবিক কণ্ঠে গল্প শোনা হচ্ছে…' : 'Playing story audio…');
+      configureAudio(id, audioObjectUrl, 'offline', true);
+    } catch {
+      if (id !== runId) return;
+      if (playWithSpeechSynthesis(id)) return;
+      fail(lang === 'bn'
+        ? 'গল্পের অডিও চালানো যাচ্ছে না। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
+        : 'Story audio could not be played. Check your connection and try again.');
     }
   };
 
@@ -352,11 +467,15 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     if (id !== runId || !isPlaying || !lines.length) return;
     if (playOfflineAudio(id)) return;
     if (globalThis.navigator?.onLine === false) {
+      if (playWithSpeechSynthesis(id)) return;
       fail(lang === 'bn'
         ? 'এই গল্পের অডিও এই ডিভাইসে ডাউনলোড করা নেই। ইন্টারনেটে যুক্ত হয়ে আগে অডিও ডাউনলোড করুন।'
         : 'This story audio is not saved on this device. Connect to the internet and download it first.');
       return;
     }
+    const cleanAudioUrl = typeof audioUrl === 'string' && audioUrl.startsWith('http')
+      ? audioUrl.replace(/^http:\/\//i, 'https://')
+      : '';
     const abortController = new AbortController();
     requestAbortController = abortController;
     try {
@@ -392,34 +511,12 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     } catch (error) {
       if (id !== runId || error.name === 'AbortError') return;
       if (playOfflineAudio(id)) return;
-      if (audioUrl && typeof audioUrl === 'string' && audioUrl.startsWith('http')) {
+      if (cleanAudioUrl) {
         onNotice(lang === 'bn' ? 'গল্পের অডিও চালানো হচ্ছে…' : 'Playing story audio…');
-        configureAudio(id, audioUrl, 'cloudinary', true);
+        configureAudio(id, cleanAudioUrl, 'cloudinary', true);
         return;
       }
-      try {
-        const audioData = await apiRequestAudio('/api/speech/audio-drama/free', {
-          body: { content, lang },
-          locale: lang,
-          signal: abortController.signal,
-        });
-        if (id !== runId || !isPlaying) return;
-        const fallbackAudio = new Blob([audioData], { type: 'audio/mpeg' });
-        if (slug && typeof globalThis.indexedDB !== 'undefined') {
-          void saveOfflineStoryAudio(slug, offlineAudioKey || content, fallbackAudio).catch(() => {});
-        }
-        if (typeof globalThis.URL?.createObjectURL !== 'function') {
-          throw new Error('Audio playback is unavailable on this device.', { cause: error });
-        }
-        cleanupAudio();
-        audioObjectUrl = globalThis.URL.createObjectURL(fallbackAudio);
-        onNotice(lang === 'bn' ? 'স্বাভাবিক কণ্ঠে গল্প শোনা হচ্ছে…' : 'Playing story audio…');
-        configureAudio(id, audioObjectUrl, 'offline', true);
-      } catch {
-        fail(lang === 'bn'
-          ? 'গল্পের অডিও চালানো যাচ্ছে না। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
-          : 'Story audio could not be played. Check your connection and try again.');
-      }
+      await fallbackToFreeTts(id);
     } finally {
       if (requestAbortController === abortController) requestAbortController = null;
     }
@@ -451,12 +548,23 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
     pause() {
       if (!isPlaying || isPaused) return;
       isPaused = true;
+      if (speechSynthActive) {
+        try {
+          globalThis.speechSynthesis?.pause?.();
+        } catch {}
+      }
       audio?.pause();
     },
     resume() {
       if (!isPlaying || !isPaused) return;
       isPaused = false;
-      if (audio) void startAudio(runId);
+      if (speechSynthActive) {
+        try {
+          globalThis.speechSynthesis?.resume?.();
+        } catch {}
+      } else if (audio) {
+        void startAudio(runId);
+      }
     },
     stop(notify = false) {
       runId += 1;
@@ -473,6 +581,13 @@ export function playDrama(lines, onProgress = () => {}, onEnd = () => {}, {
         : 0;
       index = Math.min(Math.floor(target), lines.length - 1);
       desiredStartIndex = target;
+      if (speechSynthActive) {
+        try {
+          globalThis.speechSynthesis?.cancel?.();
+        } catch {}
+        playWithSpeechSynthesis(runId, desiredStartIndex);
+        return;
+      }
       if (timedSegments?.length) {
         const segmentIndex = Math.floor(target);
         const segment = timedSegments[segmentIndex];

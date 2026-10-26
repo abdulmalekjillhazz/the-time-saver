@@ -13,6 +13,7 @@ import {
   getPronunciationFeedbackTier,
   MAX_SPEECH_PRACTICE_ATTEMPTS,
   shouldSubmitPronunciationScore,
+  speechWords,
 } from '../lib/speechPractice.js';
 import { apiRequest } from '../lib/apiClient.js';
 import { isAndroidNativeApp, recognizeEnglishSpeech, stopEnglishSpeechRecognition } from '../lib/nativeSpeech.js';
